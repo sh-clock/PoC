@@ -1,0 +1,76 @@
+name: poc-ci
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the GitHub Release (release assets are FREE, unlike artifacts)
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build (make)
+        run: make -C . all V=1
+
+      - name: Smoke test — engine renders a PNG headlessly
+        run: |
+          # --shot renders one deterministic frame (320x224) to
+          # shots/shot_00000.00.png with no window: proves the release
+          # binary actually runs, not just links.
+          ./fog_poc --glb input/THRF9FD.glb --camdat input/camdat.json \
+                    --input input --shot
+          test -s shots/shot_00000.00.png
+          file shots/shot_00000.00.png
+
+      - name: Upload release assets (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            fog_poc
+            shots/shot_00000.00.png
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with Zig (cross-compile, no mingw toolchain needed)
+        run: |
+          # Same command documented in Makefile.mingw option B.
+          curl -sL https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz | tar -xJ -C "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP/zig-linux-x86_64-0.13.0:$PATH"
+          zig version
+          zig cc -target x86_64-windows-gnu -O2 -std=c99 \
+            -o fog_poc.exe src/fog_poc.c -luser32 -lgdi32
+          file fog_poc.exe
+
+      - name: Upload release assets (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: fog_poc.exe
+
+      - name: Build source tarball (any ref)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git archive --format=tar.gz -o "sh-poc-source.tar.gz" HEAD
+          # attach in the next step
+          echo "TARBALL=sh-poc-source.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Attach source tarball
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ env.TARBALL }}

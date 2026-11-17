@@ -1,0 +1,26 @@
+# Silent Hill fog+snow PoC — Windows cross-compile (STANDALONE exe)
+# Option A: classic MinGW-w64 cross toolchain
+#   make -f Makefile.mingw
+# Option B: Zig (bundles its own MinGW-w64; no toolchain install needed)
+#   zig cc -target x86_64-windows-gnu -O2 -std=c99 -o fog_poc.exe \
+#       src/fog_poc.c -luser32 -lgdi32
+# Result: fog_poc.exe imports only USER32/GDI32/KERNEL32 + the Windows
+# Universal CRT (an OS component on Windows 10/11) - no external DLLs.
+
+MINGW_PREFIX ?= x86_64-w64-mingw32
+CC      := $(MINGW_PREFIX)-gcc
+CFLAGS  := -O2 -std=c99 -Wall -Wextra -Wno-unused-parameter
+LDFLAGS := -static -lm -luser32 -lgdi32
+
+SRC = src/fog_poc.c
+BIN = fog_poc.exe
+
+all: $(BIN)
+
+$(BIN): $(SRC) src/snow_tim_data.h src/sh_font8.h
+	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
+
+clean:
+	rm -f $(BIN)
+
+.PHONY: all clean
