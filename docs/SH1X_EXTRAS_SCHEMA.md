@@ -1,0 +1,190 @@
+# SH1X — Silent Hill 1 IPD→glTF extras schema v2.0
+
+Status: DRAFT (this session). Implementation: `tools/ipd2gltf.py` emits it.
+
+## Goal
+
+Carry **every bit of the source IPD (+ embedded PLM) data** in the GLB so:
+
+1. A **stock glTF viewer** renders the room (with the usual z-buffer artifacts —
+   documented, unavoidable in pure glTF; geometry is emitted at authored
+   positions with NO separation offsets).
+2. A **special software renderer** (fog_poc / wallpaper / camtrack) reads
+   `extras.SH1X` and reproduces the PS1 engine's painter's-algorithm composite
+   **byte-identically** to the game's necessary inputs — no name tables, no
+   hacks, no inferred values: the renderer logic matches
+   `shdecompilations/silent-hill-decomp` exactly.
+
+## Placement
+
+```
+scene.extensions.SH1X (top-level scene extension on scene 0? NO — glTF forbids
+                       custom top-level keys; we use scene.extras.SH1X)
+```
+
+glTF 2.0 allows `extras` on: scenes, nodes, meshes, materials, accessors...
+We use:
+
+- `scenes[0].extras.SH1X` — the room-level verbatim container (header,
+  modelInfos, modelBuffers incl. instances/billboards/subchunkRanges,
+  subcell table, modelOrder, collision, embedded PLM, texture list,
+  file identity). **Byte-identical** reconstruction is possible from this
+  node alone.
+- `nodes[i].extras.SH1X` — per-instance references for renderer convenience:
+  `{ room: <room name>, buffer: <idx>, instance: <idx>, object: <name>,
+     plm_object: <idx into SH1X.plm.objects>, ot_base: <int>,
+     field_B_1: <int>, add_seq: <int — global engine add order> }`.
+  (Derived data, *redundant* by design: every value is derivable from the
+  scene-level container; the C engine's loader is simpler this way.)
+- `meshes[i].extras.SH1X` — per-mesh engine view: `{ plm_object, plm_mesh,
+     vertexOffset, normalOffset, flagsByte }` + `packs` array (see below).
+
+## Scene-level container (the verbatim payload)
+
+```
+SH1X = {
+  schema: "SH1X",  version: 2,
+  room: "HP0003",
+  file: { name: "HP0003.IPD", size: 47104, sha256: "..." },
+
+  header: {          // s_IpdHeader, FILE bytes 0x00..0x54 (84 bytes)
+    magic: 20, isLoaded: 0, chunkX: 0, chunkZ: 3,
+    lmHdrOff: 4372,                    // 0x1114
+    modelInfoCount: 9, modelBufferCount: 9, modelOrderSize: 54,
+    padC: [0,...8 zeros],              // bytes 0x0C..0x14, verbatim
+    modelInfosOff: 0x188, modelBuffersOff: 0x218,
+    textureCount: 0,                   // u8 @0x1C
+    subcellTable: [ [ [start,count] x5 ] x5 ],   // bytes 0x1D..0x51 verbatim
+    modelOrderOff: 0x47C,
+    raw: "<base64 of the 84 header bytes>"
+  },
+
+  modelInfos: [ {     // 9 x s_IpdModelInfo (16B each), verbatim
+    isExternal: 0, pad: [0,0,0], name: "BM11_FAR", modelHdrPtr: 0,
+    raw: "<base64 16B>"
+  } ],
+
+  modelBuffers: [ {   // 9 x s_IpdModelBuffer (24B), verbatim
+    modelInstanceCount: 1, billboardInstanceCount: 0, subchunkCount: 1, pad: 0,
+    minX: 5427, maxX: 5529, minZ: 3481, maxZ: 6040,     // raw s16 Q7.8
+    modelInstancesOff: 0x2F0, billboardInstancesOff: 0x314, subchunkRangesOff: 0x314,
+    instances: [ {     // 36B each, verbatim
+      objIdx: 0, rt: [4096,0,0, 0,4096,0, 0,0,4096], pad: 0,
+      t: [5939, -461, 5530],            // s32 Q8 raw
+      raw: "<base64 36B>"
+    } ],
+    billboards: [ { offset: [s16 x3], idx: s8, pad: s8, raw } ],  // 8B each
+    subchunkRanges: [ { minX,maxX,minZ,maxZ, raw } ],              // 8B each
+    raw: "<base64 24B>"
+  } ],
+
+  modelOrder: [0,1,2,...],            // u8 x modelOrderSize, verbatim
+
+  collision: {          // s_IpdCollisionData @0x54, verbatim
+    positionX: 0, positionZ: 30720,   // s32 Q23.8
+    counts: {splitV: 75, surf: 9, poly: 75, cyl: 0},
+    splitVertices: [ {x,y,z, raw} x75 ],       // s16 Q7.8, 6B each
+    surfaces: [ { offset:[3], floorType, disableHeight, surfaceCacheIdx,
+                   triggerFlagIdx, slopeGradientX, slopeGradientZ, raw } x9 ],
+    polygons: [ { offsetX, offsetY, offsetZ (Q7.8 decoded), triggerFlagIdx,
+                   splitVertexIdx0/1, surfaceIdx0/1, raw } x75 ],  // 10B each
+    cylinders: [ {...} x0 ],
+    cellSize: 512, cellCountX: 20, cellCountZ: 20,
+    shapeAllocs: [ {shapeLutIdx, surfaceLutIdx} x401 ],
+    shapeLut: [u8 x226], surfaceLut: [u8 x25],
+    shapePassCounter: 0, stampBuffer: [u8 x256],
+    raw: "<base64 of the whole collision block>"
+  },
+
+  plm: {              // the embedded LM (s_LmHeader), verbatim
+    magic: 0x0630, version: 6, isLoaded: 0,
+    materialCount: 3, modelCount: 11,
+    order: [0..10],
+    materials: [ { name: "HP1F012", texPtr: 0, fieldC:0, fieldD:0,
+                   fieldE:0, fieldF:0, field10:0, field12:0,
+                   uv14: [0,0], uv16: [0,0], raw: "<base64 24B>" } ],
+    objects: [ {      // s_ModelHeader 16B, verbatim
+      name: "NULL", meshCount: 9, vertexOffset: 0, normalOffset: 0,
+      flagsByte: 0,       // bit0 B0, bits1-3 B1, bits4-5 B4, bits6-7 B6
+      meshes: [ {     // s_MeshHeader 24B, verbatim
+        primitiveCount, vertexCount, normalCount, unkCount3,
+        packs: [ {   // s_Primitive 20B, VERBATIM — the renderer's raw input
+          u0,v0, cba, u1,v1, b6, u2,v2, u3,v3,
+          faces: [4], normalSlots: [4],
+          texIdx: b6&0x7F, semiTransparent: (b6>>7)&1,
+          raw: "<base64 20B>"
+        } ],
+        vertsXY: [ [s16,s16] xN ], vertsZ: [ s16 xN ],
+        normals: [ {nx,ny,nz,slotCount} xN ],
+        slots: [ u8 xN ],
+        raw: "<base64 24B>"
+      } ],
+      raw: "<base64 16B>"
+    } ]
+  },
+
+  textures: [ { name: "HP1F012", tim: "<base64 of the whole TIM file>",
+                clutX:.., clutY:.., ... } ],   // the referenced TIMs verbatim
+
+  render: {          // derived, redundant, for consumer convenience (verified
+                     // to be pure functions of the verbatim data above)
+    otShift: 1,
+    otBaseOfFlagB1: {0:2, 1:0, 2:4, 3:33, 4:66, 5:99},   // func_800571D0
+    mapCell: 10240, scale: 1/256,
+    farCullQ8: ...,   // engine far plane
+    addOrder: "buffers(file order) -> instances -> billboards; meshes in PLM order; packs in order"
+  }
+}
+```
+
+## Coverage matrix (every IPD/PLM byte → SH1X field)
+
+| Source bytes | SH1X location | Verbatim raw | Decoded fields |
+|---|---|---|---|
+| IPD header 0x00–0x54 (84B) | header | ✔ raw b64 | magic, isLoaded, chunkX/Z, lmHdrOff, counts, padC[8], modelInfosOff, modelBuffersOff, textureCount, subcellTable[5][5][2], modelOrderOff |
+| modelInfos 9x16B | modelInfos[] | ✔ | isExternal, pad3, name, modelHdrPtr |
+| modelBuffers 9x24B | modelBuffers[] | ✔ | counts, AABB Q7.8 raw s16, offsets |
+| instances 9x36B | modelBuffers[].instances[] | ✔ | objIdx, rt[9], pad, t[3] |
+| billboards n x8B | modelBuffers[].billboards[] | ✔ | offset[3], idx, pad |
+| subchunkRanges n x8B | modelBuffers[].subchunkRanges[] | ✔ | minX/maxX/minZ/maxZ |
+| modelOrder 54B | modelOrder[] | ✔ (array) | — |
+| collision header 0x54–0x88 (52B) | collision | ✔ (inside raw) | posX/Z, counts, offsets, cellSize, cells, LUT sizes, passCounter |
+| stampBuffer 256B | collision.stampBuffer | ✔ | — |
+| splitV 75x6B | collision.splitVertices[] | ✔ | x,y,z |
+| surfaces 9x12B | collision.surfaces[] | ✔ | offset, floorType, disableHeight, cacheIdx, trigIdx, gradients |
+| polygons 75x10B | collision.polygons[] | ✔ | offsets, trigIdx, split/surface indices |
+| cylinders n x10B | collision.cylinders[] | ✔ | floorType, disableHeight, trigIdx, offset, radius |
+| shapeAllocs 401x4B | collision.shapeAllocs[] | ✔ | lut index pairs |
+| shapeLut 226B | collision.shapeLut | ✔ | — |
+| surfaceLut 25B | collision.surfaceLut | ✔ | — |
+| PLM header 20B | plm | ✔ | magic, version, counts, offsets |
+| PLM order | plm.order | ✔ | — |
+| materials 3x24B | plm.materials[] | ✔ | all 9 fields incl. texPtr |
+| objects 11x16B | plm.objects[] | ✔ | name, meshCount, vertexOffset, normalOffset, flagsByte |
+| meshes n x24B | plm.objects[].meshes[] | ✔ | counts + 5 offsets |
+| packs n x20B | ...meshes[].packs[] | ✔ | u/v x4, cba, b6, faces[4], normalSlots[4] |
+| vertsXY n x4B | ...meshes[].vertsXY | ✔ | — |
+| vertsZ n x2B | ...meshes[].vertsZ | ✔ | — |
+| normals n x4B | ...meshes[].normals[] | ✔ | nx,ny,nz,slotCount |
+| slots n x1B | ...meshes[].slots | ✔ | — |
+| TIM files | textures[] | ✔ whole-file b64 | parsed dims for reference |
+
+**Nothing is dropped, reinterpreted, or replaced.** Unknown/pad bytes ride along
+in the `raw` base64 blobs AND as explicit arrays where their layout is known.
+
+## Renderer contract (the consumer side — decomp-verbatim)
+
+1. Read `SH1X` from `scenes[0].extras` (fallback: per-node extras).
+2. Rebuild in memory: `modelInfos`, `modelBuffers` (with instance transforms),
+   `modelOrder`, the subcell table, and the PLM object/mesh/pack tables.
+3. Per frame (decomp `WorldMap_Draw`):
+   - subcell (z,x) from camera → range `[start, start+count)` of modelOrder;
+   - for each buffer index in range: `WorldMap_SubchunkVisibleCheck`;
+   - for each instance: set `modelCoord.workm = rt,t` (+chunkEdge), walk
+     meshes; `Gfx_MeshDraw` semantics:
+     - quad depth = MAX of 4 vertex SZ (Q8), `<=32→32`, `>far→skip`;
+     - bucket = `ot_base + (maxZ >> 3)` (otShift 1);
+     - backface cull = dual gte_NormalClip test;
+     - semi-transparency from pack b6 bit 7 (engine bit15 of the u16);
+   - billboards after the buffer's instances.
+4. OT walk far→near, LIFO within bucket. No z-buffer anywhere.

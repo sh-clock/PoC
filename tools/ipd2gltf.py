@@ -1043,6 +1043,10 @@ class Pack:
     uv: tuple            # ((u0,v0),(u1,v1),(u2,v2),(u3,v3))
     faces: tuple
     normal_slots: tuple
+    b6: int = 0          # raw byte @6 of s_Primitive (the u16 'bits1' low
+                         # byte — set to s_Material::field_E by the engine)
+    b7: int = 0          # raw byte @7 (texIdx:7 | stp:1) — the engine's
+                         # bits1.flags bit-15 semi-transparency test
 
 
 @dataclass
@@ -1052,6 +1056,9 @@ class Mesh:
     slot_normal: list     # slot -> A-group index
     slot_vertex: bytes    # slot -> vertex index
     packs: list
+    verts_xy: tuple = ()  # raw s16 (x,y) pairs per vertex (SH1X verbatim)
+    verts_z: tuple = ()   # raw s16 z per vertex (SH1X verbatim)
+    header_raw: bytes = b""   # the 24B s_MeshHeader verbatim
 
 
 @dataclass
@@ -1061,6 +1068,7 @@ class PlmObject:
     vertex_offset: int     # byte @9 [s_ModelHeader.vertexOffset]
     normal_offset: int     # byte @10 [s_ModelHeader.normalOffset]
     meshes: list
+    header_raw: bytes = b""   # the 16B s_ModelHeader verbatim (SH1X)
 
     # ---- s_ModelHeader flag bitfield (decomp formats/model.h, verbatim) ----
     @property
@@ -1116,6 +1124,14 @@ class PlmLibrary:
     tex_names: list
     objects: dict          # name -> PlmObject (first match, legacy-identical)
     obj_order: list
+    header_raw: bytes = b""     # the 20B s_LmHeader verbatim (SH1X)
+    tex_raws: tuple = ()        # per-material 24B raw blocks (SH1X)
+    order_raw: tuple = ()       # u8 model order verbatim (SH1X)
+    trailing_raw: bytes = b""   # bytes after the last mesh table — SH1X
+                                # (some PLMs carry unreferenced trailing
+                                # data; the contract is EVERY byte)
+    all_objects: list = field(default_factory=list)   # EVERY object header
+                                # in FILE order, duplicates included (SH1X)
 
     @classmethod
     def parse(cls, data, base, source_name):
@@ -1133,10 +1149,16 @@ class PlmLibrary:
                 f"({data[base + 9:base + 12].hex()}) - refusing to guess")
         obj_start = u32(data, base + 12)
         tex_names = []
+        tex_raws = []
         for t in range(tex_num):
             o = base + tex_off + 24 * t
             tex_names.append(data[o:o + 24].decode("ascii", "replace").rstrip("\x00"))
-        lib = cls(source_name, tex_names, {}, [])
+            tex_raws.append(bytes(data[o:o + 24]))
+        order_raw = tuple(data[base + u32(data, base + 16) + i]
+                          for i in range(obj_num))
+        lib = cls(source_name, tex_names, {}, [],
+                  header_raw=bytes(data[base:base + 20]),
+                  tex_raws=tuple(tex_raws), order_raw=order_raw)
         for i in range(obj_num):
             ooff = base + obj_start + 16 * i
             name = data[ooff:ooff + 8].decode("ascii", "replace").rstrip("\x00")
@@ -1178,10 +1200,13 @@ class PlmLibrary:
                     raise ValueError(
                         f"{source_name}:{name} mesh{m}: table out of file bounds")
                 verts = []
+                verts_xy = []
+                verts_z = []
                 for v in range(vert_num):
-                    verts.append((s16(data, base + vxy_off + v * 4),
-                                  s16(data, base + vxy_off + v * 4 + 2),
-                                  s16(data, base + vz_off + v * 2)))
+                    verts_xy.append((s16(data, base + vxy_off + v * 4),
+                                     s16(data, base + vxy_off + v * 4 + 2)))
+                    verts_z.append(s16(data, base + vz_off + v * 2))
+                    verts.append((verts_xy[-1][0], verts_xy[-1][1], verts_z[-1]))
                 normals_a = []
                 for n in range(num_c):
                     o = base + nrm_off + n * 4
@@ -1207,12 +1232,25 @@ class PlmLibrary:
                                u8(data, poff + 14), u8(data, poff + 15)),
                         normal_slots=(u8(data, poff + 16), u8(data, poff + 17),
                                       u8(data, poff + 18), u8(data, poff + 19)),
+                        b6=u8(data, poff + 6),
+                        b7=b7,
                     ))
-                meshes.append(Mesh(verts, normals_a, slot_normal, slot_vertex, packs))
-            obj = PlmObject(name, d_flag, vert_off, nrm_off, meshes)
+                meshes.append(Mesh(verts, normals_a, slot_normal, slot_vertex, packs,
+                                   verts_xy=tuple(verts_xy),
+                                   verts_z=tuple(verts_z),
+                                   header_raw=bytes(data[moff:moff + 24])))
+            obj = PlmObject(name, d_flag, vert_off, nrm_off, meshes,
+                            header_raw=bytes(data[ooff:ooff + 16]))
             lib.obj_order.append(name)
+            # SH1X keeps EVERY object header (duplicates included) keyed by
+            # their file index — the verbatim contract; `objects` (name ->
+            # first match) stays legacy-identical for the render path.
+            lib.all_objects.append(obj)
             if name not in lib.objects:      # first match wins (legacy-identical)
                 lib.objects[name] = obj
+        # SH1X: capture every byte after the last table (unreferenced
+        # trailing data some PLMs carry) — computed by the caller, which
+        # knows the file end (parse_ipd sets trailing_raw).
         return lib
 
 
@@ -1613,6 +1651,136 @@ LEAF_TEXTURE_W, LEAF_TEXTURE_H = 64, 64     # the engine UV window size
 # IPD parsing (room assembly)
 # ---------------------------------------------------------------------------
 @dataclass
+class CollisionData:
+    """s_IpdCollisionData @0x54, fully parsed + verbatim (SH1X contract).
+
+    Array offsets in the FILE are RELATIVE TO 0x54 (the collision block
+    start) — measured on HP0000..HP0003 + THRF9FD (the splitV/surf/poly
+    tables tile the region between modelOrder and the PLM exactly when
+    read as 0x54+field; absolute-reading overlaps the instance tables).
+    """
+    position_x: int = 0            # s32 Q23.8
+    position_z: int = 0
+    n_split_v: int = 0
+    n_surface: int = 0
+    n_polygon: int = 0
+    n_cylinder: int = 0
+    split_vertices: tuple = ()      # ((x,y,z) s16 Q7.8, ...)
+    surfaces: tuple = ()           # dicts, parsed bitfields
+    polygons: tuple = ()           # dicts
+    cylinders: tuple = ()
+    cell_size: int = 0             # s16 Q8
+    cell_count_x: int = 0
+    cell_count_z: int = 0
+    shape_allocs: tuple = ()       # ((shapeLutIdx, surfaceLutIdx) s16, ...)
+    shape_lut_size: int = 0
+    surface_lut_size: int = 0
+    shape_lut: tuple = ()           # u8
+    surface_lut: tuple = ()         # u8
+    shape_pass_counter: int = 0
+    stamp_buffer: tuple = ()        # u8 x 256
+    header_raw: bytes = b""        # 0x54..0x88 verbatim
+
+
+def parse_collision(data):
+    """Parse the s_IpdCollisionData at FILE offset 0x54 (fixed header
+    position; ipd.ksy collision_offset).  Offsets are collision-relative."""
+    co = 0x54
+    if len(data) < co + 0x34:
+        return None
+    c = CollisionData()
+    c.position_x, c.position_z = s32(data, co), s32(data, co + 4)
+    c.n_split_v, c.n_surface, c.n_polygon, c.n_cylinder = (
+        data[co + 8], data[co + 9], data[co + 10], data[co + 11])
+    # array offsets are RELATIVE TO THE COLLISION BLOCK (0x54): the runtime
+    # struct's pointers are ipdHdr-relative and PTR_OFFSET_RESOLVE'd against
+    # the collision block start; measured — the splitV/surf/poly tables then
+    # tile the gap between modelOrder and the PLM exactly (HP0003:
+    # 0x4b4..0x1113 vs lmHdr 0x1114).
+    sv_off, su_off, pg_off, cy_off = struct.unpack_from("<IIII", data, co + 12)
+    sa_off = u32(data, co + 0x20)
+    sv_off += co; su_off += co; pg_off += co; cy_off += co; sa_off += co
+    c.cell_size = s16(data, co + 0x1C)
+    c.cell_count_x, c.cell_count_z = data[co + 0x1E], data[co + 0x1F]
+    c.shape_lut_size, c.surface_lut_size = u16(data, co + 0x24), u16(data, co + 0x24 + 2)
+    shl_off, sul_off = struct.unpack_from("<II", data, co + 0x28)
+    shl_off += co; sul_off += co
+    c.shape_pass_counter = data[co + 0x30]
+    c.stamp_buffer = tuple(data[co + 0x34:co + 0x134])
+    c.header_raw = bytes(data[co:co + 0x34])
+    end = len(data)
+    def ok(off, n):
+        return off + n <= end
+    if ok(sv_off, c.n_split_v * 6) and c.n_split_v:
+        c.split_vertices = tuple(
+            struct.unpack_from("<3h", data, sv_off + 6 * i)
+            for i in range(c.n_split_v))
+    if ok(su_off, c.n_surface * 12) and c.n_surface:
+        surfs = []
+        for i in range(c.n_surface):
+            o = su_off + 12 * i
+            u16v = u16(data, o + 6)
+            surfs.append({
+                "offset": list(struct.unpack_from("<3h", data, o)),
+                "floorType": u16v & 0x1F,
+                "disableHeight": (u16v >> 5) & 7,
+                "surfaceCacheIdx": (u16v >> 8) & 3,
+                "triggerFlagIdx": (u16v >> 11) & 0xF,
+                "slopeGradientX": s16(data, o + 8),
+                "slopeGradientZ": s16(data, o + 10),
+                "raw": bytes(data[o:o + 12]),
+            })
+        c.surfaces = tuple(surfs)
+    if ok(pg_off, c.n_polygon * 10) and c.n_polygon:
+        polys = []
+        for i in range(c.n_polygon):
+            o = pg_off + 10 * i
+            # decomp s_IpdPolygon layout (formats/ipd.h), 10 bytes:
+            #   bytes 0-1: offsetX:14 | triggerFlagIdxHigh:2   (u16)
+            #   bytes 2-3: offsetY:14 | triggerFlagIdxLow:2    (u16)
+            #   bytes 4-5: offsetZ (s16, no bits)
+            #   bytes 6-9: splitVertexIdx0/1, surfaceIdx0/1
+            # ksy combines the trigger bits as (low << 2) | high.
+            wx, wy = u16(data, o), u16(data, o + 2)
+            polys.append({
+                "offsetX": wx & 0x3FFF,
+                "offsetY": wy & 0x3FFF,
+                "offsetZ": s16(data, o + 4),
+                "triggerFlagIdx": ((wy >> 14) & 3) << 2 | ((wx >> 14) & 3),
+                "splitVertexIdx0": data[o + 6],
+                "splitVertexIdx1": data[o + 7],
+                "surfaceIdx0": data[o + 8],
+                "surfaceIdx1": data[o + 9],
+                "raw": bytes(data[o:o + 10]),
+            })
+        c.polygons = tuple(polys)
+    if ok(cy_off, c.n_cylinder * 10) and c.n_cylinder:
+        cyls = []
+        for i in range(c.n_cylinder):
+            o = cy_off + 10 * i
+            u16v = u16(data, o)
+            cyls.append({
+                "floorType": u16v & 0x1F,
+                "disableHeight": (u16v >> 5) & 7,
+                "triggerFlagIdx": (u16v >> 12) & 0xF,
+                "offset": list(struct.unpack_from("<3h", data, o + 2)),
+                "radius": s16(data, o + 8),
+                "raw": bytes(data[o:o + 10]),
+            })
+        c.cylinders = tuple(cyls)
+    n_alloc = (c.cell_count_x * c.cell_count_z) + 1
+    if ok(sa_off, n_alloc * 4) and n_alloc > 1:
+        c.shape_allocs = tuple(
+            struct.unpack_from("<2h", data, sa_off + 4 * i)
+            for i in range(n_alloc))
+    if ok(shl_off, c.shape_lut_size) and c.shape_lut_size:
+        c.shape_lut = tuple(data[shl_off:shl_off + c.shape_lut_size])
+    if ok(sul_off, c.surface_lut_size) and c.surface_lut_size:
+        c.surface_lut = tuple(data[sul_off:sul_off + c.surface_lut_size])
+    return c
+
+
+@dataclass
 class Instance:
     obj_name: str
     source: str            # 'ipd' | 'glb'
@@ -1625,6 +1793,8 @@ class Instance:
     resolved_lib: object = None   # PlmLibrary the object was imported from
     resolved_from: str = ""      # index label of that library
     resolved_obj_name: str = ""  # object name inside resolved_lib (prefix case)
+    obj_idx: int = -1      # modelInfos index (the engine's obj_id) — SH1X
+    raw: bytes = b""       # the 36B s_IpdModelInstance verbatim — SH1X
 
     @property
     def lookup_name(self):
@@ -1657,6 +1827,17 @@ class Room:
     # per-buffer billboard anchor records, keyed by buffer index (the engine
     # draws a buffer's field_10 anchors AFTER that buffer's instances)
     buffer_billboards: dict = field(default_factory=dict)
+    # ---- SH1X verbatim capture (byte-identical extras contract) ----
+    header_raw: bytes = b""            # the 84B s_IpdHeader verbatim
+    model_info_raws: tuple = ()        # per-modelInfo 16B raw blocks
+    model_buffer_raws: tuple = ()      # per-modelBuffer 24B raw blocks
+    billboard_raws: dict = field(default_factory=dict)   # buffer -> [8B blocks]
+    subchunk_raws: dict = field(default_factory=dict)    # buffer -> [8B blocks]
+    file_size: int = 0
+    file_sha256: str = ""
+    # collision (s_IpdCollisionData @0x54) — fully parsed + verbatim
+    collision: object = None
+    collision_raw: bytes = b""          # 0x54 .. lmHdr (incl. arrays) verbatim
 
 
 def parse_ipd(path, resolver):
@@ -1664,6 +1845,10 @@ def parse_ipd(path, resolver):
     data = open(path, "rb").read()
     stem = os.path.splitext(os.path.basename(path))[0]
     room = Room(stem, path, s8(data, 2), s8(data, 0 + 3), pos_num=u8(data, 9))
+    room.file_size = len(data)
+    room.file_sha256 = hashlib.sha256(data).hexdigest()
+    room.header_raw = bytes(data[0:0x54])
+    room.collision = parse_collision(data)
     if u8(data, 0) != 0x14:
         raise ValueError(f"{stem}: bad IPD id 0x{u8(data, 0):02X}")
     plm_off = u32(data, 4)
@@ -1680,6 +1865,25 @@ def parse_ipd(path, resolver):
     data_off = u32(data, 24)
     order_off = u32(data, 80)               # [modelOrderList]
     room.plm = PlmLibrary.parse(data, plm_off, f"{stem}(embedded)")
+    # SH1X: the full verbatim collision block (header + arrays) spans
+    # 0x54 .. plm_off (the PLM start) — includes every array between.
+    room.collision_raw = bytes(data[0x54:plm_off]) if plm_off > 0x54 else b""
+    # SH1X: unreferenced trailing bytes of the embedded PLM (after the
+    # LAST mesh table, to the file end) — the byte-identical contract.
+    last_end = plm_off + 20
+    for obj in room.plm.all_objects:
+        for mesh in obj.meshes:
+            # every table of this mesh, PLM-relative
+            mh = mesh.header_raw
+            po, vx, vz, nm_, sl = struct.unpack_from("<IIIII", mh, 4)
+            last_end = max(last_end,
+                           plm_off + po + len(mesh.packs) * 20,
+                           plm_off + vx + len(mesh.verts) * 4,
+                           plm_off + vz + len(mesh.verts) * 2,
+                           plm_off + nm_ + len(mesh.normals_a) * 4,
+                           plm_off + sl + len(mesh.slot_vertex))
+    if len(data) > last_end:
+        room.plm.trailing_raw = bytes(data[last_end:])
     glb_ent = resolver.find_glb(stem)
     room.glb = None
     if glb_ent is not None:
@@ -1740,6 +1944,7 @@ def parse_ipd(path, resolver):
             f"deviation) and reported here")
     # name list
     names = []
+    model_info_raws = []
     for i in range(obj_num):
         o = name_off + 16 * i
         if o + 16 > len(data):
@@ -1747,7 +1952,10 @@ def parse_ipd(path, resolver):
             break
         names.append((s32(data, o),
                       data[o + 4:o + 12].decode("ascii", "replace").rstrip("\x00")))
+        model_info_raws.append(bytes(data[o:o + 16]))
+    room.model_info_raws = tuple(model_info_raws)
     used_names = set()
+    model_buffer_raws = []
     for pi in range(pos_num):
         poff = data_off + 24 * pi
         if poff + 24 > len(data):
@@ -1755,8 +1963,13 @@ def parse_ipd(path, resolver):
             break
         pobj_num = u8(data, poff)
         unk1_num = u8(data, poff + 1)
+        unk2_num = u8(data, poff + 2)
+        model_buffer_raws.append(bytes(data[poff:poff + 24]))
         pdata_off = u32(data, poff + 12)
         punk1_off = u32(data, poff + 16)
+        punk2_off = u32(data, poff + 20)
+        room.billboard_raws[pi] = []
+        room.subchunk_raws[pi] = []
         for j in range(pobj_num):
             doff = pdata_off + 36 * j
             if doff + 36 > len(data):
@@ -1774,11 +1987,13 @@ def parse_ipd(path, resolver):
             if flag == 0:
                 used_names.add(name)
                 room.instances.append(Instance(name, "ipd", rt, (tx, ty, tz), ctx,
-                                               group=pi))
+                                               group=pi, obj_idx=obj_id,
+                                               raw=bytes(data[doff:doff + 36])))
             elif flag == 1:
                 used_names.add(name)
                 room.instances.append(Instance(name, "glb", rt, (tx, ty, tz), ctx,
-                                               group=pi))
+                                               group=pi, obj_idx=obj_id,
+                                               raw=bytes(data[doff:doff + 36])))
             else:
                 room.problems.append(f"{stem}: unknown objname flag {flag} for {name!r}")
         # ---- billboard foliage anchor table ("unk1" / decomp field_10) ------
@@ -1823,6 +2038,8 @@ def parse_ipd(path, resolver):
                     f"{stem}: pos group {pi} billboard entry {k} out of bounds")
                 break
             sx, sy, sz, sw = struct.unpack_from("<4h", data, punk1_off + 8 * k)
+            room.billboard_raws[pi].append(
+                bytes(data[punk1_off + 8 * k:punk1_off + 8 * k + 8]))
             if sw not in BILLBOARD_TYPES:
                 room.problems.append(
                     f"{stem}: pos group {pi} billboard entry {k}: unknown "
@@ -1841,6 +2058,15 @@ def parse_ipd(path, resolver):
                 {"group": pi, "index": k, "x": sx, "y": sy, "z": sz,
                  "w": sw, "cluster": BILLBOARD_TYPES[sw]["name"],
                  "quads": len(BILLBOARD_TYPES[sw]["quads"])})
+        # subchunk visibility ranges (s_SubchunkRange 8B each) — SH1X verbatim
+        for k in range(unk2_num):
+            if punk2_off + 8 * k + 8 > len(data):
+                room.problems.append(
+                    f"{stem}: pos group {pi} subchunk range {k} out of bounds")
+                break
+            room.subchunk_raws[pi].append(
+                bytes(data[punk2_off + 8 * k:punk2_off + 8 * k + 8]))
+    room.model_buffer_raws = tuple(model_buffer_raws)
     # unplaced embedded-PLM objects (never referenced by position data).
     # DEFAULT: not exported (the IPD's position data is the authoritative placement;
     # exporting them at identity transform would fabricate placement, which the legacy
@@ -3222,6 +3448,219 @@ def _role_assessment(instances):
             f"visually placed props, not collision-only markers")
 
 
+def _b64(b):
+    import base64 as _b64mod
+    return _b64mod.b64encode(bytes(b)).decode("ascii")
+
+
+def build_sh1x(room, resolver, report):
+    """Assemble the SH1X verbatim extras container for one room.
+
+    Every field is the RAW source value (Q7.8/Q23.8/s16 units as stored).
+    Byte-identical IPD+PLM reconstruction is possible from the `raw` blobs
+    alone (see tools/sh1x_roundtrip.py); the decoded fields exist for
+    consumer convenience and are pure functions of the raws.
+    """
+    inst_key = {id(i): n for n, i in enumerate(room.instances)}
+    sh1x = {
+        "schema": "SH1X", "version": 2,
+        "room": room.name,
+        "file": {"name": room.name + ".IPD", "size": room.file_size,
+                 "sha256": room.file_sha256},
+        # ---- s_IpdHeader, 84 bytes verbatim + decoded ------------------
+        "header": {
+            "magic": room.header_raw[0],
+            "isLoaded": room.header_raw[1],
+            "chunkX": s16(room.header_raw, 2),
+            "chunkZ": s16(room.header_raw, 3),
+            "lmHdrOff": u32(room.header_raw, 4),
+            "modelInfoCount": room.header_raw[8],
+            "modelBufferCount": room.header_raw[9],
+            "modelOrderSize": room.header_raw[10],
+            "padC": list(room.header_raw[12:20]),
+            "modelInfosOff": u32(room.header_raw, 0x14),
+            "modelBuffersOff": u32(room.header_raw, 0x18),
+            "textureCount": room.header_raw[0x1C],
+            "subcellTable": [[list(room.subcell_table[(z, x)])
+                              for x in range(5)] for z in range(5)],
+            "modelOrderOff": u32(room.header_raw, 0x50),
+            "raw": _b64(room.header_raw),
+        },
+        # ---- s_IpdModelInfo list, 16B each -----------------------------
+        "modelInfos": [
+            {"isExternal": s32(r, 0), "pad": list(r[1:4]),
+             "name": r[4:12].decode("ascii", "replace").rstrip("\x00"),
+             "modelHdrPtr": u32(r, 12), "raw": _b64(r)}
+            for r in room.model_info_raws],
+        # ---- s_IpdModelBuffer list + children, verbatim -----------------
+        "modelBuffers": [],
+        "modelOrder": list(room.model_order),
+        # ---- s_IpdCollisionData, verbatim -------------------------------
+        "collision": _sh1x_collision(room),
+        # ---- the embedded PLM (s_LmHeader), verbatim ---------------------
+        "plm": _sh1x_plm(room.plm),
+    }
+    for pi, br in enumerate(room.model_buffer_raws):
+        buf = {
+            "modelInstanceCount": br[0],
+            "billboardInstanceCount": br[1],
+            "subchunkCount": br[2],
+            "pad": br[3],
+            "minX": s16(br, 4), "maxX": s16(br, 6),
+            "minZ": s16(br, 8), "maxZ": s16(br, 10),
+            "modelInstancesOff": u32(br, 12),
+            "billboardInstancesOff": u32(br, 16),
+            "subchunkRangesOff": u32(br, 20),
+            "instances": [], "billboards": [], "subchunkRanges": [],
+            "raw": _b64(br),
+        }
+        for inst in room.instances:
+            if inst.group != pi:
+                continue
+            buf["instances"].append({
+                "objIdx": inst.obj_idx,
+                "rt": list(inst.rt),
+                "pad": struct.unpack_from("<H", inst.raw, 22)[0],
+                "t": list(inst.t),
+                "raw": _b64(inst.raw),
+            })
+        for k, r in enumerate(room.billboard_raws.get(pi, ())):
+            x, y, z, w = struct.unpack_from("<4h", r)
+            buf["billboards"].append(
+                {"offset": [x, y, z], "idx": w, "raw": _b64(r)})
+        for r in room.subchunk_raws.get(pi, ()):
+            buf["subchunkRanges"].append(
+                {"minX": s16(r, 0), "maxX": s16(r, 2),
+                 "minZ": s16(r, 4), "maxZ": s16(r, 6), "raw": _b64(r)})
+        sh1x["modelBuffers"].append(buf)
+    # ---- referenced TIMs, whole-file verbatim --------------------------
+    texs = []
+    for name in sorted(report["tex_ok"]):
+        tim = report["tim_cache"].get(name)
+        if tim is not None and getattr(tim, "data", None):
+            texs.append({"name": name, "size": len(tim.data),
+                         "sha256": hashlib.sha256(tim.data).hexdigest(),
+                         "tim": _b64(tim.data)})
+    sh1x["textures"] = texs
+    # ---- derived render constants (redundant, documented) ---------------
+    sh1x["render"] = {
+        "otShift": 1,
+        "otBaseOfFlagB1": dict(PlmObject.OT_BASE_OF_FLAG_B1),
+        "mapCell": MAP_CELL, "scale": SCALE,
+        "addOrder": ("modelOrder[subcell range] -> buffers in list order -> "
+                     "instances in order, then billboards; meshes in PLM "
+                     "order; packs in pack order (WorldMap_Draw, "
+                     "world_map.c:1349-1447)"),
+        "quadBucket": ("ot_base + (MAX vertex SZ Q8 >> 3)  [otShift 1: "
+                       "((maxZ >> 1) >> 2)]; <=32 -> 32; > farCull -> skip"),
+        "farCullQ8": 0x79C << 3,   # engine Gfx_MeshDraw: MIN(0x79C<<(otShift+2), fog.far)
+        "semiTransBit": "pack byte @7 bit 7 (engine prim->bits1.flags & (1<<15))",
+    }
+    return sh1x
+
+
+def _sh1x_plm_objects(plm):
+    """Every s_ModelHeader in FILE order (duplicates included — the SH1X
+    verbatim contract; `objects`-by-name drops later duplicates)."""
+    out = []
+    for o in plm.all_objects:
+        out.append({
+            "name": o.name, "meshCount": len(o.meshes),
+            "vertexOffset": o.vertex_offset,
+            "normalOffset": o.normal_offset,
+            "flagsByte": o.d_flag,
+            "fieldB0": o.flag_b0, "fieldB1": o.flag_b1,
+            "fieldB4": o.flag_b4, "unkB6": o.unk_b6,
+            "otBase": o.ot_base,
+            "meshes": [
+                {"primitiveCount": len(mesh.packs),
+                 "vertexCount": len(mesh.verts),
+                 "normalCount": len(mesh.normals_a),
+                 "unkCount3": len(mesh.slot_vertex),
+                 "vertsXY": [list(v) for v in mesh.verts_xy],
+                 "vertsZ": list(mesh.verts_z),
+                 "normals": [{"nx": n[0], "ny": n[1], "nz": n[2],
+                              "slotCount": n[3]} for n in mesh.normals_a],
+                 "slots": list(mesh.slot_vertex),
+                 "packs": [
+                     {"u0": p.uv[0][0], "v0": p.uv[0][1], "cba": p.cba,
+                      "u1": p.uv[1][0], "v1": p.uv[1][1],
+                      "b6": p.b6, "b7": p.b7,
+                      "texIdx": p.tex_num, "semiTransparent": p.stp,
+                      "u2": p.uv[2][0], "v2": p.uv[2][1],
+                      "u3": p.uv[3][0], "v3": p.uv[3][1],
+                      "faces": list(p.faces),
+                      "normalSlots": list(p.normal_slots),
+                      "raw": _b64(struct.pack(
+                          "<BBH8B4B4B",
+                          p.uv[0][0], p.uv[0][1], p.cba,
+                          p.uv[1][0], p.uv[1][1],
+                          p.b6, p.b7,
+                          p.uv[2][0], p.uv[2][1],
+                          p.uv[3][0], p.uv[3][1],
+                          p.faces[0], p.faces[1], p.faces[2], p.faces[3],
+                          p.normal_slots[0], p.normal_slots[1],
+                          p.normal_slots[2], p.normal_slots[3]))}
+                     for p in mesh.packs],
+                 "headerRaw": _b64(mesh.header_raw)}
+                for mesh in o.meshes],
+            "headerRaw": _b64(o.header_raw)})
+    return out
+
+
+def _sh1x_collision(room):
+    c = room.collision
+    if c is None:
+        return None
+    return {
+        "positionX": c.position_x, "positionZ": c.position_z,
+        "counts": {"splitV": c.n_split_v, "surface": c.n_surface,
+                   "polygon": c.n_polygon, "cylinder": c.n_cylinder},
+        "splitVertices": [{"x": v[0], "y": v[1], "z": v[2],
+                           "raw": _b64(struct.pack("<3h", *v))}
+                          for v in c.split_vertices],
+        "surfaces": [dict(s, raw=_b64(s["raw"])) for s in c.surfaces],
+        "polygons": [dict(p, raw=_b64(p["raw"])) for p in c.polygons],
+        "cylinders": [dict(y, raw=_b64(y["raw"])) for y in c.cylinders],
+        "cellSize": c.cell_size,
+        "cellCountX": c.cell_count_x, "cellCountZ": c.cell_count_z,
+        "shapeAllocs": [list(a) for a in c.shape_allocs],
+        "shapeLutSize": c.shape_lut_size,
+        "surfaceLutSize": c.surface_lut_size,
+        "shapeLut": list(c.shape_lut),
+        "surfaceLut": list(c.surface_lut),
+        "shapePassCounter": c.shape_pass_counter,
+        "stampBuffer": list(c.stamp_buffer),
+        "headerRaw": _b64(c.header_raw),
+        "blockRaw": _b64(room.collision_raw),
+    }
+
+
+def _sh1x_plm(plm):
+    return {
+        "magic": u16(plm.header_raw, 0),
+        "version": plm.header_raw[2],
+        "isLoaded": plm.header_raw[3],
+        "texNameOff": u32(plm.header_raw, 4),
+        "objNum": plm.header_raw[8],
+        "pad": list(plm.header_raw[9:12]),
+        "objStartOff": u32(plm.header_raw, 12),
+        "orderOff": u32(plm.header_raw, 16),
+        "order": list(plm.order_raw),
+        "trailingRaw": _b64(plm.trailing_raw),
+        "materials": [
+            {"name": r[:8].decode("ascii", "replace").rstrip("\x00"),
+             "texPtr": u32(r, 8), "fieldC": r[12], "fieldD": r[13],
+             "fieldE": r[14], "fieldF": r[15],
+             "field10": u16(r, 16), "field12": u16(r, 18),
+             "uv14": [r[20], r[21]], "uv16": [r[22], r[23]],
+             "raw": _b64(r)}
+            for r in plm.tex_raws],
+        "objects": _sh1x_plm_objects(plm),
+        "headerRaw": _b64(plm.header_raw),
+    }
+
+
 def export_room(room, resolver, out_dir, include_unused=False, builder=None):
     """Export one room to <name>.glb (default) or append it into a shared
     whole-map builder (--whole-map mode).
@@ -3321,12 +3760,19 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
     }
     report["problems"].extend(
         f"draw order: {p}" for p in room.order_problems)
-    # ---- v12: OT LAYER SEPARATION pre-pass -------------------------------
-    # Engine layering (OT section bases + LIFO add order) cannot be
-    # expressed by a depth buffer; compute the per-pack recession offsets
-    # BEFORE emission (full evidence in the OT LAYER SEPARATION section
-    # above) and apply them to every pack's corners during emission.
-    layer_offsets, layer_info = compute_layer_separation(room)
+    # ---- SH1X v14: NO LAYER SEPARATION ---------------------------------
+    # The v12/v13c z-offset recession pass (1-3 PS1 units along the winner
+    # normal) is REMOVED: it mutated authored geometry and left visible
+    # seams at room corners (user report, white background).  The correct
+    # contract: geometry at AUTHORED positions (stock glTF viewers render
+    # the room as-is, z-buffer quirks included), and the ENGINE-EXACT
+    # painter consumer reads the verbatim SH1X extras below — reproducing
+    # WorldMap_Draw/Gfx_MeshDraw ordering-table semantics bit-identically
+    # with zero geometry mutation.
+    layer_offsets, layer_info = None, {"disabled": True, "reason": (
+        "v14: removed — geometry stays authored; the engine-exact consumer "
+        "paints from SH1X extras (OT bases + add order + buckets), not "
+        "from depth-separated geometry")}
     report["layer_separation"] = layer_info
     inst_key_of = {id(inst): i for i, inst in enumerate(room.instances)}
     # ---- v11: PLM object render flags (s_ModelHeader byte @11) + the
@@ -3449,9 +3895,9 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
             mesh_pack_offsets = {}
             mesh_indices = build_instance_meshes(room, inst, lib, resolver,
                                                  builder, report,
-                                                 layer_offsets=layer_offsets,
+                                                 layer_offsets=None,
                                                  inst_key=inst_key_of[id(inst)],
-                                                 out_mesh_pack_offsets=mesh_pack_offsets)
+                                                 out_mesh_pack_offsets=None)
             if not mesh_indices:
                 continue
             n = name_counts.get(inst.obj_name, 0)
@@ -3464,22 +3910,24 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
             obj_meta = None
             obj = lib.objects.get(inst.lookup_name)
             if obj is not None:
-                obj_meta = {"ot_base": obj.ot_base, "field_B_1": obj.flag_b1}
-            # one child node per PLM mesh under a per-instance parent node.
-            # extras.layer_offsets: FLAT per-quad separation vectors in
-            # consumer walk order (prim order, quads in order, 1 entry per
-            # reconstructed quad, null = unoffset) — an engine-exact OT
-            # consumer subtracts them from the bucket depth to reproduce
-            # the AUTHORED ordering table (the separation exists for
-            # z-buffer viewers, not for painters).
-            def _mesh_extras(j, mi):
-                ex = dict(obj_meta) if obj_meta else {}
-                po = mesh_pack_offsets.get(j)
-                if po:
-                    ex["layer_offsets"] = po
-                return ex or None
+                # SH1X node extras: derived references into the scene-level
+                # SH1X container (kept for loader convenience; redundant by
+                # design — see docs/SH1X_EXTRAS_SCHEMA.md)
+                obj_meta = {
+                    "ot_base": obj.ot_base, "field_B_1": obj.flag_b1,
+                    "SH1X": {
+                        "room": room.name, "buffer": inst.group,
+                        "object": inst.obj_name,
+                        "plm_object": (room.plm.obj_order.index(inst.obj_name)
+                                       if inst.obj_name in room.plm.obj_order
+                                       else -1),
+                        "objIdx": inst.obj_idx,
+                        "add_seq": sum(len(room.buffer_billboards.get(b, ()))
+                                       for b in range(inst.group)) + inst.group,
+                    },
+                }
             mesh_nodes = [builder.add_node(f"{node_name}_m{j}", mi, root=False,
-                                           extras=_mesh_extras(j, mi))
+                                           extras=dict(obj_meta) if obj_meta else None)
                           for j, mi in enumerate(mesh_indices)]
             builder.add_node(node_name, None, mesh_nodes, extras=obj_meta)
 
@@ -3538,7 +3986,18 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
         room_roots = builder.json["scenes"][0]["nodes"][s_roots:]
         del builder.json["scenes"][0]["nodes"][s_roots:]
         report["map_parent_node"] = builder.add_node(room.name, None,
-                                                       room_roots)
+                                                     room_roots)
+        # ---- SH1X verbatim extras: whole-map mode stores per-room SH1X
+        # containers on the per-room ROOT node's extras (each room is
+        # self-contained); the per-room file mode puts the SAME container
+        # on scenes[0].extras.SH1X (below).
+        room_root_node = builder.json["nodes"][report["map_parent_node"]]
+        room_root_node["extras"] = room_root_node.get("extras") or {}
+        try:
+            room_root_node["extras"]["SH1X"] = build_sh1x(room, resolver, report)
+        except Exception as e:
+            report["problems"].append(f"SH1X emission failed: {e}")
+            raise
         room_meshes = builder.json["meshes"][s_meshes:]
         mats_used = {p["material"] for m in room_meshes
                      for p in m["primitives"] if "material" in p}
@@ -3565,6 +4024,16 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
         })
     else:
         out_path = os.path.join(out_dir, f"{room.name}.glb")
+        # ---- SH1X verbatim extras on the scene (the room's whole IPD+PLM
+        # data, byte-identical; docs/SH1X_EXTRAS_SCHEMA.md).  A stock glTF
+        # viewer ignores it; the engine-exact consumer paints from it.
+        scene0 = builder.json["scenes"][0]
+        scene0["extras"] = scene0.get("extras") or {}
+        try:
+            scene0["extras"]["SH1X"] = build_sh1x(room, resolver, report)
+        except Exception as e:
+            report["problems"].append(f"SH1X emission failed: {e}")
+            raise
         size = builder.write_glb(out_path)
         report.update({"output": out_path, "bytes": size,
                        "meshes": builder.stats["meshes"],
@@ -4277,44 +4746,32 @@ def validate_glb(path, tex_aliases=None):
                         (min(sdist_r) < -0.0002 and max(sdist_r) > 0.0002)):
                     continue
                 n_tie += 1
-                # v13b EXPORT CONTRACT (hard floor): every census pair must
-                # be separated by at least ONE PS1 UNIT (3.90625 mm, the
-                # engine's authored micro-offset quantum) minus 1 mm
-                # tolerance — this catches exact ties and engine-inverted
-                # pairs (the per-pixel flicker classes).  The MACRO margin
-                # (one full OT bucket for >=50 cm2 overlaps) is enforced by
-                # the solver on the authored classification and verified
-                # end-to-end by the orbit probe.
+                # v14 CONTRACT CHANGE: with the layer-separation pass
+                # REMOVED (geometry stays authored — the z-offset recession
+                # caused corner seams, user report), coincident pairs in a
+                # z-buffered viewer are EXPECTED, not errors.  The
+                # engine-exact composite is produced by the SH1X painter
+                # consumer (OT bases + add order), NOT by depth.  This
+                # check now only counts and DOCUMENTS them (informational).
                 gap = max(sdist)
                 if gap > 0:
-                    # engine-INVERTED but stably separated: no flicker —
-                    # the z-buffer deterministically shows the nearer
-                    # surface where the engine's paint order showed the
-                    # farther one.  Sub-visible composite difference on
-                    # tilted near-parallel geometry (measured: foliage
-                    # panels); documented as a warning, not an error.
                     checks.setdefault("layering_inverted_stable", []).append(
                         f"{wn['node']} over {ls['node']}: "
                         f"{gap * 1000.0:+.2f} mm (stable, no flicker)")
-                elif gap > -0.0029:
-                    # tie or unresolved (< 1 PS1 unit): FLICKERS per-pixel
-                    n_bad += 1
-                    if len(bad_pairs) < 12:
-                        bad_pairs.append(
-                            f"{wn['node']}(ot{wn['base']}) over "
-                            f"{ls['node']}(ot{ls['base']}): loser is "
-                            f"{gap * 1000.0:+.2f} mm off the winner plane")
+                checks.setdefault("layering_coincident_documented", []).append(
+                    f"{wn['node']}(ot{wn['base']}) over "
+                    f"{ls['node']}(ot{ls['base']}): {gap * 1000.0:+.2f} mm "
+                    f"— resolved by the SH1X painter, depth-ambiguous only "
+                    f"in stock z-buffer viewers (expected, documented)")
         checks["layering_contract"] = {
-            "coincident_overlapping_pairs": n_tie, "violations": n_bad}
-        if n_bad:
-            checks["errors"].append(
-                f"layering contract: {n_bad}/{n_tie} coincident pairs still "
-                f"depth-ambiguous or inverted (engine winner not nearest) — "
-                f"these surfaces flicker in z-buffered viewers: " +
-                "; ".join(bad_pairs))
-        else:
-            ok(f"layering contract: {n_tie} coincident pairs, all resolved "
-               f"to the engine winner (nearest surface)")
+            "coincident_overlapping_pairs": n_tie, "violations": 0,
+            "note": ("v14: coincident pairs are EXPECTED — geometry is "
+                     "authored (no separation); the engine composite is "
+                     "reproduced by the SH1X painter consumer from extras, "
+                     "not by depth.  Pairs are documented in "
+                     "layering_coincident_documented.")}
+        ok(f"layering contract (v14): {n_tie} coincident pairs documented — "
+           f"authored geometry, SH1X painter resolves them")
 
     # images are PNG
     for i, im in enumerate(doc.get("images", [])):
