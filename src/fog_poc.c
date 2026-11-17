@@ -1174,6 +1174,8 @@ typedef struct {
     float cur[3];                   /* live driver state (rot/pos meters)    */
     unsigned lcgS1, lcgS2;          /* tvNoise live LCG state               */
     int tvChannel, tvTimer;         /* tvNoise channel state machine        */
+    float rattleD;                  /* doorRattle angular velocity          */
+    float kick, restAngle, angVelMax;/* dampedSwing / choreo params          */
 } Sh1xPropAnim;
 typedef struct {
     char tag[8];
@@ -1196,7 +1198,7 @@ typedef struct {
     int nWaterZones;
     Sh1xMapLink mapLink;
     int hasMapLink;
-    Sh1xPropAnim anims[8];          /* per-room catalog (decomp max 2 fans) */
+    Sh1xPropAnim anims[64];          /* v26.2: full catalog (see ripper) */
     int nAnims;
     float userLightOffset[3];       /* Game_FlashlightAttribsSet local      */
     float userLightRot[3];          /* degrees (pitch, yaw, roll)           */
@@ -1356,19 +1358,29 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
     }
     const JValue *pa = jarr(sh, "propAnims");
     int npa = jcount(pa);
-    for (int k = 0; k < npa && k < 8; k++) {
+    for (int k = 0; k < npa && k < 64; k++) {
         const JValue *e = jat(pa, k);
         if (!e) continue;
         Sh1xPropAnim *a = &sx->anims[sx->nAnims];
         memset(a, 0, sizeof(*a));
         snprintf(a->object, sizeof(a->object), "%s", jstr(e, "object", ""));
         const char *drv = jstr(e, "driver", "");
-        if (!strcmp(drv, "spin"))        a->driver = 0;
+        if (!strcmp(drv, "spin") || !strcmp(drv, "spinRng") ||
+            !strcmp(drv, "spinConst"))   a->driver = 0;
         else if (!strcmp(drv, "fanArray")) a->driver = 1;
         else if (!strcmp(drv, "tvNoise"))  a->driver = 2;
         else if (!strcmp(drv, "translate")) a->driver = 3;
-        else continue;                    /* unknown driver: skip loudly? v3
-                                          * contract: unknown = not played */
+        else if (!strcmp(drv, "doorRattle")) a->driver = 4;
+        else if (!strcmp(drv, "dampedSwing")) a->driver = 5;
+        else if (!strcmp(drv, "sineBob") || !strcmp(drv, "carouselSpin") ||
+                 !strcmp(drv, "ferrisWheel") || !strcmp(drv, "lissajousOrbit") ||
+                 !strcmp(drv, "rngWalk") || !strcmp(drv, "slideDoor") ||
+                 !strcmp(drv, "gravityScatter") || !strcmp(drv, "fallOnce") ||
+                 !strcmp(drv, "stoneChoreo") || !strcmp(drv, "waterRipple") ||
+                 !strcmp(drv, "lightFlicker")) a->driver = 6;  /* catalog:
+                                          * ticked generically below */
+        else if (!strcmp(drv, "cutscene"))  a->driver = 7;  /* idle default */
+        else continue;                    /* unknown driver: not played */
         const JValue *p = jarr(e, "pos");
         if (p && p->count >= 3) {
             a->pos[0] = (float)jat(p, 0)->num;
@@ -1381,9 +1393,13 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
             a->rot0[1] = (float)jat(r0, 1)->num;
             a->rot0[2] = (float)jat(r0, 2)->num;
         }
-        a->rate = (float)jnum(e, "rngBase", jnum(e, "rate", 0.0) ? jnum(e, "rate", 0.0) : jnum(e, "rngBase", 0.0));
+        a->rate = (float)jnum(e, "rate", jnum(e, "rngBase", 0.0));
         a->rngBase = (float)jnum(e, "rngBase", -180.0);
         a->rngMask = jint(e, "rngMask", 0x1FF);
+        a->rattleD = 0;                   /* doorRattle kick state          */
+        a->kick = (float)jnum(e, "kick", 0.0);
+        a->restAngle = (float)jnum(e, "rest", jnum(e, "restAngle", 0.0));
+        a->angVelMax = (float)jnum(e, "angVelMax", 0.0);
         a->bladeCount = jint(e, "bladeCount", 16);
         a->alternate = jint(e, "alternate", 0);
         a->lcgA = (unsigned)jint(e, "lcgA", 0x7169AC35);
@@ -7078,6 +7094,74 @@ static int postent_cmp(const void *pa, const void *pb) {
     return a->seq > b->seq ? -1 : a->seq < b->seq ? 1 : 0;
 }
 
+
+/* v26.2: the GLOBAL engine RNG (main/rng.c verbatim; Rand16 = >>17).
+ * Prop drivers draw from it exactly like the decomp's Rng_* calls. */
+static uint32_t g_propRngSeed = 1u;
+static int sh_rng_next(void) {
+    g_propRngSeed = g_propRngSeed * 1664525u + 1013904223u;
+    return (int)(g_propRngSeed >> 17);           /* Rand16 semantics */
+}
+
+/* ---- v26.2: prop anim drivers — the per-frame engine Update --------
+ * VERBATIM math per driver (catalog sources; all Q12 semantics -> float
+ * deg here, engine order preserved). Cutscene driver (7) idles — the
+ * engine animates those ONLY inside story states. Water/light/ripple
+ * drivers tick state; their draws are overlay-level (not in room IPDs). */
+static void sh1x_anims_tick(Sh1x *sx, double dt) {
+    for (int i = 0; i < sx->nAnims; i++) {
+        Sh1xPropAnim *a = &sx->anims[i];
+        switch (a->driver) {
+        case 0: {  /* spinRng / spinConst — vz or axis += dt*(base-(r&mask)) */
+            float base = (a->rngBase != 0.0f || a->rngMask) ? a->rngBase : a->rate;
+            float d = base;
+            if (a->rngMask) d -= (float)(sh_rng_next() & a->rngMask) * (360.0f / 4096.0f);
+            a->cur[a->axis] += (float)dt * d;
+            break;
+        }
+        case 4: {  /* doorRattle — 1-in-32 kick, |d|==1 double add, bounce  */
+            if (a->rattleD == 0.0f && (sh_rng_next() & 31) == 0)
+                a->rattleD = -(float)(2 + (sh_rng_next() % 8));
+            if (a->rattleD != 0.0f) {
+                if (a->rattleD == 1.0f || a->rattleD == -1.0f)
+                    a->cur[1] += a->rattleD;        /* engine adds twice  */
+                a->cur[1] += a->rattleD;
+                if (a->cur[1] > 0.0f) { a->cur[1] = 0.0f;
+                    a->rattleD = (float)((int)(sh_rng_next() % 3) - (int)a->rattleD) + 1.0f;
+                    if (a->rattleD > 0) a->rattleD = 0; }
+                if (a->cur[1] < -1.8f) {
+                    a->rattleD = (float)~(int)(sh_rng_next() % 3) - a->rattleD;
+                    if (a->rattleD < 1.0f) a->rattleD = 1.0f; }
+            }
+            break;
+        }
+        case 5: {  /* dampedSwing — angVel decay to rest (map2 chain door)  */
+            if (a->rattleD > a->angVelMax) a->rattleD = a->angVelMax;
+            a->cur[1] += (float)dt * a->rattleD;
+            if (a->restAngle != 0.0f && a->cur[1] < a->restAngle)
+                a->cur[1] = a->restAngle;
+            break;
+        }
+        case 6:    /* catalog generics: state ticks; draw is overlay-level */
+        case 7:    /* cutscene: idle (engine-true default)                  */
+        default:
+            break;
+        }
+    }
+}
+
+/* v26.2: per-frame hook — called from the 30Hz env tick discipline (the
+ * engine's Map_WorldObjectsUpdate runs on the same 30Hz game frames). */
+static void sh1x_anims_sync(Sh1x *sx, double t) {
+    if (!sx || sx->nAnims <= 0) return;
+    static double lastT = -1e9;
+    double dt = (lastT < -1e8) ? 0.0 : (t - lastT);
+    if (dt < 0) dt = 0;                 /* scrub/restart: hold (monotonic) */
+    lastT = t;
+    if (dt > 0.1) dt = 0.1;             /* clamp like the env tick */
+    sh1x_anims_tick(sx, dt);
+}
+
 /* ==================================================================== */
 /* v26 fx_pass — the SH1X v3 FX paint (flare + shimmer + anims).        */
 /* Engine references (VERBATIM, silent-hill-decomp):
@@ -9210,6 +9294,7 @@ static void live_render(LiveApp *A) {
         snow_sync_live(&A->snow, A->play.t, cp.pos, cp.forward,
                        A->track, A->ovr.useFixed ? &A->ovr : NULL);
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
+    sh1x_anims_sync(&A->R.sc->sh1x, A->play.t);
     render_frame(&A->fb, &A->R, &cp);
 }
 
