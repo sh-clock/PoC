@@ -21,11 +21,13 @@ jobs:
 
       - name: Smoke test — engine renders a PNG headlessly
         run: |
-          # --shot renders one deterministic frame (320x224) to
+          # --shot t=0 renders one deterministic frame (320x224) to
           # shots/shot_00000.00.png with no window: proves the release
           # binary actually runs, not just links.
+          # (--shot REQUIRES a value: "t=SECONDS[,file=NAME.png]" —
+          # a bare --shot exits with "unknown arg".)
           ./fog_poc --glb input/THRF9FD.glb --camdat input/camdat.json \
-                    --input input --shot
+                    --input input --shot t=0
           test -s shots/shot_00000.00.png
           file shots/shot_00000.00.png
 
