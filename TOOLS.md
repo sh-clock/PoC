@@ -80,6 +80,11 @@ extracted/BG/HP1F031.TIM ...  ← textures, also under BG/ (embedded into the GL
 python3 tools/ipd2gltf.py --input ./extracted/BG --output ./glbs --rooms THRF9FD,HP0003
 ```
 
+Never set `--output` to the same folder as the input: the converter always
+excludes the output directory from texture scanning, so an in-place
+conversion silently drops every texture reference (degraded, textureless
+GLB — the mesh count drops and `0 images` appears in the log).
+
 Point `--input` at the folder that holds the room's `.IPD` **and its
 textures** (the tool scans the whole tree, including inside ZIP archives).
 `--rooms` limits the export; without it every `.IPD` found is converted.

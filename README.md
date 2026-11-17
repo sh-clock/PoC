@@ -69,8 +69,8 @@ From a repo checkout, first convert the sample scene, then run with
 live against the engine-exact weather:
 
 ```
-python3 tools/ipd2gltf.py --input input --output input --rooms THRF9FD
-./fog_poc                                          # realtime window (native 320x224)
+python3 tools/ipd2gltf.py --input input --output glbs --rooms THRF9FD
+./fog_poc --glb glbs/THRF9FD.glb --camdat input/camdat.json --input input                                          # realtime window (native 320x224)
 ./fog_poc --window-size 1920x1080                  # bigger window
 ./fog_poc --res 640x360                            # NON-ENGINE 16:9 mode
 ./fog_poc --modern                                  # opt OUT of the wobble

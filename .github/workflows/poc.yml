@@ -24,10 +24,13 @@ jobs:
           # input/ tracks only the base rip files; regenerate the GLBs with
           # the converter at THIS commit so CI always exercises the
           # tools/ipd2gltf.py it ships.
-          python3 tools/ipd2gltf.py --input input --output input \
+          # NOTE: --output must NOT be the input dir — the converter always
+          # excludes the output directory from texture scanning (writing
+          # into input/ would drop every texture reference -> degraded GLB).
+          python3 tools/ipd2gltf.py --input input --output glbs \
               --rooms THRF9FD,HP0003
-          test -s input/THRF9FD.glb
-          test -s input/HP0003.glb
+          test -s glbs/THRF9FD.glb
+          test -s glbs/HP0003.glb
 
       - name: Smoke test — engine renders a PNG headlessly
         run: |
@@ -36,7 +39,7 @@ jobs:
           # binary actually runs, not just links.
           # (--shot REQUIRES a value: "t=SECONDS[,file=NAME.png]" —
           # a bare --shot exits with "unknown arg".)
-          ./fog_poc --glb input/THRF9FD.glb --camdat input/camdat.json \
+          ./fog_poc --glb glbs/THRF9FD.glb --camdat input/camdat.json \
                     --input input --shot t=0
           test -s shots/shot_00000.00.png
           file shots/shot_00000.00.png

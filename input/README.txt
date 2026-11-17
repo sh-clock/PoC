@@ -4,7 +4,11 @@ non-commercial testing only — produce your own via TOOLS.md.
 The repo tracks ONLY the base files; the GLBs are not committed. Convert
 them with the current tools/ipd2gltf.py (the release zips do exactly this):
 
-  python3 tools/ipd2gltf.py --input input --output input --rooms THRF9FD,HP0003
+  python3 tools/ipd2gltf.py --input input --output glbs --rooms THRF9FD,HP0003
+
+(--output must NOT be the input dir: the converter always excludes the
+output directory from texture scanning, so an in-place conversion drops
+every texture reference and emits a degraded GLB.)
 
 THRF9FD (outdoor street scene, filetable USA index 1291):
   THRF9FD.IPD     - the room (embedded PLM + collision + render data)
