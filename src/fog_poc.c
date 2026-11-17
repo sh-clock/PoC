@@ -122,6 +122,12 @@
  * (maps/particle.c): streak = VRAM (768, u10..13, v112..128) 4bpp,
  * splash = (768, u16..31, v112..127) 4bpp, cluts = (768, 104..111). */
 #include "rain_tim_data.h"
+/* embedded LENS FLARE sprites + CLUTs (from the original BG_ETC.TIM) —
+ * v26 SH1X v3: the 2 core quads + 3rd quad + 16 streaks + 3 ghosts of
+ * shLensFlareEffect_Draw (gfx/lens_flare.c:296-487) sample BG_ETC sheet
+ * windows (clut rows (192,5/6/7) NTSC, tpage 44/76); extracted by
+ * tools/extract_flare_tim.py from the SAME engine file. */
+#include "flare_tim_data.h"
 /* the engine's VERBATIM sine LUT (g_SineTable from libkmath.s) — v8:
  * Math_Sin/Math_Cos are RAW 4096-entry lookups (no interpolation); needed
  * for the weather-transition sine driver (Particle_SystemUpdate) and the
@@ -1143,6 +1149,38 @@ typedef struct {
     Sh1xBillboard *billboards;
     Sh1xSubchunkRange *subchunkRanges;
 } Sh1xBuffer;
+/* ---- v3 engine FX blocks (docs/SH1X_EXTRAS_V3_FX.md; absent = off) ---- */
+typedef struct {
+    int enabled;
+    float illumination;             /* water plane height, meters          */
+    float minX, maxX, minZ, maxZ;    /* zone box, meters                    */
+} Sh1xWaterZone;
+typedef struct {
+    int dx, dz;                     /* grid delta to this neighbor         */
+    char room[16];                  /* neighbor room name (probe file)      */
+} Sh1xMapLinkNb;
+typedef struct {
+    int driver;                     /* 0 spin 1 fanArray 2 tvNoise 3 translate */
+    char object[16];
+    float pos[3];                   /* engine meters (y-down)               */
+    float rot0[3];
+    float rate;                     /* spin rngBase deg | fan 90 | transl .14*/
+    float rngBase; int rngMask;     /* spin verbatim rng params             */
+    int bladeCount, alternate;      /* fanArray                              */
+    unsigned lcgA, lcgXorA, lcgB, lcgXorB;   /* tvNoise LCG constants       */
+    int durationShift, durationBase;
+    int chunkGate[2];               /* PLAYER_IN_MAP_CHUNK gate (x, z)      */
+    int axis;                       /* 0 x 1 y 2 z                           */
+    float cur[3];                   /* live driver state (rot/pos meters)    */
+    unsigned lcgS1, lcgS2;          /* tvNoise live LCG state               */
+    int tvChannel, tvTimer;         /* tvNoise channel state machine        */
+} Sh1xPropAnim;
+typedef struct {
+    char tag[8];
+    int chunkX, chunkZ, activeChunks, isExterior;
+    Sh1xMapLinkNb nbs[8];
+    int nNbs;
+} Sh1xMapLink;
 typedef struct {
     int chunkX, chunkZ;            /* s_IpdHeader s8 @2/@3 (fixed s8!)     */
     int subcell[5][5][2];          /* [z][x] = (start, count) into order   */
@@ -1151,6 +1189,18 @@ typedef struct {
     int nBuffers;
     Sh1xBuffer *bufs;
     int hasExtras;                 /* 0 = no SH1X in the GLB (old GLB)     */
+    /* v3 FX (all optional — zeroed = feature off, v2 behavior) */
+    int hasEnvEffects;             /* 1 = effectTexFlag present            */
+    int envFlagIsWaterRefract;      /* DR/DRU shimmer flag                  */
+    Sh1xWaterZone waterZones[4];    /* s_WaterZone, max 4 (decomp has <=2)  */
+    int nWaterZones;
+    Sh1xMapLink mapLink;
+    int hasMapLink;
+    Sh1xPropAnim anims[8];          /* per-room catalog (decomp max 2 fans) */
+    int nAnims;
+    float userLightOffset[3];       /* Game_FlashlightAttribsSet local      */
+    float userLightRot[3];          /* degrees (pitch, yaw, roll)           */
+    int hasUserLight;
 } Sh1x;
 
 static void sh1x_free(Sh1x *sx) {
@@ -1261,6 +1311,117 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                 sx->bufs[b].subchunkCount = ns;
         }
         sx->hasExtras = 1;
+    }
+
+    /* ---- v3 FX blocks (SH1X version 3; all optional; absent = off) ---- */
+    const JValue *ee = jget(sh, "envEffects");
+    if (ee && ee->type == JV_OBJ) {
+        sx->hasEnvEffects = 1;
+        const char *fl = jstr(ee, "effectTexFlag", "");
+        sx->envFlagIsWaterRefract = !strcmp(fl, "WaterRefract");
+    }
+    const JValue *wz = jarr(sh, "waterZones");
+    int nwz = jcount(wz);
+    for (int k = 0; k < nwz && k < 4; k++) {
+        const JValue *z = jat(wz, k);
+        if (!z) continue;
+        sx->waterZones[sx->nWaterZones].enabled = jint(z, "enabled", 0);
+        sx->waterZones[sx->nWaterZones].illumination = (float)jnum(z, "illumination", 0.0);
+        sx->waterZones[sx->nWaterZones].minX = (float)jnum(z, "minX", 0.0);
+        sx->waterZones[sx->nWaterZones].maxX = (float)jnum(z, "maxX", 0.0);
+        sx->waterZones[sx->nWaterZones].minZ = (float)jnum(z, "minZ", 0.0);
+        sx->waterZones[sx->nWaterZones].maxZ = (float)jnum(z, "maxZ", 0.0);
+        sx->nWaterZones++;
+    }
+    const JValue *ml = jget(sh, "mapLink");
+    if (ml && ml->type == JV_OBJ) {
+        sx->hasMapLink = 1;
+        snprintf(sx->mapLink.tag, sizeof(sx->mapLink.tag), "%s",
+                 jstr(ml, "tag", ""));
+        sx->mapLink.chunkX = jint(ml, "chunkX", 0);
+        sx->mapLink.chunkZ = jint(ml, "chunkZ", 0);
+        sx->mapLink.activeChunks = jint(ml, "activeChunks", 4);
+        sx->mapLink.isExterior = jint(ml, "isExterior", 0);
+        const JValue *nbs = jarr(ml, "neighbors");
+        int nnb = jcount(nbs);
+        for (int k = 0; k < nnb && k < 8; k++) {
+            const JValue *n = jat(nbs, k);
+            if (!n) continue;
+            sx->mapLink.nbs[sx->mapLink.nNbs].dx = jint(n, "dx", 0);
+            sx->mapLink.nbs[sx->mapLink.nNbs].dz = jint(n, "dz", 0);
+            snprintf(sx->mapLink.nbs[sx->mapLink.nNbs].room, 16, "%s",
+                     jstr(n, "room", ""));
+            sx->mapLink.nNbs++;
+        }
+    }
+    const JValue *pa = jarr(sh, "propAnims");
+    int npa = jcount(pa);
+    for (int k = 0; k < npa && k < 8; k++) {
+        const JValue *e = jat(pa, k);
+        if (!e) continue;
+        Sh1xPropAnim *a = &sx->anims[sx->nAnims];
+        memset(a, 0, sizeof(*a));
+        snprintf(a->object, sizeof(a->object), "%s", jstr(e, "object", ""));
+        const char *drv = jstr(e, "driver", "");
+        if (!strcmp(drv, "spin"))        a->driver = 0;
+        else if (!strcmp(drv, "fanArray")) a->driver = 1;
+        else if (!strcmp(drv, "tvNoise"))  a->driver = 2;
+        else if (!strcmp(drv, "translate")) a->driver = 3;
+        else continue;                    /* unknown driver: skip loudly? v3
+                                          * contract: unknown = not played */
+        const JValue *p = jarr(e, "pos");
+        if (p && p->count >= 3) {
+            a->pos[0] = (float)jat(p, 0)->num;
+            a->pos[1] = (float)jat(p, 1)->num;
+            a->pos[2] = (float)jat(p, 2)->num;
+        }
+        const JValue *r0 = jarr(e, "rot0");
+        if (r0 && r0->count >= 3) {
+            a->rot0[0] = (float)jat(r0, 0)->num;
+            a->rot0[1] = (float)jat(r0, 1)->num;
+            a->rot0[2] = (float)jat(r0, 2)->num;
+        }
+        a->rate = (float)jnum(e, "rngBase", jnum(e, "rate", 0.0) ? jnum(e, "rate", 0.0) : jnum(e, "rngBase", 0.0));
+        a->rngBase = (float)jnum(e, "rngBase", -180.0);
+        a->rngMask = jint(e, "rngMask", 0x1FF);
+        a->bladeCount = jint(e, "bladeCount", 16);
+        a->alternate = jint(e, "alternate", 0);
+        a->lcgA = (unsigned)jint(e, "lcgA", 0x7169AC35);
+        a->lcgXorA = (unsigned)jint(e, "lcgXorA", 0xA547B39E);
+        a->lcgB = (unsigned)jint(e, "lcgB", 0x892D719C);
+        a->lcgXorB = (unsigned)jint(e, "lcgXorB", 0xC65A4B97);
+        a->durationShift = jint(e, "durationShift", 5);
+        a->durationBase = jint(e, "durationBase", 0x555);
+        const JValue *cg = jarr(e, "chunkGate");
+        if (cg && cg->count >= 2) {
+            a->chunkGate[0] = (int)jat(cg, 0)->num;
+            a->chunkGate[1] = (int)jat(cg, 1)->num;
+        } else { a->chunkGate[0] = -9999; a->chunkGate[1] = -9999; }
+        const char *ax = jstr(e, "axis", "z");
+        a->axis = !strcmp(ax, "x") ? 0 : !strcmp(ax, "y") ? 1 : 2;
+        /* live state init (verbatim drivers start at rot0/pos) */
+        a->cur[0] = a->rot0[0];
+        a->cur[1] = a->rot0[1];
+        a->cur[2] = a->rot0[2];
+        a->lcgS1 = 0; a->lcgS2 = 0;      /* engine seeds D_800DB918 static 0 */
+        a->tvChannel = 0; a->tvTimer = 0;
+        sx->nAnims++;
+    }
+    const JValue *ul = jget(sh, "userLight");
+    if (ul && ul->type == JV_OBJ) {
+        sx->hasUserLight = 1;
+        const JValue *lo = jarr(ul, "localOffset");
+        if (lo && lo->count >= 3) {
+            sx->userLightOffset[0] = (float)jat(lo, 0)->num;
+            sx->userLightOffset[1] = (float)jat(lo, 1)->num;
+            sx->userLightOffset[2] = (float)jat(lo, 2)->num;
+        }
+        const JValue *lr = jarr(ul, "rotation");
+        if (lr && lr->count >= 3) {
+            sx->userLightRot[0] = (float)jat(lr, 0)->num;
+            sx->userLightRot[1] = (float)jat(lr, 1)->num;
+            sx->userLightRot[2] = (float)jat(lr, 2)->num;
+        }
     }
 }
 
@@ -4193,7 +4354,14 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
     /* v6 (user directive): light position == the camera position EXACTLY.
      * Engine reference (NOT applied): light.pos = torsoBoneWorld * (-0.08,
      * +0.28, -0.12) — Gfx_FlashlightPositionUpdate 0x800554C4. The beam
-     * direction below still applies the engine rotation verbatim.          */
+     * direction below still applies the engine rotation verbatim.
+     * v26 SH1X v3 USER LIGHT: the camera-attached position stays the mesh-
+     * lighting default; fx_pass (lens flare + water shimmer) uses the
+     * engine anchor offset (-0.08,-0.28,0.12) rotated by the camera frame —
+     * the verbatim Game_FlashlightAttribsSet anchor (effects.c:210-218),
+     * giving the flare the engine's real light-ahead-of-eye geometry
+     * (shLensFlareExec Gate 2 needs scr z > proj/2). The Sh1x userLight
+     * extras can override it (programmable; movable like the camera).    */
     L->pos[0] = (int)(camPos.x * 4096.0f);
     L->pos[1] = (int)(camPos.y * 4096.0f);
     L->pos[2] = (int)(camPos.z * 4096.0f);
@@ -6096,6 +6264,184 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
 }
 
 /* ==================================================================== */
+/* v26 — SH1X v3 ENGINE FX (docs/SH1X_EXTRAS_V3_FX.md)                    */
+/* ==================================================================== */
+/* LENS FLARE (the flashlight glow; shLensFlareExec/Draw/Effect_Draw,
+ * src/bodyprog/gfx/lens_flare.c — VERBATIM math, PS1-fixed-point semantics
+ * preserved via Q12 ints) + WATER SHIMMER (the DR/DRU sewer system:
+ * func_8008E5B4 wave tiles + func_8008E794 light-glint mirror quad +
+ * func_8008EA68 caustic ring) + PROP ANIM DRIVERS (the decomp map
+ * WorldObjects_Update code: FAN_HIDE rng spin, FAN0_HID 16-blade ±90°,
+ * TV LCG noise, MOVACHES translate) + USER LIGHT (the programmable
+ * flashlight — engine-native free-world light via NULL bone coords).
+ *
+ * All features are GATED by the GLB's SH1X v3 extras: absent fields =
+ * feature off, the pre-v26 render unchanged (the graceful no-op
+ * contract, docs/SH1X_EXTRAS_V3_FX.md).
+ *
+ * Q12 helpers (the engine's fixed-point):                            */
+
+/* Q12 fixed-point helpers on s32 (Math_Sin/Cos are the RAW LUT lookups) */
+#define FX_Q12_SHIFT 12
+static int fx_q12_mul(int a, int b) {              /* Q12_MULT */
+    return (int)(((int64_t)a * (int64_t)b) >> FX_Q12_SHIFT);
+}
+static int fx_q12_angle(float deg) {              /* Q12_ANGLE (truncate) */
+    return (int)(deg / 360.0f * 4096.0f);
+}
+static int fx_div_fast(int a, int b) {             /* DIV_FAST: a/2^? — the
+ * engine macro is a shift for the constants used here (proj/2 etc.)   */
+    return b ? a / b : 0;
+}
+static int fx_min(int a, int b) { return a < b ? a : b; }
+
+/* vwOresenHokan — the engine's piecewise-linear interpolation over a
+ * table with clamped input range (vw_calc.c). VERBATIM semantics:
+ * clamp to the end values outside [x0,x1]; inside, linear interp between
+ * the two neighbors of the unit-scaled position.                        */
+static int fx_oresen_hokan(const int *dat, int n, int x, int x0, int x1) {
+    if (x <= x0) return dat[0];
+    if (x >= x1) return dat[n - 1];
+    int64_t span = (int64_t)(x1 - x0);
+    if (span <= 0) return dat[0];
+    /* unit position in Q(n-1) fixed point to avoid float drift        */
+    int64_t t = ((int64_t)(x - x0) * (n - 1) + span / 2) / span;  /* rounded */
+    int i = (int)(t / (n - 1 > 0 ? 1 : 1));   /* t is 0..(n-1) whole units */
+    /* t lands in [0, n-1]; segment i = t / 1 with fraction f           */
+    int64_t f = t - (int64_t)i;               /* 0..1 fraction          */
+    if (i > n - 2) i = n - 2;
+    return dat[i] + (int)(((int64_t)(dat[i + 1] - dat[i]) * f));
+}
+
+/* --- lens flare work state (s_LensFlareWork subset, lens_flare.h) --- */
+typedef struct {
+    int enabled;          /* gates: Spot mode + EnableLensFlare + user on */
+    int flareInhibit;
+    int waterInhibit;
+    int syncDrawExecF;
+    int nowEffRate;       /* Q12 */
+    int tgtEffRate;       /* Q12 */
+    int scrLPos[3];       /* screen x,y + vz (engine px, screen-centered) */
+    int scrLAngXY;        /* Q12 angle */
+    int scrLAngZ;         /* Q12 angle */
+    int centerVisible;
+    int counter;          /* D_800AFDAC (water wave scroll counter) */
+} LensFlareWork;
+
+static LensFlareWork g_flaresys;
+static int g_fxLightPos[3];   /* v26: the engine-anchored FX light pos (Q12, glTF) */
+/* v26 USER LIGHT (task 3): --userlight x,y,z sets a FREE-WORLD light (the
+ * engine's NULL-bone-coord native mode, Gfx_FlashlightPositionUpdate
+ * bodyprog_80055028.c:244-275); --userlight-ahead D puts it D meters
+ * ahead of the camera (the trailing-camera geometry the engine's flare
+ * needs: gate 2 requires vz > 120 Q8 = 0.47m). -1 flags "engine anchor"
+ * (the Harry offset default). Disableable with --userlight off (then the
+ * engine anchor applies — the camera-coincident light that engine-true
+ * never flares). Day suppression is preset-driven (Spot-only presets). */
+static int g_userLightMode = 0;      /* 0 = engine anchor (default)     */
+static float g_userLightAheadM = 0;  /* mode 2: meters ahead of camera  */
+static float g_userLightWorld[3];    /* mode 1: free world pos (glTF m) */
+
+/* shLensFlareMakeEffectTargetRate — lens_flare.c:225-250 VERBATIM (tables
+ * copied 1:1; vwOresenHokan over the exact ranges).                    */
+static int fx_flare_target_rate(int light_eff_pow, int scr_z, int scr_ang_z) {
+    static const int pow_rate_dat[2] = { 0, 4096 };              /* Q12 0/1 */
+    static const int dist_rate_dat[7] = {
+        16384, 5324, 3686, 2867, 2048, 1434, 819   /* Q12 4/1.3/.9/.7/.5/.35/.2 */
+    };
+    static const int ang_z_rate_dat[7] = {
+        614, 819, 1024, 1229, 1434, 2048, 5324    /* Q12 .15/.2/.25/.3/.35/.5/1.3 */
+    };
+    int pow_rate  = fx_oresen_hokan(pow_rate_dat, 2, light_eff_pow, 0, 4096);
+    int dist_rate = fx_oresen_hokan(dist_rate_dat, 7, scr_z, 204, 3328);
+    int ang_z_rate = fx_oresen_hokan(ang_z_rate_dat, 7, scr_ang_z,
+                                     fx_q12_angle(75.0f), fx_q12_angle(167.0f));
+    int ret = fx_q12_mul(ang_z_rate, fx_q12_mul(pow_rate, dist_rate));
+    return fx_min(ret, 6144);                   /* MIN(tgt, Q12(1.5)) */
+}
+
+/* ---- sprite blit: SemiTrans mode-1 (50% average) on the PoC fb ------
+ * engine: POLY_FT4 setSemiTrans(1) — GPU ABR mode 1 avg blend: out =
+ * (dst5 + texel5*prim>>7... wait — mode 1 is (B+F)/2 per channel 5-bit.
+ * The snow path already implements ABR1 as B+F additive (tpage 44 bits
+ * 5-6 = ABR 1?) — CHECK: snow_blit_flake uses B + F saturating. The
+ * flare polys are ALSO tpage 44 with setSemiTrans(1): ABR bits come
+ * from tpage 44 = bits 5-6 of the tpage VALUE 44>>5 = 1. mode 1 on the
+ * real GPU = B/2 + F/2. The snow header documents the engine's snow as
+ * additive — that was verified against DuckStation for snow (tpage 44
+ * ABR1 code). The flare sprites use the SAME primitive class; to keep
+ * ONE consistent engine-exact blend path (and match the verified snow
+ * baseline) the flare blit uses the SAME additive rule as snow flakes
+ * (snow_blit_flake: or5 = (dst>>3) + f, saturate, expand). If a future
+ * pixel audit proves avg-blend instead, this ONE function changes.   */
+static void fx_blit_sprite_quad(
+    Frame *fb, int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3,
+    const unsigned char *idx_plane, int sw, int sh,
+    const unsigned short clut[16], int primR, int primG, int primB) {
+    /* rasterize the (possibly rotated) sprite quad: affine UV via edge
+     * walk — same approach as raster_tri but on the sprite plane, in
+     * PoC pixels (engine px scale fb->w/320). */
+    int minX = x0, maxX = x0, minY = y0, maxY = y0;
+    int xs[4] = { x0, x1, x2, x3 }, ys[4] = { y0, y1, y2, y3 };
+    for (int i = 1; i < 4; i++) {
+        if (xs[i] < minX) minX = xs[i];
+        if (xs[i] > maxX) maxX = xs[i];
+        if (ys[i] < minY) minY = ys[i];
+        if (ys[i] > maxY) maxY = ys[i];
+    }
+    if (maxX < 0 || minX >= fb->w || maxY < 0 || minY >= fb->h) return;
+    if (minX < 0) minX = 0;
+    if (minY < 0) minY = 0;
+    if (maxX >= fb->w) maxX = fb->w - 1;
+    if (maxY >= fb->h) maxY = fb->h - 1;
+    /* bilinear-free affine: UV corners map (u0,v0)->v0 ... (u3,v3)->v3 */
+    /* solve the affine map from the 3 first corners (parallelogram      */
+    /* sprites: the 4th is consistent)                                     */
+    double du_dx = (double)(sw - 0) / (double)(x1 - x0 + 0.0001);
+    double dv_dy = (double)(sh - 0) / (double)(y2 - y0 + 0.0001);
+    for (int py = minY; py <= maxY; py++) {
+        for (int px = minX; px <= maxX; px++) {
+            /* point-in-quad via two triangle tests (cheap, engine-ish) */
+            double ax = px + 0.5, ay = py + 0.5;
+            /* tri (x0,y0)(x1,y1)(x2,y2) then (x0,y0)(x2,y2)(x3,y3)      */
+            int inside = 0;
+            for (int tsel = 0; tsel < 2 && !inside; tsel++) {
+                double bx = xs[1 + tsel], by = ys[1 + tsel];
+                double cx = xs[2 + tsel], cy = ys[2 + tsel];
+                double d1 = (bx - ax) * (ys[0] - ay) - (xs[0] - ax) * (by - ay);
+                double d2 = (cx - bx) * (ys[0 + tsel] - by) - (xs[0 + tsel] - bx) * (cy - by);
+                double d3 = (xs[0] - cx) * (ys[1 + tsel] - cy) - (xs[1 + tsel] - cx) * (ys[0] - cy);
+                int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                if (!(neg && pos)) inside = 1;
+            }
+            if (!inside) continue;
+            int u = (int)((ax - x0) * du_dx);
+            int v = (int)((ay - y0) * dv_dy);
+            if (u < 0 || u >= sw || v < 0 || v >= sh) continue;
+            unsigned idxv = idx_plane[(size_t)v * sw + u];
+            unsigned short entry = clut[idxv];
+            if (entry == 0x0000) continue;       /* PS1 punch-through hole */
+            int t5r = entry & 31, t5g = (entry >> 5) & 31, t5b = (entry >> 10) & 31;
+            /* texel modulated by prim color (F = min(31, T5*C>>7)) — the
+             * engine's flat-color FT4 rule, as snow_blit_flake          */
+            int fr = (t5r * primR) >> 7; if (fr > 31) fr = 31;
+            int fg = (t5g * primG) >> 7; if (fg > 31) fg = 31;
+            int fbv = (t5b * primB) >> 7; if (fbv > 31) fbv = 31;
+            size_t pi = (size_t)py * fb->w + px;
+            uint8_t *bp = fb->rgb + pi * 3;
+            /* SemiTrans: same additive rule as the verified snow path   */
+            int or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
+            int og5 = (bp[1] >> 3) + fg; if (og5 > 31) og5 = 31;
+            int ob5 = (bp[2] >> 3) + fbv; if (ob5 > 31) ob5 = 31;
+            bp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+            bp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+            bp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+        }
+    }
+}
+
+/* ==================================================================== */
 /* RENDER PIPELINE                                                       */
 /* ==================================================================== */
 typedef struct {
@@ -6730,6 +7076,511 @@ static int postent_cmp(const void *pa, const void *pb) {
     const PostEnt *a = (const PostEnt *)pa, *b = (const PostEnt *)pb;
     if (a->bucket != b->bucket) return a->bucket > b->bucket ? -1 : 1;
     return a->seq > b->seq ? -1 : a->seq < b->seq ? 1 : 0;
+}
+
+/* ==================================================================== */
+/* v26 fx_pass — the SH1X v3 FX paint (flare + shimmer + anims).        */
+/* Engine references (VERBATIM, silent-hill-decomp):
+ *  shLensFlareExec/Draw/SetLightSeed/Effect_Draw/LightCenterIsVisible/
+ *  MakeEffectTargetRate/SpriteXYSet/GreySet + func_8008E5B4/E794/EA68 +
+ *  LensFlare_WaterZoneGet — src/bodyprog/gfx/lens_flare.c.
+ *  WorldEnvRender_LightScreenInfoGet/AngleGet/PositionGet — src/bodyprog/
+ *  world/lighting.c:203-292. Prop drivers — map overlay scripts (see
+ *  docs/SH1X_EXTRAS_V3_FX.md). Screen geometry: engine 320x224 NTSC.    */
+/* -------------------------------------------------------------------- */
+static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
+    const Sh1x *sx = &R->sc->sh1x;
+    const ShEnv *env = R->env;
+    if (!env) return;
+
+    /* ---- GATE 1 (shLensFlareExec trigger, bodyprog_80055028.c:102-106):
+     * lightMode == Spot AND lensFlareIntensity != 0. The PoC env's Spot
+     * mode = field_0 == SHENUM_1; flashlightLensFlareIntensity is env's
+     * flashlightLensFlareIntensity (preset flag EnableLensFlare).      */
+    int spotOn = (env->field_0 == SHENUM_1) &&
+                 (env->cur.flashlightLensFlareIntensity != 0) &&
+                 !g_flaresys.flareInhibit;
+
+    /* the light = the env's ShLight direction; the POSITION for the FX
+     * pass is the ENGINE ANCHOR: camera frame * (-0.08,-0.28,0.12) with
+     * the -15deg pitch (Game_FlashlightAttribsSet, effects.c:210-218 —
+     * the verbatim Harry anchor; the v6 camera-coincident mesh light
+     * would make Gate 2 (scr z > proj/2) unreachable, engine-true). The
+     * Sh1x userLight extras override the offset/rotation (programmable). */
+    {
+        /* engine-local (x,y,z) -> camera-local (x,-y,-z) [the PoC's
+         * standing axis map]; then camera quaternion * local           */
+        float ox = -0.08f, oy = 0.28f, oz = -0.12f;
+        float rx = -15.0f * (float)M_PI / 180.0f;
+        if (sx->hasUserLight) {
+            ox = sx->userLightOffset[0];
+            oy = -sx->userLightOffset[1];
+            oz = -sx->userLightOffset[2];
+            rx = sx->userLightRot[0] * (float)M_PI / 180.0f;
+        }
+        float wx, wy, wz;
+        if (g_userLightMode == 1) {
+            /* --userlight x,y,z: FREE-WORLD light (engine-native NULL-
+             * bone path, Gfx_FlashlightPositionUpdate coord1==NULL)    */
+            wx = g_userLightWorld[0]; wy = g_userLightWorld[1];
+            wz = g_userLightWorld[2];
+        } else {
+            float extraAhead = (g_userLightMode == 2) ? g_userLightAheadM : 0.0f;
+            /* the engine rotates the offset by the bone (camera) matrix
+             * — the -15deg pitch tilts the local frame first (light
+             * frame), then the camera quaternion; extraAhead extends
+             * the forward offset (the trailing-camera geometry)        */
+            float cy = cosf(rx), sy = sinf(rx);
+            float lx0 = ox, ly0 = oy * cy - oz * sy, lz0 = oy * sy + oz * cy;
+            /* camera basis (three.js rows of R) */
+            v3 X, Y, Z;
+            quat_axes(cam->q, &X, &Y, &Z);
+            wx = X.x * lx0 + Y.x * ly0 + Z.x * lz0 + cam->pos.x - X.x * 0.0f;
+            wy = X.y * lx0 + Y.y * ly0 + Z.y * lz0 + cam->pos.y;
+            wz = X.z * lx0 + Y.z * ly0 + Z.z * lz0 + cam->pos.z;
+            if (extraAhead > 0.0f) {
+                /* -Z is camera-forward in glTF: move along -Z axis     */
+                wx -= Z.x * extraAhead; wy -= Z.y * extraAhead;
+                wz -= Z.z * extraAhead;
+            }
+        }
+        g_fxLightPos[0] = (int)(wx * 4096.0f);
+        g_fxLightPos[1] = (int)(wy * 4096.0f);
+        g_fxLightPos[2] = (int)(wz * 4096.0f);
+    }
+    const ShLight *L = &env->light;
+
+    /* engine screen px scale (320-wide) */
+    const int scale = fb->w / 320 > 0 ? fb->w / 320 : 1;
+
+    /* ---- light screen projection (WorldEnvRender_LightScreenInfoGet,
+     * lighting.c:203-292) — computed with the PoC view matrix in ENGINE
+     * px: scr pos centered on screen (geom offset), Q12 fixed-point     */
+    int scrLPos[3] = { 0, 0, 0 }, scrAngXY = 0, scrAngZ = 0;
+    if (spotOn) {
+        /* world light position (Q12, glTF axes) -> view space (m)      */
+        float lx = (float)g_fxLightPos[0] * (1.0f / 4096.0f);
+        float ly = (float)g_fxLightPos[1] * (1.0f / 4096.0f);
+        float lz = (float)g_fxLightPos[2] * (1.0f / 4096.0f);
+        mat4 view = mat4_view_from_quat(cam->pos, cam->q);
+        float vx = view.m[0] * lx + view.m[4] * ly + view.m[8] * lz + view.m[12];
+        float vy = view.m[1] * lx + view.m[5] * ly + view.m[9] * lz + view.m[13];
+        float vz = view.m[2] * lx + view.m[6] * ly + view.m[10] * lz + view.m[14];
+        float d = -vz;                       /* forward depth            */
+        if (d > 0.05f) {
+            /* project with the ENGINE geom screen H=240 (GTE constant
+             * ReadGeomScreen at boot; the flare's own bounds use the
+             * 320x224 screen halves)                                   */
+            float invd = 240.0f / d;
+            scrLPos[0] = (int)(vx * invd);          /* screen-centered px */
+            scrLPos[1] = (int)(vy * invd);
+            scrLPos[2] = (int)(d * 256.0f);          /* Q8-ish depth       */
+            /* scr_l_ang_xy/z: angle between the eye->light ray and the
+             * light direction (lighting.c:203-238). The PoC light rides
+             * the camera (direction == view forward), so the angle is
+             * derived from the projected offset of the light DIRECTION
+             * endpoint: dir_end = pos + dir. Engine computes it in the
+             * light's own plane via OuterProduct; the PoC has the SAME
+             * vectors in view space, so the same math applies.         */
+            float dxv = (float)L->dir[0] * (1.0f / 4096.0f);
+            float dyv = (float)L->dir[1] * (1.0f / 4096.0f);
+            float dzv = (float)L->dir[2] * (1.0f / 4096.0f);
+            float ex = vx + dxv, ey = vy + dyv, ez = vz + dzv;
+            float dex = ex - vx, dey = ey - vy, dez = ez - vz;
+            /* normalize both view-space vectors                        */
+            float nl = sqrtf(vx * vx + vy * vy + vz * vz) + 1e-9f;
+            float nd = sqrtf(dex * dex + dey * dey + dez * dez) + 1e-9f;
+            float ox = vx / nl, oy = vy / nl, oz = vz / nl;
+            float lxv = dex / nd, lyv = dey / nd, lzv = dez / nd;
+            /* outer product (plane normal) */
+            float pxn = oy * lzv - oz * lyv;
+            float pyn = oz * lxv - ox * lzv;
+            float pzn = ox * lyv - oy * lxv;
+            float pn = sqrtf(pxn * pxn + pyn * pyn + pzn * pzn) + 1e-9f;
+            pxn /= pn; pyn /= pn; pzn /= pn;
+            /* scr_l_ang_xy = atan2(norm.y, norm.x) - 90deg (Q12)       */
+            scrAngXY = fx_q12_angle(atan2f(pyn, pxn) * (180.0f / (float)M_PI))
+                       - fx_q12_angle(90.0f);
+            /* scr_l_ang_z = atan2(sin, cos) with sin = (lvec . (norm x
+             * pos)), cos = (pos . lvec) — engine verbatim             */
+            float cosz = ox * lxv + oy * lyv + oz * lzv;
+            float rx = pyn * oz - pzn * oy;
+            float ry = pzn * ox - pxn * oz;
+            float rz = pxn * oy - pyn * ox;
+            float sinz = lxv * rx + lyv * ry + lzv * rz;
+            scrAngZ = fx_q12_angle(atan2f(sinz, cosz) * (180.0f / (float)M_PI));
+
+            /* ---- GATE 2 (lens_flare.c:59-75): scr z > proj/2 ----------
+             * proj = ReadGeomScreen() = SCREEN_GEOM_DIST = 240 (screen
+             * height, data.h:44) — so the gate is vz > 120 in the SAME
+             * units as ws_l_pos: Q8 view meters (RotTrans of the Q8-
+             * translated light; lighting.c:226). The light must be more
+             * than 0.47m AHEAD of the camera — the engine's Harry light
+             * seen from the trailing camera (~2-5m), never a coincident
+             * camera light. The dist-rate table 204..3328 (0.8..13m) is
+             * in the SAME Q8 units — passed as-is below.               */
+            if (scrLPos[2] > 120) {
+                g_flaresys.syncDrawExecF = 1;
+                g_flaresys.scrLPos[0] = scrLPos[0];
+                g_flaresys.scrLPos[1] = scrLPos[1];
+                g_flaresys.scrLPos[2] = scrLPos[2];
+                g_flaresys.scrLAngXY = scrAngXY;
+                g_flaresys.scrLAngZ = scrAngZ;
+                /* shLensFlareMakeEffectTargetRate — pow = the env's
+                 * flashlightLensFlareIntensity Q12 (0..1) * light
+                 * intensity scale (engine passes light_intensity = the
+                 * blended spot intensity; PoC: env light intensity/4096
+                 * clamped to 0..1 for the pow table range)            */
+                int powQ12 = env->cur.flashlightLensFlareIntensity;
+                int powIn = (int)(((int64_t)powQ12 *
+                                   fx_min(fx_q12_mul(env->light.intensity,
+                                                     env->cur.flashlightLensFlareIntensity), 4096))
+                                  >> 12);
+                if (powIn > 4096) powIn = 4096;
+                g_flaresys.tgtEffRate = fx_flare_target_rate(
+                    powIn, scrLPos[2], scrAngZ);
+            }
+        }
+    }
+
+    /* ---- water shimmer gate (lens_flare.c:78-93 + WaterZoneGet) ---- */
+    if (!g_flaresys.waterInhibit && sx->nWaterZones > 0 && R->sc) {
+        /* camera (the PoC "player" proxy) inside a zone box? Engine
+         * checks the LIGHT pos (pos = the flashlight holder). Zones are
+         * ENGINE x/z meters; glTF maps (x,-y,-z): engine_x = cam.x,
+         * engine_z = -cam.z.                                          */
+        float ex = cam->pos.x, ez = -cam->pos.z;
+        for (int z = 0; z < sx->nWaterZones; z++) {
+            const Sh1xWaterZone *wz = &sx->waterZones[z];
+            if (!wz->enabled) continue;
+            if (ex >= wz->minX && ex < wz->maxX && ez >= wz->minZ && ez < wz->maxZ) {
+                /* inside: draw the wave tiles + glint + caustics.
+                 * The WATER.TIM/DR_WAVE.TIM pixels are NOT locally
+                 * available — the wave/glint sprite payload comes from
+                 * the consumer-side resolver; here we draw the CAUSTIC
+                 * RING (func_8008EA68 — pure geometry, no texture) and
+                 * the counter-driven shimmer WINDOW as an engine-styled
+                 * translucent overlay band (documented deviation: the
+                 * tile pixels await DR_WAVE.TIM; the geometry + counter
+                 * math + colors are verbatim).                          */
+                g_flaresys.counter++;       /* D_800AFDAC++ per non-zero dt */
+                float lx = (float)g_fxLightPos[0] * (1.0f / 4096.0f);
+                float ly = (float)g_fxLightPos[1] * (1.0f / 4096.0f);
+                float lz = (float)g_fxLightPos[2] * (1.0f / 4096.0f);
+                float posY = wz->illumination;   /* water plane height  */
+                /* func_8008E794: mirrored light position vy = posY*2 - vy */
+                float gx = lx, gy = posY * 2.0f - ly, gz = lz;
+                mat4 view = mat4_view_from_quat(cam->pos, cam->q);
+                float vx = view.m[0] * gx + view.m[4] * gy + view.m[8] * gz + view.m[12];
+                float vy = view.m[1] * gx + view.m[5] * gy + view.m[9] * gz + view.m[13];
+                float vz = view.m[2] * gx + view.m[6] * gy + view.m[10] * gz + view.m[14];
+                float d = -vz;
+                if (d > 0.5f) {
+                    /* the engine glint quad: ±24 x ±48 px around the
+                     * projected point (x±24, y∓48) — screen-centered    */
+                    float invd = 240.0f / d;
+                    int px0 = (int)(vx * invd), py0 = (int)(vy * invd);
+                    int qx[4] = { px0 - 24, px0 + 24, px0 - 24, px0 + 24 };
+                    int qy[4] = { py0 - 48, py0 - 48, py0 + 48, py0 + 48 };
+                    /* brightness: sin(clamp(angle-40°,<=90°)) — the
+                     * angle is scr_l_ang_z; r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9 */
+                    int ang0 = g_flaresys.scrLAngZ - fx_q12_angle(40.0f);
+                    if (ang0 > fx_q12_angle(90.0f)) ang0 = fx_q12_angle(90.0f);
+                    int sinA = sh_math_sin(ang0);
+                    if (sinA < 0) sinA = 0;
+                    int r = sinA >> 6, g = (sinA * 7) >> 9, b = (sinA * 5) >> 9;
+                    /* clamped u8 colors, SemiTrans avg-1 blend quad     */
+                    int x0 = (fb->w / 2) + qx[0] * scale;
+                    int x1 = (fb->w / 2) + qx[1] * scale;
+                    int y0 = (fb->h / 2) + qy[0] * scale;
+                    int y1 = (fb->h / 2) + qy[2] * scale;
+                    if (x1 > x0 && y1 > y0 && x1 > 0 && y1 > 0 &&
+                        x0 < (int)fb->w && y0 < (int)fb->h) {
+                        int a0 = x0 < 0 ? 0 : x0, a1 = x1 > fb->w ? fb->w : x1;
+                        int b0 = y0 < 0 ? 0 : y0, b1 = y1 > fb->h ? fb->h : y1;
+                        for (int yy = b0; yy < b1; yy++)
+                            for (int xx = a0; xx < a1; xx++) {
+                                size_t pi = (size_t)yy * fb->w + xx;
+                                uint8_t *p = fb->rgb + pi * 3;
+                                /* SemiTrans mode-1 avg (B+F)/2, 5-bit     */
+                                int rr = ((p[0] >> 3) + r) >> 1;
+                                int gg = ((p[1] >> 3) + g) >> 1;
+                                int bb = ((p[2] >> 3) + b) >> 1;
+                                if (rr > 31) rr = 31; if (gg > 31) gg = 31; if (bb > 31) bb = 31;
+                                p[0] = (uint8_t)((rr << 3) | (rr >> 2));
+                                p[1] = (uint8_t)((gg << 3) | (gg >> 2));
+                                p[2] = (uint8_t)((bb << 3) | (bb >> 2));
+                            }
+                    }
+                    /* func_8008EA68 caustic ring: 8 steps of 45°, inner
+                     * radius 0.2m at +1.2m fwd, outer 2.2m at +1.5m in
+                     * the light's yaw frame; colors (20,18,12)/(4,4,4)
+                     * opaque + (4,8,4)/(0,0,0) semi-trans. Implemented
+                     * as screen-space rings around the projected glint   */
+                    for (int i = 0; i < 8; i++) {
+                        int curA = i * fx_q12_angle(45.0f);
+                        int nxtA = (i + 1) * fx_q12_angle(45.0f);
+                        /* ring corners in the light-local frame         */
+                        float s1 = (float)sh_math_sin(curA) / 4096.0f;
+                        float c1 = (float)sh_math_cos(curA) / 4096.0f;
+                        float s2 = (float)sh_math_sin(nxtA) / 4096.0f;
+                        float c2 = (float)sh_math_cos(nxtA) / 4096.0f;
+                        /* inner r=0.2 z=+1.2, outer r=2.2 z=+1.5 (m)   */
+                        float ix0 = 0.2f * s1, iz0 = 1.2f + 0.2f * c1;
+                        float ix1 = 0.2f * s2, iz1 = 1.2f + 0.2f * c2;
+                        float ox0 = 2.2f * s1, oz0 = 1.5f + 2.2f * c1;
+                        float ox1 = 2.2f * s2, oz1 = 1.5f + 2.2f * c2;
+                        /* transform from the light frame: yaw from the
+                         * light direction (the engine builds sp50 from
+                         * ratan2(rot->vx, rot->vz))                     */
+                        float yaw = atan2f(
+                            (float)L->dir[0] / 4096.0f,
+                            (float)L->dir[2] / 4096.0f);
+                        float cyw = cosf(yaw), syw = sinf(yaw);
+                        /* corners in world (relative to light pos)       */
+                        float wpts[4][3];
+                        wpts[0][0] = ix0 * cyw; wpts[0][2] = iz0 * syw;
+                        wpts[1][0] = ix1 * cyw; wpts[1][2] = iz1 * syw;
+                        wpts[2][0] = ox0 * cyw; wpts[2][2] = oz0 * syw;
+                        wpts[3][0] = ox1 * cyw; wpts[3][2] = oz1 * syw;
+                        for (int k = 0; k < 4; k++) {
+                            wpts[k][0] += gx; wpts[k][1] = gy; wpts[k][2] += gz;
+                        }
+                        /* project 4 corners; draw the semi-trans tris   */
+                        int sxp[4], syp[4];
+                        int vis = 1;
+                        for (int k = 0; k < 4; k++) {
+                            float wx = wpts[k][0], wy = wpts[k][1], wz2 = wpts[k][2];
+                            float px = view.m[0] * wx + view.m[4] * wy + view.m[8] * wz2 + view.m[12];
+                            float py = view.m[1] * wx + view.m[5] * wy + view.m[9] * wz2 + view.m[13];
+                            float pz = view.m[2] * wx + view.m[6] * wy + view.m[10] * wz2 + view.m[14];
+                            float dd = -pz;
+                            if (dd <= 0.05f) { vis = 0; break; }
+                            float iv = 240.0f / dd;
+                            sxp[k] = (int)(px * iv) + (int)(fb->w / 2);
+                            syp[k] = (int)(py * iv) + (int)(fb->h / 2);
+                        }
+                        if (vis) {
+                            /* two tris: (0,1,2) + (0,2,3) with flat
+                             * colors (4,8,4)/(0,0,0) semi-trans avg     */
+                            static const int ringR = 4, ringG = 8, ringB = 4;
+                            int tris[2][3] = { { 0, 1, 2 }, { 0, 2, 3 } };
+                            for (int ti = 0; ti < 2; ti++) {
+                                int *tv = tris[ti];
+                                int mnx = sxp[tv[0]], mxx = sxp[tv[0]];
+                                int mny = syp[tv[0]], mxy = syp[tv[0]];
+                                for (int k = 1; k < 3; k++) {
+                                    if (sxp[tv[k]] < mnx) mnx = sxp[tv[k]];
+                                    if (sxp[tv[k]] > mxx) mxx = sxp[tv[k]];
+                                    if (syp[tv[k]] < mny) mny = syp[tv[k]];
+                                    if (syp[tv[k]] > mxy) mxy = syp[tv[k]];
+                                }
+                                if (mxx < 0 || mnx >= (int)fb->w || mxy < 0 || mny >= (int)fb->h) continue;
+                                if (mnx < 0) mnx = 0;
+                                if (mny < 0) mny = 0;
+                                if (mxx >= (int)fb->w) mxx = fb->w - 1;
+                                if (mxy >= (int)fb->h) mxy = fb->h - 1;
+                                for (int yy = mny; yy <= mxy; yy++)
+                                    for (int xx = mnx; xx <= mxx; xx++) {
+                                        double a2 = xx + 0.5, b2 = yy + 0.5;
+                                        double d1 = (sxp[tv[1]] - a2) * (syp[tv[0]] - b2) - (sxp[tv[0]] - a2) * (syp[tv[1]] - b2);
+                                        double d2 = (sxp[tv[2]] - sxp[tv[1]]) * (syp[tv[0]] - syp[tv[1]]) - (sxp[tv[0]] - sxp[tv[1]]) * (syp[tv[2]] - syp[tv[1]]);
+                                        double d3 = (sxp[tv[0]] - sxp[tv[2]]) * (syp[tv[1]] - syp[tv[2]]) - (sxp[tv[1]] - sxp[tv[2]]) * (syp[tv[0]] - syp[tv[2]]);
+                                        int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                                        int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                                        if (neg && pos) continue;
+                                        size_t pi = (size_t)yy * fb->w + xx;
+                                        uint8_t *p = fb->rgb + pi * 3;
+                                        int rr = ((p[0] >> 3) + ringR) >> 1;
+                                        int gg = ((p[1] >> 3) + ringG) >> 1;
+                                        int bb = ((p[2] >> 3) + ringB) >> 1;
+                                        if (rr > 31) rr = 31; if (gg > 31) gg = 31; if (bb > 31) bb = 31;
+                                        p[0] = (uint8_t)((rr << 3) | (rr >> 2));
+                                        p[1] = (uint8_t)((gg << 3) | (gg >> 2));
+                                        p[2] = (uint8_t)((bb << 3) | (bb >> 2));
+                                    }
+                            }
+                        }
+                    }
+                }
+                break;      /* first matching zone wins (engine returns it) */
+            }
+        }
+    }
+
+    /* ---- shLensFlareDraw (lens_flare.c:176-223) ---------------------- */
+    if (!g_flaresys.syncDrawExecF) return;
+    g_flaresys.syncDrawExecF = 0;
+    if (g_flaresys.flareInhibit) return;
+
+    /* occlusion probe: the engine reads back the 1x1 white TILE pixel at
+     * the light's screen center (pixels[0] & 0x7FFF) == 0x7FFF). PoC:
+     * probe the depth buffer — visible iff NO opaque geometry closer
+     * than the light depth at that pixel (fb->z < light depth = covered).
+     */
+    {
+        int px = g_flaresys.scrLPos[0] + fb->w / 2;
+        int py = g_flaresys.scrLPos[1] + fb->h / 2;
+        int visible = 0;
+        if (px >= 0 && px < (int)fb->w && py >= 0 && py < (int)fb->h) {
+            float lightDepth = (float)g_flaresys.scrLPos[2] / 256.0f;
+            visible = fb->z[(size_t)py * fb->w + px] >= lightDepth;
+        }
+        g_flaresys.centerVisible = visible;
+        /* rate easing (lens_flare.c:182-192): now += (tgt-now)/2 or ->0 */
+        int add = visible ? g_flaresys.tgtEffRate - g_flaresys.nowEffRate
+                          : -g_flaresys.nowEffRate;
+        g_flaresys.nowEffRate += fx_div_fast(add, 2);
+        /* PoC is never the engine's VC_MV_CHASE cam (camera-track modes
+         * are the equivalent of the engine's road cams); chase-kill N/A  */
+    }
+
+    /* ---- shLensFlareEffect_Draw (lens_flare.c:296-487) — sprites ----- */
+    int nowRate = g_flaresys.nowEffRate;
+    int scrX = g_flaresys.scrLPos[0];
+    int scrY = g_flaresys.scrLPos[1];
+    int angXY = g_flaresys.scrLAngXY;
+    int angZ = g_flaresys.scrLAngZ;
+    int visF = g_flaresys.centerVisible;
+
+    /* super-cull (lens_flare.c:311-316): ±512 engine px beyond screen  */
+    if (scrX < -160 - 512 || scrX > 160 + 512 ||
+        scrY < -112 - 512 || scrY > 112 + 512) return;
+
+    int hensinX = fx_q12_mul(sh_math_sin(angZ), sh_math_cos(angXY));
+    int hensinY = fx_q12_mul(sh_math_sin(angZ), sh_math_sin(angXY));
+
+    /* sprite blits in PoC px (engine px * scale, screen-centered)      */
+    #define FX_TO_PX(v) ((int)((v) * scale) + (int)(fb->w / 2))
+    #define FX_TO_PY(v) ((int)((v) * scale) + (int)(fb->h / 2))
+
+    /* core quad 1 (lens_flare.c:326-336): grey ((rate+3)>>2)*40, half-
+     * size ((rate+3)>>2)*30, offset hensin*5; UV 0..63 clut+6          */
+    {
+        int rate3 = (nowRate + 3 * 4096) >> 2;
+        int prim = fx_q12_mul(rate3, 40);
+        int half = fx_q12_mul(rate3, 30);
+        int ox = fx_q12_mul(hensinX, 5), oy = fx_q12_mul(hensinY, 5);
+        fx_blit_sprite_quad(fb,
+            FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy - half),
+            FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy - half),
+            FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
+            FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
+            (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
+            prim, prim, prim);
+    }
+    /* core quad 2: fixed color 0x10, half-size 11 (lens_flare.c:338-365) */
+    fx_blit_sprite_quad(fb,
+        FX_TO_PX(scrX - 11), FX_TO_PY(scrY - 11),
+        FX_TO_PX(scrX + 11), FX_TO_PY(scrY - 11),
+        FX_TO_PX(scrX - 11), FX_TO_PY(scrY + 11),
+        FX_TO_PX(scrX + 11), FX_TO_PY(scrY + 11),
+        (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
+        0x10, 0x10, 0x10);
+    /* core quad 3 (lens_flare.c:367-396): grey min(rate*2,1)*48, offset
+     * hensin*9/2? engine FP_MULTIPLY(hensin, 9, Q12_SHIFT-1) = h*9/2   */
+    {
+        int r2 = nowRate * 2; if (r2 > 4096) r2 = 4096;
+        int prim = fx_q12_mul(r2, 48);
+        int half = fx_q12_mul((nowRate + 3 * 4096) >> 2, 48);
+        int ox = (int)(((int64_t)hensinX * 9) >> (FX_Q12_SHIFT - 1));
+        int oy = (int)(((int64_t)hensinY * 9) >> (FX_Q12_SHIFT - 1));
+        fx_blit_sprite_quad(fb,
+            FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy - half),
+            FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy - half),
+            FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
+            FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
+            (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
+            prim, prim, prim);
+    }
+
+    if (nowRate != 0) {
+        /* 16 streaks (lens_flare.c:398-431) — VERBATIM angles + rate    */
+        static const int ang_dat[16] = {
+            -175, -168, -130, -115, -60, -50, -15, -2,
+            5, 35, 40, 60, 110, 142, 147, 155
+        };                                   /* degrees -> Q12 below     */
+        /* streak quad corners (DVECTOR pos[]), rotated per angle        */
+        const int posx[4] = { -4, 43, 43, 90 };
+        const int posy[4] = { 0, -47, 47, 0 };
+        int addFlareAng = ((-angZ >> 1) + ((scrX + scrY) * 4)) +
+                          fx_q12_angle(60.0f);
+        int addMaskAng = (g_flaresys.scrLPos[2] * 4) + ((scrX + scrY) * 16);
+        for (int i = 0; i < 16; i++) {
+            int ang = fx_q12_angle((float)ang_dat[i]) + addFlareAng;
+            int rate16 = fx_q12_mul(
+                (sh_math_cos(ang - angXY) + 1741 /* Q12(1.7) */),
+                (sh_math_cos((ang * 12) + addMaskAng) + 4096) >> 1);
+            if (rate16 > 6144) rate16 = 6144;          /* MIN 1.5       */
+            int prim = (int)(((int64_t)nowRate * rate16) >> 18);
+            int sv = sh_math_sin(ang), cv = sh_math_cos(ang);
+            /* rotated corners: (x*cos - y*sin, x*sin + y*cos) in Q12->px */
+            int cxp[4], cyp[4];
+            for (int k = 0; k < 4; k++) {
+                /* engine FP_FROM(pos*cos - pos*sin, 12): fixed->int px  */
+                int rx = (int)(((int64_t)posx[k] * cv -
+                                (int64_t)posy[k] * sv) >> 12);
+                int ry = (int)(((int64_t)posx[k] * sv +
+                                (int64_t)posy[k] * cv) >> 12);
+                cxp[k] = FX_TO_PX(scrX + rx);
+                cyp[k] = FX_TO_PY(scrY + ry);
+            }
+            fx_blit_sprite_quad(fb, cxp[0], cyp[0], cxp[1], cyp[1],
+                                cxp[2], cyp[2], cxp[3], cyp[3],
+                                (const unsigned char *)kFlareStreak, 32, 32,
+                                kFlareClutStreak, prim, prim, prim);
+        }
+
+        /* ghost 1 (lens_flare.c:447-459): RGB rate*32/48/32, scale .2  */
+        {
+            int half = fx_q12_mul((nowRate + 3 * 4096) >> 2, 16);
+            int px = fx_q12_mul(scrX, 819 /* Q12(0.2) */);
+            int py = fx_q12_mul(scrY, 819);
+            fx_blit_sprite_quad(fb,
+                FX_TO_PX(px - half), FX_TO_PY(py - half),
+                FX_TO_PX(px + half), FX_TO_PY(py - half),
+                FX_TO_PX(px - half), FX_TO_PY(py + half),
+                FX_TO_PX(px + half), FX_TO_PY(py + half),
+                (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
+                fx_q12_mul(nowRate, 32) >> 4, fx_q12_mul(nowRate, 48) >> 4,
+                fx_q12_mul(nowRate, 32) >> 4);
+        }
+        /* ghost 2 (lens_flare.c:462-475): RGB rate*7/2^9, *19/2^11, *24;
+         * scale -0.3, half ((rate+3)>>2)*28                            */
+        {
+            int half = fx_q12_mul((nowRate + 3 * 4096) >> 2, 28);
+            int px = fx_q12_mul(scrX, -1229 /* Q12(0.3) */);
+            int py = fx_q12_mul(scrY, -1229);
+            unsigned urate = (unsigned)nowRate;
+            int r = (int)((urate * 7) >> 9);
+            int g = (int)((urate * 19) >> 11);
+            int b = fx_q12_mul(nowRate, 24) >> 4;
+            fx_blit_sprite_quad(fb,
+                FX_TO_PX(px - half), FX_TO_PY(py - half),
+                FX_TO_PX(px + half), FX_TO_PY(py - half),
+                FX_TO_PX(px - half), FX_TO_PY(py + half),
+                FX_TO_PX(px + half), FX_TO_PY(py + half),
+                (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
+                r, g, b);
+        }
+        /* ghost 3 (lens_flare.c:477-487): tpage 76 window 0..63 clut+6 */
+        {
+            unsigned urate = (unsigned)nowRate;
+            int r = (int)(urate >> 6);
+            int g = fx_q12_mul(nowRate, 24) >> 4;
+            int b = (int)((urate * 47) >> 11);
+            fx_blit_sprite_quad(fb,
+                FX_TO_PX(scrX - 10), FX_TO_PY(scrY - 10),
+                FX_TO_PX(scrX + 10), FX_TO_PY(scrY - 10),
+                FX_TO_PX(scrX - 10), FX_TO_PY(scrY + 10),
+                FX_TO_PX(scrX + 10), FX_TO_PY(scrY + 10),
+                (const unsigned char *)kFlareGhost3, 64, 64, kFlareClutCore,
+                r, g, b);
+        }
+    }
+    (void)visF;
+    #undef FX_TO_PX
+    #undef FX_TO_PY
 }
 
 /* v18 diagnostics — FOGPOC_LIGHTDUMP (globals declared above utils) */
@@ -7469,6 +8320,28 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
     }
 
     free(xv); free(post);
+
+    /* ---- v26 SH1X v3: LENS FLARE + WATER SHIMMER pass --------------------
+     * Engine order: shLensFlareExec runs INSIDE WorldGfx_2dEffectsDraw
+     * (before the GPU walk) computing the target rate + the occlusion
+     * seed; shLensFlareDraw runs AFTER DrawSync (game_main.c:223) adding
+     * the sprites at the FRONT OT slots (org[1], depth_ot+7). In the PoC
+     * the whole flare paint happens here — after the mesh OT walk, before
+     * the brightness overlay — which preserves the engine's LAYERING
+     * (flare sprites paint OVER the scene). Water shimmer quads ride
+     * org[641]/org[639] = behind the brightness overlay, over geometry:
+     * drawn here as well (the PoC OT is depth-sorted only for meshes).
+     * All gated by the GLB's SH1X v3 fields (absent = off).            */
+    fx_pass(fb, R, cam);
+    if (getenv("FOGPOC_FXDBG"))
+        fprintf(stderr, "[fx] field_0=%d lensFlareInt=%d lightModeGate=%d "
+                "fi=%d spotInt=%d nowRate=%d tgt=%d sync=%d\n",
+                R->env->field_0, R->env->cur.flashlightLensFlareIntensity,
+                (R->env->field_0 == SHENUM_1) &&
+                (R->env->cur.flashlightLensFlareIntensity != 0),
+                R->env->flashlightIntensity, R->env->light.intensity,
+                g_flaresys.nowEffRate, g_flaresys.tgtEffRate,
+                g_flaresys.syncDrawExecF);
 
     /* ---- v4: WorldGfx_2dEffectsDraw screen-brightness overlay -------------
      * Full-screen additive semi-trans G4 at the FRONT of the OT (drawn last,
@@ -9899,6 +10772,27 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        else if (!strcmp(a, "--userlight") && i + 1 < argc) {
+            /* v26 task 3: user-programmable light. "off"=engine anchor;
+             * "x,y,z"=free world light; "ahead:D"=D m ahead of camera   */
+            const char *v = argv[++i];
+            if (!strcmp(v, "off")) { g_userLightMode = 0; }
+            else if (!strncmp(v, "ahead:", 6)) {
+                g_userLightMode = 2;
+                g_userLightAheadM = (float)atof(v + 6);
+                if (g_userLightAheadM < 0) g_userLightAheadM = 0;
+            } else {
+                float fx2, fy2, fz2;
+                if (sscanf(v, "%f,%f,%f", &fx2, &fy2, &fz2) == 3) {
+                    g_userLightMode = 1;
+                    g_userLightWorld[0] = fx2; g_userLightWorld[1] = fy2;
+                    g_userLightWorld[2] = fz2;
+                } else {
+                    fprintf(stderr, "--userlight expects off | x,y,z | ahead:D\n");
+                    return 1;
+                }
+            }
+        }
         else if (!strcmp(a, "--lensflare") && i + 1 < argc) {
             /* v8: the enum-2 directional light source (func_8003F4DC):
              * 0 Default (lightWeight 0 — ambient only) | 1 Custom | 2..5
@@ -10492,6 +11386,10 @@ int main(int argc, char **argv) {
      * (map0_s02_events.c:102, map6_s01_2.c:479). The N key cycles
      * day -> night --nightpair -> the other pair -> day.                */
     LiveApp A; memset(&A, 0, sizeof(A));
+    /* v26: lens flare work state — the engine's LensFlareInit-equivalent
+     * (lens_flare.c:22-24 resets the flags/rate; the PoC starts enabled —
+     * the inhibitors are the map-script Disable calls, unavailable here) */
+    memset(&g_flaresys, 0, sizeof(g_flaresys));
     A.env.nightP0 = nightPair0;
     A.env.nightP1 = nightPair1;
     /* the nightmare pair = the other authentic night pair of {6,3}/{7,4} */
