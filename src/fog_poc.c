@@ -545,6 +545,13 @@ static int jint(const JValue *obj, const char *key, int def) {
     const JValue *v = jget(obj, key);
     return (v && v->type == JV_NUM) ? (int)v->num : def;
 }
+static int jintb(const JValue *obj, const char *key, int def) {
+    /* v27: SH1X fields accept JSON booleans too (isExterior/enabled/
+     * alternate are emitted as true/false by the ripper; jint's strict
+     * JV_NUM test silently took the default for them) */
+    const JValue *v = jget(obj, key);
+    return (v && (v->type == JV_NUM || v->type == JV_BOOL)) ? (int)v->num : def;
+}
 static const char *jstr(const JValue *obj, const char *key, const char *def) {
     const JValue *v = jget(obj, key);
     return (v && v->type == JV_STR) ? v->str : def;
@@ -1369,7 +1376,7 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
     for (int k = 0; k < nwz && k < 4; k++) {
         const JValue *z = jat(wz, k);
         if (!z) continue;
-        sx->waterZones[sx->nWaterZones].enabled = jint(z, "enabled", 0);
+        sx->waterZones[sx->nWaterZones].enabled = jintb(z, "enabled", 0);
         sx->waterZones[sx->nWaterZones].illumination = (float)jnum(z, "illumination", 0.0);
         sx->waterZones[sx->nWaterZones].minX = (float)jnum(z, "minX", 0.0);
         sx->waterZones[sx->nWaterZones].maxX = (float)jnum(z, "maxX", 0.0);
@@ -1385,7 +1392,7 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         sx->mapLink.chunkX = jint(ml, "chunkX", 0);
         sx->mapLink.chunkZ = jint(ml, "chunkZ", 0);
         sx->mapLink.activeChunks = jint(ml, "activeChunks", 4);
-        sx->mapLink.isExterior = jint(ml, "isExterior", 0);
+        sx->mapLink.isExterior = jintb(ml, "isExterior", 0);
         const JValue *nbs = jarr(ml, "neighbors");
         int nnb = jcount(nbs);
         for (int k = 0; k < nnb && k < 8; k++) {
@@ -1492,7 +1499,7 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                 a->driver = 7;   /* fanArray w/o per-inst pos: no draw */
         }
         a->bladeCount = jint(e, "bladeCount", 16);
-        a->alternate = jint(e, "alternate", 0);
+        a->alternate = jintb(e, "alternate", 0);
         a->lcgA = (unsigned)jint(e, "lcgA", 0x7169AC35);
         a->lcgXorA = (unsigned)jint(e, "lcgXorA", 0xA547B39E);
         a->lcgB = (unsigned)jint(e, "lcgB", 0x892D719C);
@@ -2020,6 +2027,115 @@ static void scene_free(Scene *s) {
     free(s->verts); free(s->idxs); free(s->texBlob);
     sh1x_free(&s->sh1x);
     memset(s, 0, sizeof(*s));
+}
+
+/* ---- v27 mapLink: neighbor room merging (task 6) ------------------- */
+/* Engine ground (map.c, ANIMS_MAPLINK evidence): exterior maps stream
+ * their 8 grid neighbors into the active 3x3 chunk set (WorldMap_
+ * ChunkLoad) — a single-room consumer shows the map EDGE ("cliff") at
+ * the room bounds. When the neighbor GLB files sit next to the active
+ * room's GLB, they are loaded and MERGED (textures, materials, verts,
+ * items) so the camera looking toward the edge sees the continuation.
+ * A MISSING FILE IS A SILENT NO-OP — nothing renders, no error output:
+ * the room behaves exactly as before (the user's explicit contract).
+ * Neighbor items ride the legacy always-drawn path (buffer -1, the
+ * engine's active-chunk set) and render STATIC (their own propAnims
+ * are not driven — documented limitation for v27). */
+static int g_mapLinkLoad = 1;      /* --maplink 0 disables (regression A/B) */
+
+static int scene_merge(Scene *dst, Scene *src) {
+    if (!src || src->itemCount <= 0) return 0;
+    const int texOff = dst->texCount, matOff = dst->matCount;
+    const int vertOff = dst->vertCount, idxOff = dst->idxCount;
+    const size_t blobOff = dst->texBlobSize;
+    dst->tex = (TexInfo *)realloc(dst->tex,
+        (size_t)(dst->texCount + src->texCount) * sizeof(TexInfo));
+    for (int i = 0; i < src->texCount; i++) {
+        dst->tex[texOff + i] = src->tex[i];
+        if (dst->tex[texOff + i].w > 0)
+            dst->tex[texOff + i].off += (uint32_t)blobOff;
+    }
+    dst->mat = (MaterialInfo *)realloc(dst->mat,
+        (size_t)(dst->matCount + src->matCount) * sizeof(MaterialInfo));
+    for (int i = 0; i < src->matCount; i++) {
+        dst->mat[matOff + i] = src->mat[i];
+        if (dst->mat[matOff + i].texIdx >= 0)
+            dst->mat[matOff + i].texIdx += texOff;
+    }
+    dst->verts = (float *)realloc(dst->verts,
+        (size_t)(dst->vertCount + src->vertCount) * 8 * sizeof(float));
+    memcpy(dst->verts + (size_t)dst->vertCount * 8, src->verts,
+           (size_t)src->vertCount * 8 * sizeof(float));
+    dst->idxs = (uint32_t *)realloc(dst->idxs,
+        (size_t)(dst->idxCount + src->idxCount) * sizeof(uint32_t));
+    memcpy(dst->idxs + dst->idxCount, src->idxs,
+           (size_t)src->idxCount * sizeof(uint32_t));
+    if (src->texBlobSize) {
+        dst->texBlob = (uint8_t *)realloc(dst->texBlob,
+            dst->texBlobSize + src->texBlobSize);
+        memcpy(dst->texBlob + blobOff, src->texBlob, src->texBlobSize);
+    }
+    dst->item = (DrawItem *)realloc(dst->item,
+        (size_t)(dst->itemCount + src->itemCount) * sizeof(DrawItem));
+    for (int i = 0; i < src->itemCount; i++) {
+        DrawItem it = src->item[i];
+        it.matIdx += matOff;
+        it.vbase += vertOff;
+        it.ibase += idxOff;
+        it.buffer = -1;          /* legacy always-drawn (active chunk set) */
+        it.addSeq = dst->itemCount + i;
+        it.animIdx = -1;        /* neighbors render static (documented)    */
+        it.animInst = 0;
+        dst->item[dst->itemCount + i] = it;
+    }
+    dst->texCount += src->texCount;
+    dst->matCount += src->matCount;
+    dst->vertCount += src->vertCount;
+    dst->idxCount += src->idxCount;
+    dst->itemCount += src->itemCount;
+    dst->texBlobSize += src->texBlobSize;
+    /* union bounds */
+    if (src->bounds.bmin.x < dst->bounds.bmin.x) dst->bounds.bmin.x = src->bounds.bmin.x;
+    if (src->bounds.bmin.y < dst->bounds.bmin.y) dst->bounds.bmin.y = src->bounds.bmin.y;
+    if (src->bounds.bmin.z < dst->bounds.bmin.z) dst->bounds.bmin.z = src->bounds.bmin.z;
+    if (src->bounds.bmax.x > dst->bounds.bmax.x) dst->bounds.bmax.x = src->bounds.bmax.x;
+    if (src->bounds.bmax.y > dst->bounds.bmax.y) dst->bounds.bmax.y = src->bounds.bmax.y;
+    if (src->bounds.bmax.z > dst->bounds.bmax.z) dst->bounds.bmax.z = src->bounds.bmax.z;
+    v3 szv = v3_sub(dst->bounds.bmax, dst->bounds.bmin);
+    dst->bounds.diag = v3_len(szv);
+    scene_free(src);
+    return 1;
+}
+
+/* Load the mapLink neighbors of the room at glbPath into sc. Returns the
+ * number merged. Interior rooms and rooms without mapLink extras are a
+ * no-op (the engine loads interiors on door transitions, not streamed). */
+static int sh1x_load_neighbors(Scene *sc, const char *glbPath) {
+    if (!g_mapLinkLoad || !sc->sh1x.hasMapLink) return 0;
+    if (!sc->sh1x.mapLink.isExterior) return 0;
+    if (!sc->sh1x.mapLink.nNbs) return 0;
+    char dir[512];
+    snprintf(dir, sizeof(dir), "%s", glbPath);
+    char *slash = strrchr(dir, '/');
+    if (slash) *slash = 0;
+    else snprintf(dir, sizeof(dir), ".");
+    int loaded = 0;
+    for (int n = 0; n < sc->sh1x.mapLink.nNbs; n++) {
+        const Sh1xMapLinkNb *nb = &sc->sh1x.mapLink.nbs[n];
+        char p[1024];
+        snprintf(p, sizeof(p), "%s/%s.glb", dir, nb->room);
+        FILE *f = fopen(p, "rb");       /* silent no-op when absent */
+        if (!f) continue;
+        fclose(f);
+        Scene *ns = (Scene *)calloc(1, sizeof(Scene));
+        if (!scene_load_glb(ns, p)) {   /* parse failure: silent skip */
+            free(ns);
+            continue;
+        }
+        if (scene_merge(sc, ns)) loaded++;
+        free(ns);                     /* scene_free freed the fields */
+    }
+    return loaded;
 }
 
 /* ==================================================================== */
@@ -11479,6 +11595,11 @@ int main(int argc, char **argv) {
              * their authored rot0 pose. */
             g_animsDemo = 1;
         }
+        else if (!strcmp(a, "--maplink") && i + 1 < argc) {
+            /* v27: 1 = merge neighbor GLBs when present (default), 0 =
+             * single room only (regression A/B) */
+            g_mapLinkLoad = !!atoi(argv[++i]);
+        }
         else if (!strcmp(a, "--userlight") && i + 1 < argc) {
             /* v26 task 3: user-programmable light. "off"=engine anchor;
              * "x,y,z"=free world light; "ahead:D"=D m ahead of camera   */
@@ -11901,6 +12022,13 @@ int main(int argc, char **argv) {
     /* ---- load the scene DIRECTLY from the GLB ---- */
     Scene sc;
     if (!scene_load_glb(&sc, glbPath)) return 1;
+    {   /* v27 mapLink: merge the present neighbor GLBs (silent no-op when
+         * the files are absent; interior rooms never stream) */
+        int nb = sh1x_load_neighbors(&sc, glbPath);
+        if (nb)
+            printf("mapLink: %d neighbor room(s) merged (cliff continuation)\n",
+                   nb);
+    }
     printf("GLB %s: %d draw items, %d verts, %d indices, %d textures, bounds "
            "(%.1f..%.1f, %.1f..%.1f, %.1f..%.1f) diag %.2f m\n",
            glbPath, sc.itemCount, sc.vertCount, sc.idxCount, sc.texCount,
