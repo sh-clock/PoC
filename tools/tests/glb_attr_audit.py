@@ -2,7 +2,7 @@
 """GLB attribute audit for the flashlight-illumination diagnosis."""
 import json, struct, sys, collections
 
-path = sys.argv[1] if len(sys.argv) > 1 else "/home/z/my-project/poc_v5/input/THRF9FD.glb"
+path = sys.argv[1] if len(sys.argv) > 1 else "../../input/THRF9FD.glb"
 data = open(path, "rb").read()
 magic, ver, total = struct.unpack("<III", data[:12])
 assert magic == 0x46546C67, "not a GLB"

@@ -3,15 +3,18 @@
 # Dumps evalTrack CSVs from the PoC for every test track, then numerically
 # compares them against the JS ground truth (camtrack_audit.js output).
 set -e
-cd /home/z/my-project
-POC=./poc/fog_poc
-TESTJSON=scripts/camtest_tracks.json
+HERE=$(cd "$(dirname "$0")" && pwd)          # tools/tests/
+REPO=$(cd "$HERE/../.." && pwd)              # PoC repo root
+cd "$REPO"
+POC=./fog_poc
+TESTJSON=tools/tests/camtest_tracks.json
 AUD=/tmp/camaudit
+mkdir -p "$AUD"
 NTRACKS=$(python3 -c "import json;print(len(json.load(open('$TESTJSON'))['models'][0]['tracks']))")
 
 echo "== C dumps (fog_poc --cam-dump, $NTRACKS tracks x 401 samples) =="
 for ((i=0; i<NTRACKS; i++)); do
-    $POC --glb poc/input/THRF9FD.glb --camdat $TESTJSON --track $i \
+    $POC --glb input/THRF9FD.glb --camdat $TESTJSON --track $i \
          --cam-dump $AUD/c_${i}.csv,400 > $AUD/c_${i}.log 2>&1 || {
         echo "FAILED: track $i"; cat $AUD/c_${i}.log; exit 1; }
 done
