@@ -1132,6 +1132,8 @@ typedef struct {
     int animIdx;              /* v26.3: index into Sh1x.anims driving this
                                  item's rotation (by node name = engine
                                  WorldObject model name), -1 = none      */
+    int animInst;             /* v27: instance index within the anim (the
+                                 engine's per-copy phase/index i)          */
 } DrawItem;
 
 typedef struct {
@@ -1173,12 +1175,38 @@ typedef struct {
     unsigned lcgA, lcgXorA, lcgB, lcgXorB;   /* tvNoise LCG constants       */
     int durationShift, durationBase;
     int chunkGate[2];               /* PLAYER_IN_MAP_CHUNK gate (x, z)      */
+    int chunkGateAlt[2];            /* v27: OR-form '5|6' second alternative */
+    int hasChunkGate;
+    int eventGate;                  /* v27: Savegame event gate (0=none)    */
     int axis;                       /* 0 x 1 y 2 z                           */
     float cur[3];                   /* live driver state (rot/pos meters)    */
     unsigned lcgS1, lcgS2;          /* tvNoise live LCG state               */
     int tvChannel, tvTimer;         /* tvNoise channel state machine        */
     float rattleD;                  /* doorRattle angular velocity          */
     float kick, restAngle, angVelMax;/* dampedSwing / choreo params          */
+    /* ---- v27: RAW-UNIT swing family (engine Q12 angle ints, 4096=360deg) */
+    int rawVy;                      /* live rotation, raw units              */
+    int rawVel;                     /* doorRattle D | kickSwing vel | damped angVel */
+    int rawVyFloor, rawAngAccel, rawAngVelFloor;  /* dampedSwing verbatim  */
+    int rawKickVel, rawOpenLimit, rawBounceHi;
+    int rawSettle, rawRebound;      /* kickSwing verbatim (map1_s03)         */
+    int kickPhase;                  /* kickSwing: 0 armed 1 kick 2 bounce    */
+    int gated;                      /* v27: driver currently gated OFF       */
+    int sharedLeader;               /* v27: index of the sharedRot leader anim */
+    int count;                      /* v27: multi-instance count             */
+    /* lightFlicker (map1_s05.c:371-396 verbatim, raw Q12 state) */
+    int flT0, flT1, flPer0, flPer1, flAmp;
+    float flBase, flAmpA, flAmpB;
+    int flRampThresh;
+    /* movement drivers (raw Q12 meters / Q12 angle accumulators) */
+    int mvMaster, mvMaster2, mvWrap, mvWrapCount;
+    int mvPend[4], mvPendVel[4];    /* ferrisWheel cabin pendulum states    */
+    int mvVel;                      /* gravityScatter fall velocity          */
+    int mvState;                    /* stoneChoreo state / cutscene sub-state */
+    int mvTimer;                    /* stoneChoreo/translate accum           */
+    int posPerInstN;                /* fanArray posed positions (glTF m)     */
+    float posPerInst[16][3];
+    int rotY180From;                /* fanArray: i>=this gets +180 deg y     */
 } Sh1xPropAnim;
 typedef struct {
     char tag[8];
@@ -1222,6 +1250,17 @@ static void sh1x_free(Sh1x *sx) {
  * structural problem the room falls back to the legacy all-items path
  * with extras ot_base where present, which is still engine-correct for
  * layering — only the subcell window degenerates to "everything").     */
+/* v27: prop-anim runtime globals ------------------------------------- */
+static int   g_animsDemo = 0;          /* --anims-demo: event gates SET  */
+static float g_sh1xLightFlicker = 1.0f;/* lightFlicker live multiplier   */
+
+static int sh_sin_q12(int angle) {
+    /* engine Math_Sin: Q3.12 angle (4096 = full turn) -> Q19.12 sine
+     * ([-4096, 4096]); g_SineTable is a plain sine table. */
+    return (int)(sinf((float)(angle & 0xFFF) * (float)(2.0 * M_PI / 4096.0))
+                 * 4096.0f);
+}
+
 static void sh1x_load(Sh1x *sx, const JValue *json) {
     memset(sx, 0, sizeof(*sx));
     const JValue *scenes = jarr(json, "scenes");
@@ -1371,17 +1410,24 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         if (!strcmp(drv, "spin") || !strcmp(drv, "spinRng") ||
             !strcmp(drv, "spinConst"))   a->driver = 0;
         else if (!strcmp(drv, "fanArray")) a->driver = 1;
-        else if (!strcmp(drv, "tvNoise"))  a->driver = 2;
+        else if (!strcmp(drv, "tvNoise"))  a->driver = 2;   /* LCG core ticks;
+                                                            paint deferred */
         else if (!strcmp(drv, "translate")) a->driver = 3;
         else if (!strcmp(drv, "doorRattle")) a->driver = 4;
         else if (!strcmp(drv, "dampedSwing")) a->driver = 5;
-        else if (!strcmp(drv, "sineBob") || !strcmp(drv, "carouselSpin") ||
-                 !strcmp(drv, "ferrisWheel") || !strcmp(drv, "lissajousOrbit") ||
-                 !strcmp(drv, "rngWalk") || !strcmp(drv, "slideDoor") ||
-                 !strcmp(drv, "gravityScatter") || !strcmp(drv, "fallOnce") ||
-                 !strcmp(drv, "stoneChoreo") || !strcmp(drv, "waterRipple") ||
-                 !strcmp(drv, "lightFlicker")) a->driver = 6;  /* catalog:
-                                          * ticked generically below */
+        else if (!strcmp(drv, "kickSwing")) a->driver = 8;
+        else if (!strcmp(drv, "gravityScatter")) a->driver = 9;
+        else if (!strcmp(drv, "stoneChoreo")) a->driver = 10;
+        else if (!strcmp(drv, "lightFlicker")) a->driver = 11;
+        else if (!strcmp(drv, "sineBob")) a->driver = 12;
+        else if (!strcmp(drv, "carouselSpin")) a->driver = 13;
+        else if (!strcmp(drv, "ferrisWheel")) a->driver = 14;
+        else if (!strcmp(drv, "lissajousOrbit")) a->driver = 15;
+        else if (!strcmp(drv, "slideDoor")) a->driver = 16;
+        else if (!strcmp(drv, "rngWalk")) a->driver = 17;
+        else if (!strcmp(drv, "fallOnce")) a->driver = 18;
+        else if (!strcmp(drv, "binSpin")) a->driver = 19;
+        else if (!strcmp(drv, "scrollBelt")) a->driver = 20;
         else if (!strcmp(drv, "cutscene"))  a->driver = 7;  /* idle default */
         else continue;                    /* unknown driver: not played */
         const JValue *p = jarr(e, "pos");
@@ -1403,6 +1449,48 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         a->kick = (float)jnum(e, "kick", 0.0);
         a->restAngle = (float)jnum(e, "rest", jnum(e, "restAngle", 0.0));
         a->angVelMax = (float)jnum(e, "angVelMax", 0.0);
+        /* v27 raw-unit swing params (engine Q12 angle ints, 4096=360deg) */
+        a->rawVyFloor  = jint(e, "vyFloorRaw", 0);
+        a->rawAngAccel = jint(e, "angAccelRaw", -113);
+        a->rawAngVelFloor = jint(e, "angVelFloorRaw", -56);
+        a->rawKickVel  = jint(e, "kickVelRaw", -128);
+        a->rawOpenLimit = jint(e, "openLimitRaw", -1920);
+        a->rawBounceHi = jint(e, "bounceHiRaw", -1791);
+        a->rawSettle  = jint(e, "settleRaw", -1790);
+        a->rawRebound = jint(e, "reboundVelRaw", 32);
+        a->kickPhase = 0;
+        a->sharedLeader = -1;
+        a->count = jint(e, "count", jint(e, "arms", 1));
+        /* lightFlicker verbatim (map1_s05.c:371-396) */
+        a->flBase = (float)jnum(e, "base", 1.35);
+        a->flAmpA = (float)jnum(e, "ampA", 0.9);
+        a->flAmpB = (float)jnum(e, "ampB", 0.6);
+        a->flRampThresh = jint(e, "rampThreshRaw", 262144);
+        { const JValue *ra = jarr(e, "rerollA");
+            /* rerollA may arrive as [lo,hi] or a legacy scalar (hi) */
+            if (ra && ra->count >= 2) { a->flAmp = 32; (void)jat(ra,1); }
+            else { a->flAmp = 32; } }
+        a->flT0 = 0; a->flT1 = 0; a->flPer0 = 0; a->flPer1 = 0;
+        /* movement driver params */
+        a->mvMaster = 0; a->mvMaster2 = 0; a->mvWrap = 0; a->mvWrapCount = 0;
+        a->mvVel = 0; a->mvState = 0; a->mvTimer = 0;
+        for (int q = 0; q < 4; q++) { a->mvPend[q] = 0; a->mvPendVel[q] = 0; }
+        a->posPerInstN = 0;
+        a->rotY180From = jint(e, "rotY180From", 7);
+        { const JValue *ppi = jarr(e, "posPerInst");
+            int n = jcount(ppi);
+            for (int q = 0; q < n && q < 16; q++) {
+                const JValue *pp = jat(ppi, q);
+                if (pp && pp->count >= 3) {
+                    a->posPerInst[q][0] = (float)jat(pp, 0)->num;
+                    a->posPerInst[q][1] = (float)jat(pp, 1)->num;
+                    a->posPerInst[q][2] = (float)jat(pp, 2)->num;
+                    a->posPerInstN++;
+                }
+            }
+            if (a->driver == 1 && !a->posPerInstN && n > 0)
+                a->driver = 7;   /* fanArray w/o per-inst pos: no draw */
+        }
         a->bladeCount = jint(e, "bladeCount", 16);
         a->alternate = jint(e, "alternate", 0);
         a->lcgA = (unsigned)jint(e, "lcgA", 0x7169AC35);
@@ -1411,10 +1499,31 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         a->lcgXorB = (unsigned)jint(e, "lcgXorB", 0xC65A4B97);
         a->durationShift = jint(e, "durationShift", 5);
         a->durationBase = jint(e, "durationBase", 0x555);
+        a->eventGate = jint(e, "eventGate", 0);
         const JValue *cg = jarr(e, "chunkGate");
+        a->hasChunkGate = 0;
         if (cg && cg->count >= 2) {
-            a->chunkGate[0] = (int)jat(cg, 0)->num;
-            a->chunkGate[1] = (int)jat(cg, 1)->num;
+            /* v27: elements are ints OR 'N|M' strings (the engine's
+             * PLAYER_IN_MAP_CHUNK_Z(5)||PLAYER_IN_MAP_CHUNK_Z(6) forms —
+             * e.g. map0_s00_2.c:1259-1262). A JV_STR ->num is 0 (the
+             * v26 defect: '5|6' parsed to 0). */
+            for (int q = 0; q < 2; q++) {
+                const JValue *v = jat(cg, q);
+                if (!v) continue;
+                if (v->type == JV_STR) {
+                    const char *s = v->str ? v->str : "";
+                    int v0 = 0, v1 = 0;
+                    if (sscanf(s, "%d|%d", &v0, &v1) >= 1) {
+                        a->chunkGate[q] = v0;
+                        a->chunkGateAlt[q] = v1;
+                        a->hasChunkGate = 1;
+                    }
+                } else {
+                    a->chunkGate[q] = (int)v->num;
+                    a->hasChunkGate = 1;
+                }
+            }
+            if (!a->hasChunkGate) { a->chunkGate[0] = -9999; a->chunkGate[1] = -9999; }
         } else { a->chunkGate[0] = -9999; a->chunkGate[1] = -9999; }
         const char *ax = jstr(e, "axis", "z");
         a->axis = !strcmp(ax, "x") ? 0 : !strcmp(ax, "y") ? 1 : 2;
@@ -1422,9 +1531,51 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         a->cur[0] = a->rot0[0];
         a->cur[1] = a->rot0[1];
         a->cur[2] = a->rot0[2];
+        a->rawVy = (int)(a->rot0[1] * 4096.0f / 360.0f);
+        a->rawVel = 0;
+        /* v27: the dampedSwing demo start = the post-event pose (the
+         * engine's vy=91 raw is set when EventFlag_168 fires; fresh
+         * saves start at 0 and the driver is cutscene-gated). */
+        if (a->driver == 5 && g_animsDemo)
+            a->rawVy = jint(e, "postEventVyRaw", 91);
         a->lcgS1 = 0; a->lcgS2 = 0;      /* engine seeds D_800DB918 static 0 */
         a->tvChannel = 0; a->tvTimer = 0;
         sx->nAnims++;
+    }
+    /* v27: sharedRot leader resolution — followers use the leader's live
+     * state verbatim (the engine adds WHEEL2_H/AXIS2_BA with the SAME
+     * rotation vector as the leader; map0_s00_2.c:52-53). MUTUAL pairs
+     * (DOOR1_BA<->CHAIN2_1 both name each other — the engine's ONE shared
+     * rot vector D_800F538C) are broken: both entries tick their own
+     * identical deterministic state (no leader), which is exactly the
+     * shared-vector behavior for deterministic drivers. */
+    for (int k = 0; k < sx->nAnims; k++) {
+        const char *sh_name = NULL;
+        /* re-walk the JSON to find sharedRot of entry k */
+        const JValue *pa2 = jarr(sh, "propAnims");
+        int npa2 = jcount(pa2);
+        if (k < npa2 && k < 64) {
+            const JValue *e2 = jat(pa2, k);
+            sh_name = e2 ? jstr(e2, "sharedRot", "") : NULL;
+        }
+        if (sh_name && *sh_name) {
+            for (int m = 0; m < sx->nAnims; m++) {
+                if (m != k && !strcmp(sx->anims[m].object, sh_name)) {
+                    sx->anims[k].sharedLeader = m;
+                    break;
+                }
+            }
+        }
+    }
+    /* cycle break: A->B and B->A would infinitely recurse in the pose fn
+     * and double-skip in the tick — clear both links (independent equal
+     * ticks, engine-shared-state semantics for deterministic drivers). */
+    for (int k = 0; k < sx->nAnims; k++) {
+        int m = sx->anims[k].sharedLeader;
+        if (m >= 0 && m < sx->nAnims && sx->anims[m].sharedLeader == k) {
+            sx->anims[k].sharedLeader = -1;
+            sx->anims[m].sharedLeader = -1;
+        }
     }
     const JValue *ul = jget(sh, "userLight");
     if (ul && ul->type == JV_OBJ) {
@@ -7108,64 +7259,207 @@ static int sh_rng_next(void) {
 }
 
 
-/* ---- v26.3: driver DRAW path --------------------------------------- */
+/* ---- v27: driver DRAW path (bind -> pose -> apply) ------------------ */
 /* Bind anims to DrawItems by name (node name = engine model name, e.g.
- * "FAN_HIDE"/"DOOR1_BA"). v26.3.1: engine semantics — the SAME model
- * (g_WorldObjectC) is added per frame at MULTIPLE poses (each fan has its
- * own pos), so a node may be named "FAN_HIDE_0"/"FAN_HIDE_1" (ripper
- * instance suffixes) while the anim object is "FAN_HIDE". Match rule:
- * (a) the anim object name is a PREFIX of the node name (or equal), and
- * (b) among candidates, the one whose engine (x,z) is NEAREST the item's
- * translation (x,z) — y is flipped between engine (y-down) and glTF
- * (y-up), so only x/z are comparable. Unmatched anims get no visible
- * carrier (manifest/cutscene entries: engine-true, their models are not
- * in this room's IPD). */
+ * "FAN_HIDE"/"DOOR1_BA"). The SAME model is added per frame at MULTIPLE
+ * poses (each fan has its own pos), so nodes carry "#N" instance suffixes
+ * (ripper convention) while the anim object is the plain engine name.
+ * Match rule: the anim object name is a PREFIX of the node name (or
+ * equal), disambiguated by WORLD xz distance — v27 computes each item's
+ * world center from its VERTEX DATA (works for both posed nodes with
+ * translations and baked-vertex instances). Multi-instance drivers
+ * (fanArray/ferrisWheel/lissajousOrbit/gravityScatter/sineBob) assign
+ * the per-copy engine index i by ascending distance to the anim pos. */
 static void sh1x_anims_bind(Scene *sc) {
     if (!sc || !sc->sh1x.nAnims) return;
     for (int i = 0; i < sc->itemCount; i++) {
         DrawItem *it = &sc->item[i];
         it->animIdx = -1;
-        const size_t nl = strlen(it->name);
-        int best = -1;
-        float bestD = 1e30f;
-        for (int k = 0; k < sc->sh1x.nAnims; k++) {
-            const Sh1xPropAnim *a = &sc->sh1x.anims[k];
-            if (a->driver > 5) continue;         /* idle/no-draw classes  */
-            const size_t ol = strlen(a->object);
-            if (!ol || ol > nl) continue;
+        it->animInst = 0;
+    }
+    for (int k = 0; k < sc->sh1x.nAnims; k++) {
+        const Sh1xPropAnim *a = &sc->sh1x.anims[k];
+        if (a->object[0] == '<' || !a->object[0]) continue; /* <light> etc */
+        const size_t ol = strlen(a->object);
+        int    bestI = -1;
+        float  bestD = 1e30f;
+        int    nth = 0;
+        for (int i = 0; i < sc->itemCount; i++) {
+            DrawItem *it = &sc->item[i];
+            if (it->animIdx >= 0) continue;    /* already bound */
+            const size_t nl = strlen(it->name);
+            if (!nl || ol > nl) continue;
             if (memcmp(it->name, a->object, ol) != 0) continue;
-            /* name matches (prefix or equal): disambiguate by xz distance
-             * to the item translation (it->model is composed; root-level
-             * anims ride nodes whose translation lives in the matrix)      */
-            const float dx = it->model.m[12] - a->pos[0];
-            /* glTF z = -engine z (converter axis map (x,-y,-z)): compare
-             * in glTF space by negating the engine anim z (audit A#9)   */
-            const float dz = it->model.m[14] - (-a->pos[2]);
-            const float d = dx * dx + dz * dz;
-            if (d < bestD) { bestD = d; best = k; }
+            /* world center from the item's own vertices (glTF space) */
+            float cx = 0, cy = 0, cz = 0;
+            int n = 0;
+            for (int v = 0; v < it->vcount && it->vbase + v < sc->vertCount;
+                 v++) {
+                const float *vp = sc->verts + (size_t)(it->vbase + v) * 8;
+                cx += vp[0]; cy += vp[1]; cz += vp[2]; n++;
+            }
+            if (!n) continue;
+            cx /= n; cy /= n; cz /= n;
+            const float dx = cx - a->pos[0];
+            const float dz = cz - (-a->pos[2]);   /* glTF z = -engine z */
+            const float dy = cy - (-a->pos[1]);
+            const float d = dx * dx + dy * dy + dz * dz;
+            if (d < bestD) { bestD = d; bestI = i; }
         }
-        it->animIdx = best;
+        if (bestI < 0) continue;
+        /* assign instance index 0; if MULTIPLE unbound items match this
+         * same anim, the next ones get i=1.. by distance order (the
+         * engine's per-copy index i). */
+        sc->item[bestI].animIdx = k;
+        sc->item[bestI].animInst = nth++;
+        if (a->count > 1) {
+            for (int more = 1; more < a->count; more++) {
+                float bd = 1e30f; int bi = -1;
+                for (int i = 0; i < sc->itemCount; i++) {
+                    DrawItem *it = &sc->item[i];
+                    if (it->animIdx >= 0) continue;
+                    const size_t nl = strlen(it->name);
+                    if (ol > nl) continue;
+                    if (memcmp(it->name, a->object, ol) != 0) continue;
+                    float cx = 0, cy = 0, cz = 0; int n = 0;
+                    for (int v = 0; v < it->vcount &&
+                         it->vbase + v < sc->vertCount; v++) {
+                        const float *vp =
+                            sc->verts + (size_t)(it->vbase + v) * 8;
+                        cx += vp[0]; cy += vp[1]; cz += vp[2]; n++;
+                    }
+                    if (!n) continue;
+                    cx /= n; cy /= n; cz /= n;
+                    float ddx = cx - a->pos[0];
+                    float ddz = cz - (-a->pos[2]);
+                    float d = ddx * ddx + ddz * ddz;
+                    if (d < bd) { bd = d; bi = i; }
+                }
+                if (bi < 0) break;
+                sc->item[bi].animIdx = k;
+                sc->item[bi].animInst = nth++;
+            }
+        }
     }
 }
 
-/* Compose the live driver rotation into the item transform. Engine adds
- * the object with rot each frame; the AUTHORED node translation stays
- * (it already equals the engine pos: the ripper emits WorldObject poses
- * as node translations, and the fan-test GLB does the same). Rot order =
- * the PoC's node rotation convention: Rx then Ry then Rz (column-major
- * pre-multiply), matching RotMatrix(vx, vy, vz). */
-static void sh1x_anim_apply(DrawItem *it, const Sh1xPropAnim *a) {
+/* v27: the LIVE WorldObject pose of one anim instance — engine rot in
+ * DEGREES + engine pos in METERS + per-axis pos replace mask. All the
+ * raw-unit drivers keep their state in raw Q12 angle ints (4096=360deg)
+ * exactly like the engine accumulators; only this function converts to
+ * the consumer's degree/meter floats. */
+static void sh1x_anim_pose(const Sh1x *sx, const Sh1xPropAnim *a, int inst,
+                           float rotDeg[3], float posEng[3],
+                           unsigned *posReplaceMask) {
+    rotDeg[0] = a->rot0[0]; rotDeg[1] = a->rot0[1]; rotDeg[2] = a->rot0[2];
+    posEng[0] = a->pos[0];  posEng[1] = a->pos[1];  posEng[2] = a->pos[2];
+    *posReplaceMask = 0;
+    const float R2D = 360.0f / 4096.0f;
+    if (a->sharedLeader >= 0 && a->sharedLeader < sx->nAnims) {
+        /* follower: the engine adds this object with the LEADER's live
+         * rotation vector (e.g. WHEEL2_H rides WHEEL1_H's spin,
+         * map0_s00_2.c:1259-1267); its own pos stands. */
+        const Sh1xPropAnim *L = &sx->anims[a->sharedLeader];
+        sh1x_anim_pose(sx, L, 0, rotDeg, posEng, posReplaceMask);
+        posEng[0] = a->pos[0]; posEng[1] = a->pos[1]; posEng[2] = a->pos[2];
+        *posReplaceMask = 0;
+        return;
+    }
+    switch (a->driver) {
+    case 0:   /* spinRng / spinConst: live angle on the anim axis */
+        rotDeg[a->axis] = a->cur[a->axis];
+        break;
+    case 1: { /* fanArray: per-instance x spin ±90deg/s, y=180 for i>=7 */
+        int i = inst > 0 ? inst : 0;
+        rotDeg[0] = a->cur[0];
+        if (i >= a->rotY180From) rotDeg[1] = 180.0f;
+        if (i < a->posPerInstN) {
+            posEng[0] = a->posPerInst[i][0];
+            posEng[1] = a->posPerInst[i][1];
+            posEng[2] = a->posPerInst[i][2];
+            *posReplaceMask = 7;
+        }
+        break;
+    }
+    case 3:   /* translate (MOVACHES): vz slides toward the clamp */
+        posEng[2] = a->cur[2];
+        *posReplaceMask = 4;
+        break;
+    case 4:   /* doorRattle: vy in raw units */
+    case 5:   /* dampedSwing (drawbridge door): vy in raw units */
+    case 8:   /* kickSwing (TOBIRA2_): vy in raw units */
+        rotDeg[1] = (float)a->rawVy * R2D;
+        break;
+    case 9:   /* gravityScatter: per-instance fall offsets */
+        posEng[1] += a->cur[1];
+        *posReplaceMask = 2;
+        break;
+    case 12: { /* sineBob: horse y = (Q12(-1) - sin(master*4+phase))/5 */
+        int master = 0;
+        for (int m = 0; m < sx->nAnims; m++)
+            if (sx->anims[m].driver == 13) { master = sx->anims[m].mvMaster; break; }
+        int i = inst > 0 ? inst : 0;
+        int phase = (i < 6) ? (int)(i * 4096 / 3) : (i * 2048 + 2048);
+        int arg = master * 4 + phase;
+        posEng[1] = (float)((-4096 - sh_sin_q12(arg)) / 5) / 4096.0f;
+        *posReplaceMask = 2;
+        break;
+    }
+    case 13:  /* carouselSpin: hub rot.vy = master angle */
+        rotDeg[1] = (float)a->mvMaster * R2D;
+        break;
+    case 14: { /* ferrisWheel: arm i angle/pos from the raw master
+                 * (map6_s04_2.c:3814-3845: angle=(m>>12)+(-739+i*307),
+                 * pos=(8.7, 10cos-13.8, 10sin-28)) */
+        int i = inst > 0 ? inst : 0;
+        int ang = (a->mvMaster >> 12) + (-739 + i * 307);
+        rotDeg[0] = (float)ang * R2D;
+        {
+            float rad = (float)ang * R2D * (float)M_PI / 180.0f;
+            posEng[0] = 8.7f;
+            posEng[1] = 10.0f * cosf(rad) - 13.8f;
+            posEng[2] = 10.0f * sinf(rad) - 28.0f;
+        }
+        *posReplaceMask = 7;
+        break;
+    }
+    case 15: { /* lissajousOrbit: balloon i pos/rot (map6_s04_2.c:3856-3874) */
+        int i = inst > 0 ? inst : 0;
+        int aq = sh_sin_q12(a->mvMaster + (i << 10)) / 30;
+        int ryCnt = (int)((i << 12) / 12);
+        rotDeg[1] = (float)(a->mvMaster2 + ryCnt) * R2D;
+        {
+            float ry = rotDeg[1] * (float)M_PI / 180.0f;
+            float temp = (float)sh_sin_q12(aq + 1024) / 4096.0f * 4.0f; /*cos*/
+            posEng[0] = temp * sinf(ry) - 16.0f;
+            posEng[1] = (float)sh_sin_q12(aq) / 4096.0f * 4.0f - 1.5f;
+            posEng[2] = temp * cosf(ry) - 64.0f;
+            rotDeg[0] = -(float)aq * R2D;
+        }
+        *posReplaceMask = 7;
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* Compose the live driver pose into the item transform — v27 semantics:
+ * the engine builds ONE matrix per WorldObject from the FULL rot vector
+ * (WorldObjects_Draw -> Math_RotMatrixZxyNeg, draw.c:577) and its pos.
+ * The item's AUTHORED translation stands for rotation-only drivers (it
+ * equals the engine pos: the ripper emits WorldObject poses as node
+ * translations); movement drivers replace the flagged axes. The authored
+ * base rotation is REPLACED (not composed): the driver owns the whole
+ * rotation, exactly like the engine. */
+static void sh1x_anim_apply(Scene *sc, DrawItem *it, const Sh1xPropAnim *a) {
     if (!it || !a) return;
-    /* angles: engine Q12 angle 4096 = 360 deg; cur[] is stored in DEGREES
-     * (driver math converts at parse: rot0 degrees in, tick adds degrees) */
-    const float rx = a->cur[0] * (float)M_PI / 180.0f;
-    const float ry = a->cur[1] * (float)M_PI / 180.0f;
-    const float rz = a->cur[2] * (float)M_PI / 180.0f;
-    const float cx = cosf(rx), sx_ = sinf(rx);
-    const float cy = cosf(ry), sy = sinf(ry);
-    const float cz = cosf(rz), sz = sinf(rz);
-    mat4 R;
-    memset(&R, 0, sizeof(R));
+    float rotDeg[3], posEng[3];
+    unsigned mask = 0;
+    sh1x_anim_pose(&sc->sh1x, a, it->animInst, rotDeg, posEng, &mask);
+    const float rx = rotDeg[0] * (float)M_PI / 180.0f;
+    const float ry = rotDeg[1] * (float)M_PI / 180.0f;
+    const float rz = rotDeg[2] * (float)M_PI / 180.0f;
     /* ENGINE ORDER — WorldObjects_Draw -> Math_RotMatrixZxyNeg
      * (draw.c:577; libkmath.s:360-384, asm-sim verified vs g_SineTable):
      * Ry(rx')*Rx(ry')*Rz(rz') with all three angles NEGATED. Column-major. */
@@ -7173,6 +7467,8 @@ static void sh1x_anim_apply(DrawItem *it, const Sh1xPropAnim *a) {
     const float ncy = cosf(nry), nsy = sinf(nry);
     const float ncz = cosf(nrz), nsz = sinf(nrz);
     const float ncx = cosf(nrx), nsx_ = sinf(nrx);
+    mat4 R;
+    memset(&R, 0, sizeof(R));
     R.m[0]  = ncy * ncz;
     R.m[1]  = nsx_ * nsy * ncz + ncx * nsz;
     R.m[2]  = -ncx * nsy * ncz + nsx_ * nsz;
@@ -7183,15 +7479,19 @@ static void sh1x_anim_apply(DrawItem *it, const Sh1xPropAnim *a) {
     R.m[9]  = -nsx_ * ncy;
     R.m[10] = ncx * ncy;
     R.m[15] = 1.0f;
-    it->model = mat4_mul(&it->model, &R);
+    /* translation: the authored base (glTF) with flagged axes replaced */
+    float tx = it->model.m[12], ty = it->model.m[13], tz = it->model.m[14];
+    if (mask & 1u) tx = posEng[0];
+    if (mask & 2u) ty = -posEng[1];            /* glTF y = -engine y */
+    if (mask & 4u) tz = -posEng[2];            /* glTF z = -engine z */
+    mat4 M = R;
+    M.m[12] = tx; M.m[13] = ty; M.m[14] = tz; M.m[15] = 1.0f;
+    it->model = M;
 }
 
-/* Per-frame: apply bound anims' CURRENT rotation to their items. Call at
- * the top of render_frame's item loop (before transform_item2), AFTER
- * sh1x_anims_sync ticked the state. Rotation is composed ONTO the item's
- * matrix from the SYNC hook each frame — but render_frame may run more
- * than once per tick (shots at multiple t with a single tick), so apply
- * from a COPY of the pre-anim matrix each frame, not cumulatively. */
+/* Per-frame: apply bound anims' CURRENT pose to their items. render_frame
+ * may run more than once per tick (shots at multiple t), so apply from a
+ * COPY of the pre-anim matrix each frame, not cumulatively. */
 static mat4 *g_animBase = NULL;      /* snapshot of pre-anim item matrices  */
 static int   g_animBaseN = 0;
 static void sh1x_anims_draw_apply(Scene *sc) {
@@ -7213,62 +7513,233 @@ static void sh1x_anims_draw_apply(Scene *sc) {
         DrawItem *it = &sc->item[i];
         it->model = g_animBase[i];            /* reset to authored pose  */
         if (it->animIdx >= 0 && it->animIdx < sc->sh1x.nAnims)
-            sh1x_anim_apply(it, &sc->sh1x.anims[it->animIdx]);
+            sh1x_anim_apply(sc, it, &sc->sh1x.anims[it->animIdx]);
     }
 }
 
-/* ---- v26.2: prop anim drivers — the per-frame engine Update --------
- * VERBATIM math per driver (catalog sources; all Q12 semantics -> float
- * deg here, engine order preserved). Cutscene driver (7) idles — the
- * engine animates those ONLY inside story states. Water/light/ripple
- * drivers tick state; their draws are overlay-level (not in room IPDs). */
+/* ---- v27: prop anim drivers — the per-frame engine Update ------------
+ * VERBATIM math per driver, ALL in the engine's own units:
+ *   * raw Q12 angle ints (4096 = 360deg) for the swing family state,
+ *   * raw Q12 meters/accumulators for the movement drivers,
+ *   * the discrete per-frame drivers (doorRattle, kickSwing) step once
+ *     per 1/30s of elapsed time exactly like the 30Hz game frames.
+ * Gates: chunkGate (the engine's PLAYER_IN_MAP_CHUNK — for a single-room
+ * consumer the viewed room's cell) and eventGate (engine-fresh: CLEAR;
+ * --anims-demo treats them as SET). Cutscene/gated drivers idle at their
+ * authored rot0 pose (engine-true). */
+static int anim_gate_on(const Sh1x *sx, const Sh1xPropAnim *a) {
+    if (a->hasChunkGate) {
+        int okx = (sx->chunkX == a->chunkGate[0]) ||
+                  (a->chunkGateAlt[0] != 0 && sx->chunkX == a->chunkGateAlt[0]);
+        int okz = (sx->chunkZ == a->chunkGate[1]) ||
+                  (a->chunkGateAlt[1] != 0 && sx->chunkZ == a->chunkGateAlt[1]);
+        if (!(okx && okz)) return 0;
+    }
+    if (a->eventGate && !g_animsDemo) return 0;
+    return 1;
+}
+
 static void sh1x_anims_tick(Sh1x *sx, double dt) {
+    const int dtRaw = (int)(dt * 4096.0);
     for (int i = 0; i < sx->nAnims; i++) {
         Sh1xPropAnim *a = &sx->anims[i];
+        a->gated = !anim_gate_on(sx, a);
+        if (a->gated) continue;        /* engine: the update loop is gated */
+        if (a->sharedLeader >= 0) continue;  /* follower: leader's state */
         switch (a->driver) {
         case 0: {  /* spinRng / spinConst — vz or axis += dt*(base-(r&mask)) */
             float base = (a->rngBase != 0.0f || a->rngMask) ? a->rngBase : a->rate;
             float d = base;
-            if (a->rngMask) d -= (float)(sh_rng_next() & a->rngMask) * (360.0f / 4096.0f);
+            if (a->rngMask)
+                d -= (float)(sh_rng_next() & a->rngMask) * (360.0f / 4096.0f);
             a->cur[a->axis] += (float)dt * d;
             break;
         }
-        case 4: {  /* doorRattle — 1-in-32 kick, |d|==1 double add, bounce  */
-            if (a->rattleD == 0.0f && (sh_rng_next() & 31) == 0)
-                a->rattleD = -(float)(2 + (sh_rng_next() % 8));
-            if (a->rattleD != 0.0f) {
-                if (a->rattleD == 1.0f || a->rattleD == -1.0f)
-                    a->cur[1] += a->rattleD;        /* engine adds twice  */
-                a->cur[1] += a->rattleD;
-                if (a->cur[1] > 0.0f) { a->cur[1] = 0.0f;
-                    a->rattleD = (float)((int)(sh_rng_next() % 3) - (int)a->rattleD) + 1.0f;
-                    if (a->rattleD > 0) a->rattleD = 0; }
-                if (a->cur[1] < -1.8f) {
-                    a->rattleD = (float)~(int)(sh_rng_next() % 3) - a->rattleD;
-                    if (a->rattleD < 1.0f) a->rattleD = 1.0f; }
+        case 1:   /* fanArray master: rot.vx ±= dt*Q12_ANGLE(90) raw/s */
+            a->mvMaster += (int)(((long long)dtRaw * 1024) >> 12);
+            a->cur[0] = (float)a->mvMaster * (360.0f / 4096.0f);
+            break;
+        case 3: { /* translate — map5_s03_2.c:664-693: vz += dt*0.14,
+                   * clamp 60.35 (state 5) / 60.44 (state 6) */
+            float z = a->cur[2] + (float)dt * 0.14f;
+            if (z > 60.35f) z = 60.35f;
+            a->cur[2] = z;
+            break;
+        }
+        case 4: {  /* doorRattle — map1_s01.c:1229-1290 VERBATIM in raw
+                    * Q12 angle units, one discrete step per 30Hz frame.
+                    * v27 fixes (vs v26): the D>0 guard on the vy>0
+                    * branch, the D>=8 && 1-in-4 stop, Rng(0,3)=%4, and
+                    * the bounce limit is the RAW -20 (Q12_ANGLE(-1.8f)
+                    * truncates to -20), not -1.8 degrees. */
+            a->mvTimer += (float)(dt * 30.0);
+            int steps = 0;
+            while (a->mvTimer >= 1.0f && steps < 8) {
+                a->mvTimer -= 1.0f; steps++;
+                if (a->rawVel == 0 && (sh_rng_next() & 31) == 0)
+                    a->rawVel = -(2 + (int)(sh_rng_next() & 7)); /*Rng(2,9)*/
+                if (a->rawVel != 0) {
+                    if (a->rawVel == 1 || a->rawVel == -1)
+                        a->rawVy += a->rawVel;      /* engine adds twice */
+                    a->rawVy += a->rawVel;
+                    if (a->rawVel > 0) {
+                        if (a->rawVy > 0) {
+                            a->rawVy = 0;
+                            if (a->rawVel >= 8 && (sh_rng_next() & 3) == 0)
+                                a->rawVel = 0;
+                            else
+                                a->rawVel = (int)(sh_rng_next() & 3)
+                                            - a->rawVel + 1;
+                            if (a->rawVel > 0) a->rawVel = 0; /* MIN(D,0) */
+                        }
+                    } else if (a->rawVy < -20) {
+                        a->rawVel = ~(int)(sh_rng_next() & 3) - a->rawVel;
+                        if (a->rawVel < 1) a->rawVel = 1;     /* MAX(D,1) */
+                    }
+                }
             }
             break;
         }
-        case 5: {  /* dampedSwing — VERBATIM map2_s00.c:1937-1943:
-                     *   D_800F22AE += dt * Q12(-0.0277);
-                     *   D_800F22AE  = MAX(Q12(-0.0137), D_800F22AE);
-                     *   D_800F538C.vy += dt * D_800F22AE;
-                     *   if (vy < Q12(-0.02222)) vy = Q12(-0.02222);
-                     * angVel ramps from 0 down to the -0.0137 floor at
-                     * -0.0277/s; the swing angle decays toward the rest
-                     * floor. All in Q12 angle units (4096 = 360 deg for
-                     * rot; the velocities are Q12 rad/s equivalents —
-                     * the catalog pre-converts to deg/s floats). */
-            a->kick += (float)dt * (-0.0277f);       /* angVel ramp      */
-            if (a->kick < a->angVelMax)              /* MAX(floor, ang)   */
-                a->kick = a->angVelMax;
-            a->cur[1] += (float)dt * a->kick;
-            if (a->cur[1] < a->restAngle)           /* vy floor          */
-                a->cur[1] = a->restAngle;
+        case 5: {  /* dampedSwing — map2_s00.c:1937-1943 VERBATIM in raw
+                    * Q12 units: angVel += dt*Q12(-0.0277) floored at
+                    * Q12(-0.0137) (MAX); vy += dt*angVel; vy floored at
+                    * Q12_ANGLE(-0.02222f) which TRUNCATES TO 0 (the door
+                    * slams shut — the v26 deg reading was 360x slow and
+                    * rested at -0.022deg instead of 0). */
+            a->rawVel += (int)(((long long)dtRaw * a->rawAngAccel) >> 12);
+            if (a->rawVel < a->rawAngVelFloor) a->rawVel = a->rawAngVelFloor;
+            a->rawVy += (int)(((long long)dtRaw * a->rawVel) >> 12);
+            if (a->rawVy < a->rawVyFloor) a->rawVy = a->rawVyFloor;
             break;
         }
-        case 6:    /* catalog generics: state ticks; draw is overlay-level */
-        case 7:    /* cutscene: idle (engine-true default)                  */
+        case 8: {  /* kickSwing — map1_s03.c:1956-1999 VERBATIM in raw
+                    * units, one discrete step per 30Hz frame (the kick
+                    * velocity is added PER FRAME, no dt multiply). */
+            if (a->kickPhase == 0) {
+                if (g_animsDemo) {       /* the cutscene state-6 kick fires */
+                    a->rawVel = a->rawKickVel;
+                    a->kickPhase = 1;
+                } else break;
+            }
+            a->mvTimer += (float)(dt * 30.0);
+            int steps = 0;
+            while (a->mvTimer >= 1.0f && steps < 8) {
+                a->mvTimer -= 1.0f; steps++;
+                a->rawVy += a->rawVel;
+                if (a->rawVel == a->rawKickVel) {       /* initial kick */
+                    if (a->rawVy < a->rawOpenLimit) {
+                        a->rawVy = a->rawOpenLimit;
+                        a->rawVel = a->rawRebound;
+                    }
+                } else if ((a->rawVy < a->rawOpenLimit && a->rawVel < 0) ||
+                           (a->rawVy >= a->rawBounceHi && a->rawVel > 0)) {
+                    int t = -a->rawVel >> 1;
+                    a->rawVel = t;
+                    if (t == 1 || t == -1) a->rawVel = 0;
+                }
+            }
+            break;
+        }
+        case 9: {  /* gravityScatter — map7_s02_2.c:1170-1189: shared fall
+                    * velocity += g_GravitySpeed(10419)/tick, clamp 20480
+                    * (Q12(5.0)); the y fall accumulates; floor y=0. */
+            a->mvTimer += (float)(dt * 30.0);
+            int steps = 0;
+            while (a->mvTimer >= 1.0f && steps < 8) {
+                a->mvTimer -= 1.0f; steps++;
+                a->mvVel += 10419;
+                if (a->mvVel > 20480) a->mvVel = 20480;
+                a->cur[1] += (float)((int)(((long long)dtRaw * a->mvVel)
+                                           >> 12)) / 4096.0f;
+                if (a->cur[1] > 0.0f) a->cur[1] = 0.0f;   /* floor y=0 */
+            }
+            break;
+        }
+        case 11: { /* lightFlicker — map1_s05.c:371-396 VERBATIM (raw Q12).
+                    * t0 ramp: t0*per >= Q12(64)=262144 -> reroll per
+                    * [32,95] + amp [32,63] (the v27 rerollA fix);
+                    * envelope = amp*sin(t1); phase = (t1*per1)>>6
+                    * wraps at Q12(1.0); intensity = Q12(1.35) +
+                    * ((Q12(0.9) + 0.6*env) * sin(phase)) >> 15. */
+            a->flT0 += dtRaw;
+            if (a->flT0 * a->flPer0 >= a->flRampThresh) {
+                a->flT0 = 0;
+                a->flPer0 = 32 + (int)(sh_rng_next() % 64);  /* Rng(32,95) */
+                a->flAmp  = 32 + (int)(sh_rng_next() % 32);  /* Rng(32,63) */
+            }
+            int sp0 = (int)(((long long)a->flAmp *
+                             sh_sin_q12(a->flT1)) >> 12);
+            a->flT1 += dtRaw;
+            int sp1 = (int)(((long long)a->flT1 * a->flPer1) >> 6);
+            if (sp1 >= 4096) {
+                a->flT1 = 0;
+                a->flPer1 = 32 + (int)(sh_rng_next() % 64);
+                sp1 &= 0xFFF;
+            }
+            int inten = 5534 /* Q12(1.35f) */
+                      + (int)((long long)(
+                          (3686 +
+                           (int)(((long long)sp0 * 2458) >> 12)) *
+                          sh_sin_q12(sp1)) >> 15);
+            g_sh1xLightFlicker = (float)inten / 4096.0f;
+            break;
+        }
+        case 13:  /* carouselSpin master — map6_s04_2.c:3553-3554:
+                    * D_800ED5B6 = (dt*(D_800EBA30+D_800ED5B4)+m)&0xFFF;
+                    * engine-fresh both speeds are 0 (static carousel);
+                    * --anims-demo uses the post-Cybil D_800ED5B4=-122. */
+            a->mvMaster = (a->mvMaster +
+                          (int)(((long long)dtRaw *
+                                 (g_animsDemo ? -122 : 0)) >> 12)) & 0xFFF;
+            break;
+        case 14: { /* ferrisWheel — map6_s04_2.c:3746-3845 VERBATIM raw:
+                    * master += dt*Q12(45.511)=186413; wrap Q12(307.2);
+                    * 4 tracked cabin pendulums: idle timer > 186413 &&
+                    * (rand16 % 186413)+186413 < timer -> swing starts;
+                    * vel += dt*Q12(-68.2667) floored -139810; angle
+                    * += dt*vel; settle -93206; damping vel>>=1. */
+            int add = (int)(((long long)dtRaw * 186413) >> 12);
+            a->mvMaster += add;
+            if (a->mvMaster > 1258291) {
+                a->mvMaster -= 1258291;
+                a->mvWrapCount++;
+                for (int q = 3; q > 0; q--) {
+                    a->mvPend[q] = a->mvPend[q - 1];
+                    a->mvPendVel[q] = a->mvPendVel[q - 1];
+                }
+                a->mvPend[0] = 0; a->mvPendVel[0] = 0;
+            }
+            for (int q = 0; q < 4; q++) {
+                if (a->mvPendVel[q] == 0) {
+                    a->mvPend[q] += add;
+                    if (a->mvPend[q] > 186413 &&
+                        ((sh_rng_next() % 186413) + 186413) < a->mvPend[q])
+                        a->mvPendVel[q]--;
+                } else if (a->mvPend[q] > 0) {
+                    a->mvPendVel[q] +=
+                        (int)(((long long)dtRaw * -279620) >> 12);
+                    if (a->mvPendVel[q] < -139810) a->mvPendVel[q] = -139810;
+                    a->mvPend[q] +=
+                        (int)(((long long)dtRaw * a->mvPendVel[q]) >> 12);
+                    if (a->mvPend[q] < 0) {
+                        if (a->mvPendVel[q] > -93206) {
+                            a->mvPendVel[q] = 0; a->mvPend[q] = 0;
+                        } else {
+                            a->mvPendVel[q] >>= 1;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case 15:  /* lissajousOrbit — map6_s04_2.c:3856-3860 VERBATIM raw:
+                    * A += dt*(Q12(0.197f)+1) = 807; B += dt*Q12(0.275f) */
+            a->mvMaster  += (int)(((long long)dtRaw * 807) >> 12);
+            a->mvMaster2 += (int)(((long long)dtRaw * 1126) >> 12);
+            break;
+        case 2:   /* tvNoise: LCG/state machine core; screen paint is a
+                    * texture-level effect (see the tv TODO in the docs) */
+        case 7:   /* cutscene: idle (engine-true default)                  */
         default:
             break;
         }
@@ -10999,6 +11470,14 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "bad --worldstage (1 day, 2 night, 3 {9,9})\n");
                 return 1;
             }
+        }
+        else if (!strcmp(a, "--anims-demo")) {
+            /* v27: treat event gates as SET (engine state after the story
+             * events): the cutscene anims play — the drawbridge door slam,
+             * the locker kick, the boiler light flicker, the rides spin.
+             * Default (engine-fresh): all event-gated drivers idle at
+             * their authored rot0 pose. */
+            g_animsDemo = 1;
         }
         else if (!strcmp(a, "--userlight") && i + 1 < argc) {
             /* v26 task 3: user-programmable light. "off"=engine anchor;
