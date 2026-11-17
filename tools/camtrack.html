@@ -2913,6 +2913,26 @@ window.SHView = (function () {
            (the engine's within-bucket LIFO: earlier-added prim on top)   */
         depthFunc: three.LessDepth
       });
+      /* v24 — THE SH1X OT SECTION BASE (engine WorldMap_Draw layering).
+       * The converter emits {ot_base, field_B_1, SH1X} on every instance/
+       * mesh node (GLTFLoader -> assignExtrasToUserData -> o.userData).
+       * The engine OT walk is FAR bucket -> NEAR: a model's section base
+       * (func_800571D0: field_B_1 0->2, 1->0, 2->4, 3->33, 4->66, 5->99)
+       * puts its quads DEEPER in the table, so they paint EARLIER = BELOW.
+       * three.js renderOrder: lower = drawn first = below. The depth
+       * buffer still resolves true interpenetration; the renderOrder only
+       * reproduces the engine's cross-layer painter priority for the
+       * coincident (authored-coplanar) quad pairs a z-buffer cannot
+       * express. Billboards ride the base-0 section (Gfx_BillboardDraw
+       * adds at org[z>>3] with NO base). Meshes without extras (legacy
+       * GLB) keep the default 0 — the editor view is UNCHANGED.        */
+      const ex = (o.userData && (o.userData.ot_base !== undefined)) ? o.userData
+                : (o.userData && o.userData.SH1X && o.userData.SH1X.ot_base !== undefined)
+                  ? o.userData.SH1X : null;
+      if (ex) {
+        o.renderOrder = -ex.ot_base;   /* deeper section = drawn first    */
+        rec.sh1x = true;
+      }
       rec.meshes.push(o);
       rec.shMats.push(shMat);
       rec.attrs.set(o, { vcol, ocol, n, isMaskBB, srcMat });
