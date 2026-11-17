@@ -21,6 +21,9 @@ jobs:
 
       - name: Convert sample scenes (GLBs are not committed)
         run: |
+          # The converter needs numpy (TIM decode) + Pillow (PNG encode) for
+          # texture embedding; the bare runner python3 has neither.
+          python3 -m pip install --user -q numpy pillow
           # input/ tracks only the base rip files; regenerate the GLBs with
           # the converter at THIS commit so CI always exercises the
           # tools/ipd2gltf.py it ships.
@@ -85,8 +88,11 @@ jobs:
       - name: Package one-click test zip (windows)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
+          # the packaging script regenerates the GLBs with the repo converter
+          # (numpy + Pillow needed for texture embedding)
+          python3 -m pip install --user -q numpy pillow
           TAG="${GITHUB_REF_NAME}"
-          # "" skips the linux binary/zip; only the -win zip is produced.
+          # NONE skips the linux binary/zip; only the -win zip is produced.
           bash tools/package_release.sh "$TAG" dist NONE ./fog_poc.exe
           unzip -l "dist/sh1x-poc-$TAG-win.zip"
 

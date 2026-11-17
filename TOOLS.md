@@ -14,8 +14,10 @@ of Silent Hill 1 (PS1).
 
 * A PC copy of **Silent Hill 1** (PS1) you legally own — a raw dump of your
   disc (a `.bin/.cue` or `.iso` image works), with its data track intact.
-* **Python 3.9+** (no third-party packages required by `ipd2gltf.py`'s core
-  path; it uses only the standard library).
+* **Python 3.9+ with `numpy` and `Pillow`** (`pip install numpy pillow`) —
+  `ipd2gltf.py` uses numpy for TIM decoding and Pillow for PNG texture
+  embedding (both are required whenever textures are embedded, which is
+  the default).
 * The **file extractor from the decompilation project**:
   `tools/silentassets/extract.py` in
   [shdecompilations/silent-hill-decomp](https://github.com/shdecompilations/silent-hill-decomp) —
