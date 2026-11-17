@@ -1,0 +1,161 @@
+# SH1X extras v3 — engine FX extensions (water / lens flare / prop anims / mapLink / userLight)
+
+Status: DESIGN (session 10/11, 2026-11). Grounds ALL four programs (ripper
+`tools/ipd2gltf.py`, PoC `src/fog_poc.c`, wallpaper `app/src/main/cpp/fog_poc.c`,
+camtrack editor `tools/camtrack.html`). Extends `SH1X_EXTRAS_SCHEMA.md` v2
+(the IPD/PLM verbatim container) — v3 ADDS engine FX data that does NOT live
+in IPD/PLM files (it lives in decomp C tables/code), so the ripper must
+hardcode-EMIT the verbatim decomp values (cited per field). Consumers must
+treat absence of any v3 field as "feature off, render exactly as before"
+(graceful no-op) — old v2 GLBs stay 100% supported.
+
+THE RULE: every value below is VERBATIM from silent-hill-decomp
+(file:line cited). Where the decomp stores the value in C, the ripper copies
+the C value; where the decomp computes it, the consumer computes it with the
+same fixed-point math. Nothing is invented.
+
+## Scene-level container addition
+
+`scenes[0].extras.SH1X` gains (per-room GLB mode) / each room root node's
+`extras.SH1X` gains (whole-map mode — same object build_sh1x already emits):
+
+```
+SH1X = { ...,                    # v2 fields unchanged
+  "version": 3,
+  "envEffects": {                 # Map_EffectTexturesLoad (env_effects.c:104-169)
+    "effectTexFlag": "Water" | "WaterRefract" | "Glass" | "Fire" | "Ef"
+                    | "Blood" | "Fire|Ef" | null,   # per-map flag, null=None
+    "tim": "WATER.TIM" | "DR_WAVE.TIM" | ...     # file to load (only when flag)
+  },
+  "waterZones": [                  # s_WaterZone (map.h:271-281) — ONLY DR/DRU
+    {"enabled": true, "illumination": 8,           # q11_4 = Q4 units raw
+     "minX": -120.0, "maxX": 80.0, "minZ": -120.0, "maxZ": 40.0}
+  ],                               # decoded Q4 meters; also "raw": [u8,q11_4,q11_4,q11_4,q11_4,q11_4]
+  "mapLink": {                     # WorldMap_MakeGrid (map.c:386-419) contract
+    "tag": "THR",                  # 3-char area tag (MAP_INFOS row, map_info.c:515-532)
+    "activeChunks": 4,             # MapFlag_One/Two/FourActiveChunks -> 1/2/4
+    "isExterior": true,            # !MapFlag_Interior
+    "neighbors": [                  # derived by filename-grid: tag + hexXX + hexZZ
+      {"dx": -1, "dz": 0, "room": "THRF8FD", "file": "THRF8FD.glb"}, ...
+    ]                               # only cells that EXIST in the grid; consumer
+                                    # ALSO probes (tag + hex(dx+x) + hex(dz+z)) at
+                                    # runtime so missing neighbor GLBs = no-op
+  },
+  "propAnims": [                   # code-driven WorldObjects (decomp map scripts)
+    {"object": "FAN_HIDE", "pos": [100.0, -1.6, 142.9],  # Q12 meters
+     "rot0": [0,0,0],
+     "driver": "spin", "axis": "z",                      # g_ObjRotC[0].vz +=
+     "rate": "rng",   # rng0 = -180deg - (Rng_Rand16() & 0x1FF) per frame, * dt
+     "chunkGate": [2,3]}                                  # PLAYER_IN_MAP_CHUNK
+  ],
+  "userLight": { ... }             # defaults only — see below; users author overrides
+}
+```
+
+## 1. Water (`WATER.md` evidence)
+
+What the engine ACTUALLY does (no geometry mirroring!):
+- **Sewer shimmer (DR/DRU)** = (a) an offscreen VRAM 32x32 rect whose UV
+  window scrolls: v0 = `(ctr>>1)&0x1F`, poly2 u0 = `((ctr+1)>>2)&0x1F`,
+  counter ++ per non-zero dt (lens_flare.c:536-599; NTSC CLUT (224,0),
+  tpage 45, SemiTrans mode-1, color (128,128,128)); (b) ONE light-glint
+  quad: mirrored light position `vy = posY*2 - pos.vy`, brightness
+  `sin(clamp(angle-40°, ≤90°))` → r=sin>>6, g=(sin*7)>>9, b=(sin*5)>>9,
+  tpage 45 CLUT (224,1), UV 64..127 x 0..31, ±24 x ±48 px around the
+  projected point, OT bucket 641 (lens_flare.c:610-680); (c) 8-caustic ring
+  around the light: per 45° step, g4[0] (20,18,12 / 4,4,4) @641 + g3[0]
+  (24,22,12/20,18,12) @641 + semi-trans g4[1] (4,8,4/0,0,0) + g3[1]
+  (8,8,4/4,8,4) @639 (lens_flare.c:683-825). Ring quad corners: inner r=0.2
+  at +1.2m fwd, outer r=2.2 at +1.5m fwd, in the light's yaw frame.
+- Gate: `!water_inhibit_f` AND camera in a waterZone box (X/Z inclusive
+  bounds) AND zone.enabled (lens_flare.c:78-93, 504-523).
+- **Sewer ripples (map5_s00)**: 12 RNG ripples in box x[-92.75,-91.25]
+  z[7.35,8.85], y=0.5, half-size = 1.5 * t, t random-walks ±32 clamped
+  [0,4095], CLUT row = 160+(r<<5), 3 rows (map5_s00.c:20-48, 89-94,
+  154-157). Only when NOT (flashlightAllowed && darkness).
+- WATER.TIM/DR_WAVE.TIM VRAM: NTSC (0,13)+CLUT(224,0) (screen/data.c
+  descriptors). **We do NOT have these TIMs locally** → the ripper emits
+  `envEffects` metadata ONLY (no pixel payload); consumers with the TIM
+  resolve it by name through the standard resolver; without it the feature
+  no-ops (documented; same ladder as BG_ETC leaf textures).
+
+## 2. Lens flare (`LENS.md` evidence) — the flashlight glow, Spot mode ONLY
+
+Gates (all must hold): lightMode==Spot(1); preset flag EnableLensFlare
+(= flashlightLensFlareIntensity Q12(1.0) ≠ 0); light z > proj/2; on-screen
+±512; ang_z ≥ 75°; NOT chase-cam; !flare_inhibit_f.
+- rate easing: `now += (tgt-now)/2` or decay to 0 when occluded; occlusion =
+  probe pixel == 0x7FFF (the 1x1 TILE + DR_MOVE scheme; consumer:
+  framebuffer readback at the light's projected center).
+- tgt = vwOresenHokan tables (pow[2]={0,1}; dist[7]={4,1.3,.9,.7,.5,.35,.2}
+  over z 204..3328; angZ[7]={.15,.2,.25,.3,.35,.5,1.3} over 75°..167°),
+  product, MIN 1.5 (lens_flare.c:225-250).
+- Sprites (tpage 44/76 from BG_ETC.TIM — WE HAVE BG_ETC.TIM locally:
+  gamefiles/thr/BG_ETC.TIM): 2 core quads UV 0..63 (grey
+  `((rate+3)>>2)*40` / fixed 0x10), 3rd quad grey min(rate*2,1)*48;
+  16 streaks (UV 0x20..0x3F, 0x40..0x5F, CLUT+5, grey
+  `(rate*_rate)>>18` where `_rate = (cos(ang-angXY)+1.7)*(cos(ang*12+mask)+1)>>1`
+  cap 1.5, ang from ang_dat[16], add_flare_ang = (-angZ>>1)+((x+y)*4)+60°,
+  add_mask_ang = z*4+((x+y)*16)); 3 ghosts (CLUT+7, tpage 44/44/76, on the
+  center-light line at 0.2/-0.3/1.0 scale). All SemiTrans mode-1.
+- BG_ETC decode windows (NTSC CLUT_X=192, CLUT_Y=0): core quad CLUT+6,
+  streak CLUT+5, ghosts CLUT+6/+7; each sprite UV window as quoted.
+
+## 3. Prop anims (`ANIMS_MAPLINK.md` evidence)
+
+NO windmills exist in SH1 (verified zero hits — user's example is
+aspirational; the catalog covers every REAL animated WorldObject):
+- nightmare school fans FAN_HIDE x2 (map1_s02.c:1446-1583): spin vz,
+  rng = -180° - (Rng_Rand16()&0x1FF) per frame * dt, chunk gate (2,3).
+- hospital fans FAN0_HID (map4_s02.c:108-158): 16 blades
+  D_800ED8B0[i] ±= dt*Q12_ANGLE(90°), alt direction, gate (1,0).
+- town TVs (map4_s03.c:405-799): TV1-3.TIM slots + LCG noise
+  `s16 = (((s32)(s2*0x7169AC35)>>3)^0xA547B39E; s2 = (((u32)(s1*0x892D719C)>>3)^0xC65A4B97)`
+  channel state machine, durations `(noise>>5)+0x555`.
+- MOVACHES (map5_s03_2.c:664-743): translate vz += dt*0.14.
+- falling fence (map4_s03.c:1705-1734): rot.vx + vy drop (one-shot).
+Ripper emits `propAnims[]` with VERBATIM driver params (numbers, not
+names, where math is needed); consumers implement the 5 driver types:
+`spin(rng|const90)`, `tvNoise(lcg)`, `translate(0.14)`, `fallOnce`, each
+gated by `chunkGate`. Positions in ENGINE meters (Q12-decoded), consumers
+convert with the standard axis map (x, -y, -z).
+
+## 4. mapLink (`ANIMS_MAPLINK.md` B-part evidence)
+
+Adjacency = filename grid. The ripper emits tag+chunkX/Z (already in
+v2 `header`) + `neighbors` (derived at build time from the rooms it
+ACTUALLY converted). Consumer rule (WorldMap_ChunkLoad, map.c:740-807):
+load neighbor room GLB when camera within 4.5m Q8 of the chunk edge
+(WorldMap_NextChunkLoadCheck :1045-1080) — wallpaper ONLY; PoC/camtrack
+ignore mapLink (their scenes are single-room by design). If the neighbor
+GLB file is absent → no load, no error, edge renders exactly as before.
+
+## 5. userLight (FLASHLIGHT.md evidence — the engine recipe)
+
+Defaults (all overridable per program): mode Spot(1); position follows the
+CONSUMING camera (the PoC's standing directive; engine anchor torso bone +
+(-0.08,-0.28,0.12) documented, unused); direction from rotation
+(-15°,0,0) → `vy=-sin(rx); vx=cos(rx)sin(ry); vz=cos(rx)cos(ry)`;
+intensity spotLightIntensity (1.3 flashlight preset 3); ramp
+fi ±= dt*4.0/s Q12 [0,4096] (0.25s full sweep); toggle only when
+FlashlightAllowed; auto-off when both env presets equal (day modes);
+per-vertex math = the EXISTING sh_mesh_light_vertex (already verbatim);
+day suppression = preset table has no Spot/FlashlightAllowed. Angle
+distinction = normal row + SetLightSourceXYZ (already in the PoC paths).
+
+## Consumer conformance (all four programs)
+
+| Field | ripper | PoC | wallpaper | camtrack |
+|---|---|---|---|---|
+| envEffects+waterZones | emit (hardcoded decomp tables) | shimmer+glint+caustic playback | same as PoC | preview toggle |
+| lens flare spec | emit (tables are consumer-side constants; ripper emits flag only) | full sprite draw (BG_ETC embedded like snow) | same | preview toggle |
+| propAnims | emit catalog | spin/tv/translate drivers | same | preview + authoring notes |
+| mapLink | emit tag/grid/neighbors | ignored (single-room) | load neighbors ≤4.5m edge | ignored |
+| userLight | emit defaults | full impl (already 90% present) | same | authoring fields |
+
+## Version bump (task 7)
+
+Releases move from vN tags to semver `1.MINOR.PATCH` (start 1.7.30 →
+next asset-change 1.7.31); CI bumps MINOR by +1 whenever anything under
+app/src/main/assets/ or the scene GLBs changes on main; PATCH for code-only
+changes. android.yml gains a `bump` step; the vN tag scheme is retired.

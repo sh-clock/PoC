@@ -334,6 +334,259 @@ s32 = lambda b, o: struct.unpack_from("<i", b, o)[0]
 
 
 # ---------------------------------------------------------------------------
+# SH1X v3 — ENGINE FX TABLES, VERBATIM from silent-hill-decomp.
+# These do NOT live in IPD/PLM files (they live in decomp C tables + map
+# overlay scripts), so the converter emits them HARDCODED with the source
+# file:line in every comment. Consumers treat any absent v3 field as
+# "feature off, render exactly as before" (old v2 GLBs stay supported).
+# Design doc: docs/SH1X_EXTRAS_V3_FX.md. Grounds: session10_evidence/
+# {WATER,LENS,ANIMS_MAPLINK,FLASHLIGHT}.md (verbatim quotes).
+# ---------------------------------------------------------------------------
+
+# Map_EffectTexturesLoad switch — src/bodyprog/gfx/env_effects.c:104-169.
+# MapIdx values from include/bodyprog/map/map.h:26-70. Flag names from
+# include/bodyprog/gfx/env_effects.h:4-14 (EffectTextureFlag_* enum).
+# EventFlag conditions (47/284/306) are story flags; the engine loads the
+# effect only while the flag is UNSET (checked at map load). The flag-
+# dependent entries are recorded for completeness; room GLBs only carry
+# AREA-CONSTANT FX (the sewers — see _room_env_fx).
+_ENV_EFFECT_TEX = {
+    # mapIdx: (flag name, TIM file, event flag or None)
+    1:  ("Glass",        "GLASS.TIM",   47),   # MAP0_S01 (cafe glass)
+    5:  ("Water",        "WATER.TIM",   None), # MAP1_S02 nightmare school
+    6:  ("Water",        "WATER.TIM",   None), # MAP1_S03
+    8:  ("Fire|Ef",      "FIRE.TIM",    None), # MAP1_S05 (fire + ef)
+    20: ("Fire",         "FIRE.TIM",   284),  # MAP3_S05
+    23: ("Fire",         "FIRE.TIM",   306),  # MAP4_S01
+    27: ("Blood",        "BLOOD.TIM",   None), # MAP4_S05
+    29: ("WaterRefract", "DR_WAVE.TIM", None), # MAP5_S00 real sewers (DR)
+    36: ("WaterRefract", "DR_WAVE.TIM", None), # MAP6_S03 alt sewers (DRU)
+    44: ("WaterRefract", "DR_WAVE.TIM", None), # MAPX_S00 @unused
+}
+
+# s_WaterZone tables — src/bodyprog/sys/map_info.c:389-401 (WATER_LIGHT_
+# ZONES_0/1), struct include/bodyprog/map/map.h:271-281 (s_WaterZone:
+# u8 isEnabled; q11_4 illumination; q11_4 minX/maxX/minZ/maxZ — the decomp
+# inits them with Q4(...) so the raw q11_4 equals meters*16; illumination
+# 8 = water plane height in the same Q4).
+# ONLY the two sewer areas carry water zones (map_info.c:527-528).
+_WATER_ZONES = {
+    "DR":  [(True, 8, -120.0, 80.0, -120.0, 40.0),
+            (True, 8,    0.0, 40.0,    0.0, 80.0)],   # !JAP0 row included
+    "DRU": [(True, 8, -160.0,  40.0, -160.0, 160.0),
+            (True, 8, -160.0, 160.0, -160.0,  40.0)],
+}
+
+# MAP_INFOS — src/bodyprog/sys/map_info.c:515-532 (tag + flags per area).
+# activeChunks: OneActiveChunks->1, TwoActiveChunks->2, else 4 (WorldGfx_
+# MapInit, src/bodyprog/world/draw.c:242-273). isExterior = !MapFlag_
+# Interior. MapType indices at include/bodyprog/map/map.h:111-126.
+_MAP_INFOS = [
+    # (tag, activeChunks, isExterior)   MapType
+    ("THR", 4, True),   # 0  Old Silent Hill
+    ("SC",  2, False),  # 1  school (A)
+    ("SU",  2, False),  # 2  school (B) nightmare
+    ("SPR", 4, True),   # 3  resort (A)
+    ("SPU", 4, True),   # 4  resort (B)
+    ("RSR", 4, True),   # 5  lakeside (A)
+    ("RSU", 4, True),   # 6  lakeside (B)
+    ("APR", 4, True),   # 7  apartments (A)
+    ("APU", 4, True),   # 8  apartments (B)
+    ("ER",  2, False),  # 9  interiors (misc)
+    ("ER",  2, False),  # 10 (same tag; map7 headers bind this row)
+    ("DR",  4, True),   # 11 real sewers
+    ("DRU", 4, True),   # 12 alt sewers
+    ("HP",  2, False),  # 13 hospital (A)
+    ("HU",  2, False),  # 14 hospital (B)
+    ("XXX", 4, True),   # 15 MapFlag_3 (special)
+]
+
+# Overlay (mapN_sXX) -> area tag binding — every src/maps/*/header.c
+# `.mapInfo = &MAP_INFOS[...]` line, verbatim (evidence: ANIMS_MAPLINK.md;
+# map0_s00/header.c:43 THR ... map7_s03/header.c:43 ER2). Rooms belong to
+# AREAS; overlay FX attaches via _PROP_ANIMS by overlay.
+_OVERLAY_TO_TAG = {
+    "MAP0_S00": "THR", "MAP0_S01": "THR", "MAP0_S02": "ER",
+    "MAP1_S00": "SC",  "MAP1_S01": "SC",  "MAP1_S02": "SU",
+    "MAP1_S03": "SU",  "MAP1_S04": "SU",  "MAP1_S05": "SU",
+    "MAP1_S06": "SC",  "MAP2_S00": "THR", "MAP2_S01": "ER2",
+    "MAP2_S02": "SPR", "MAP2_S03": "THR", "MAP2_S04": "ER",
+    "MAP3_S00": "HP",  "MAP3_S01": "HP",  "MAP3_S02": "HU",
+    "MAP3_S03": "HU",  "MAP3_S04": "HU",  "MAP3_S05": "HU",
+    "MAP3_S06": "HP",  "MAP4_S00": "SPR", "MAP4_S01": "ER",
+    "MAP4_S02": "SPU", "MAP4_S03": "SPU", "MAP4_S04": "HU",
+    "MAP4_S05": "SPU", "MAP4_S06": "SPR", "MAP5_S00": "DR",
+    "MAP5_S01": "RSR", "MAP5_S02": "ER",  "MAP5_S03": "ER2",
+    "MAP6_S00": "RSU", "MAP6_S01": "ER",  "MAP6_S02": "RSU",
+    "MAP6_S03": "DRU", "MAP6_S04": "APU", "MAP6_S05": "APU",
+    "MAP7_S00": "ER2", "MAP7_S01": "ER2", "MAP7_S02": "ER2",
+    "MAP7_S03": "ER2",
+}
+
+# Prop anims — code-driven WorldObjects (decomp map overlay scripts).
+# There is NO data-driven prop animation in SH1 (ANM is characters-only);
+# every animated prop is C code calling WorldObjects_Add per frame
+# (ANIMS_MAPLINK.md, section A5). The converter emits the VERBATIM driver
+# parameters. Coordinates are ENGINE Q12 meters (y-down); consumers apply
+# the standard axis map (x,-y,-z). NOTE: no windmills exist in SH1
+# (verified zero decomp hits — the user's example is aspirational).
+_PROP_ANIMS = {
+    "MAP1_S02": [  # map1_s02.c:1446-1451 (init) + 1564-1583 (per-frame)
+        {"object": "FAN_HIDE", "pos": [100.0, -1.6, 142.9],
+         "rot0": [0, 0, 0],
+         "driver": "spin", "axis": "z", "rate": "rng180",
+         "rngBase": -180.0, "rngMask": 0x1FF, "chunkGate": [2, 3],
+         "sound": "Sfx_Unk1455",
+         "src": "map1_s02.c:1564-1583"},
+        {"object": "FAN_HIDE", "pos": [100.0, -1.6, 145.25],
+         "rot0": [0, 0, 0],
+         "driver": "spin", "axis": "z", "rate": "rng205",
+         "rngBase": -205.0, "rngMask": 0x1FF, "chunkGate": [2, 3],
+         "sound": "Sfx_Unk1455",
+         "src": "map1_s02.c:1575-1583"},
+    ],
+    "MAP4_S02": [  # map4_s02.c:52-53 + 108-158 (16 blades, alt direction)
+        {"object": "FAN0_HID", "pos": None,          # from placement tables
+         "driver": "fanArray", "axis": "x",
+         "bladeCount": 16, "rate": 90.0,             # dt * Q12_ANGLE(90deg)
+         "alternate": True, "chunkGate": [1, 0],
+         "sound": "Sfx_Unk1542",
+         "src": "map4_s02.c:108-158"},
+    ],
+    "MAP4_S03": [  # map4_s03.c:427-464 (TIM load) + 696-799 (state machine)
+        {"object": "TV", "tim": ["TV1.TIM", "TV2.TIM", "TV3.TIM"],
+         "driver": "tvNoise",
+         "lcgA": 0x7169AC35, "lcgXorA": 0xA547B39E,
+         "lcgB": 0x892D719C, "lcgXorB": 0xC65A4B97,
+         "durationShift": 5, "durationBase": 0x555,
+         "pos": "table:D_800DB7D4/D_800DB7E4",
+         "src": "map4_s03.c:405-464,696-799"},
+    ],
+    "MAP5_S03": [  # map5_s03_2.c:712 (init) + 664-693 (move) + 743 (add)
+        {"object": "MOVACHES", "pos": [104.2225, -0.1683, 60.0667],
+         "driver": "translate", "axis": "z", "speed": 0.14,  # dt * 0.14 m/s
+         "chunkGate": [2, 1],
+         "src": "map5_s03_2.c:664-743"},
+    ],
+}
+
+
+def _room_tag(room_name):
+    """Area tag of a room stem (variable length: THR/SPR/DRU are 3 chars,
+    SC/SU/ER/DR/HP/HU are 2 — room_prefix() already decodes exactly this)."""
+    return room_prefix(room_name)
+
+
+def _room_env_fx(room_name):
+    """v3 envEffects + waterZones for one room GLB (AREA-level data).
+
+    Tag from the room filename prefix (THR/HP/DR/...). The effect-texture
+    FLAG is per OVERLAY (MapIdx), not per area — a room GLB cannot know its
+    overlay — EXCEPT the sewers, where the flag is constant for the whole
+    area (DR/DRU = WaterRefract, env_effects.c:131-136) and is attached so
+    sewer GLBs are self-contained. Returns ({}, []) for areas with no FX
+    (the graceful no-op contract — old behavior preserved)."""
+    tag = _room_tag(room_name)
+    known = {t[0] for t in _MAP_INFOS}
+    if tag not in known:
+        return {}, []
+    zones = []
+    for z in _WATER_ZONES.get(tag, ()):
+        zones.append({
+            "enabled": z[0], "illumination": z[1],
+            "minX": z[2], "maxX": z[3], "minZ": z[4], "maxZ": z[5],
+            "units": "meters (s_WaterZone q11_4 raw / 16)",
+            "struct": "s_WaterZone map.h:271-281",
+        })
+    env = {}
+    if tag in ("DR", "DRU"):
+        env = {"effectTexFlag": "WaterRefract", "tim": "DR_WAVE.TIM",
+               "mapIdx": 29 if tag == "DR" else 36,
+               "eventFlag": None,
+               "src": "env_effects.c:131-136 (MapIdx_MAP5_S00/MAP6_S03)"}
+    return env, zones
+
+
+def _room_maplink(room_name, known_rooms):
+    """v3 mapLink — the WorldMap_MakeGrid contract (map.c:386-419): one
+    combined world per area tag; a room's grid neighbors are the rooms at
+    (chunkX+dx, chunkZ+dz), cells decoded from the 4 hex filename digits
+    (ConvertHexToS8). `known_rooms` = the room names the CURRENT conversion
+    actually emits (caller-built); neighbors absent from it are omitted —
+    consumers ALSO probe filenames at runtime so a missing neighbor GLB is
+    a silent no-op (task 6's requirement)."""
+    tag = _room_tag(room_name)
+    if len(room_name) != len(tag) + 4 or len(tag) == 0:
+        return None
+    hexpart = room_name[len(tag):len(tag) + 4].upper()
+    if len(hexpart) != 4 or not all(c in "0123456789ABCDEF" for c in hexpart):
+        return None
+    try:
+        hx = int(hexpart[:2], 16)
+        hz = int(hexpart[2:4], 16)
+    except ValueError:
+        return None
+    cx = hx - 256 if hx > 127 else hx
+    cz = hz - 256 if hz > 127 else hz
+    info = next((t for t in _MAP_INFOS if t[0] == tag), None)
+    if info is None:
+        return None
+    neighbors = []
+    for dx in (-1, 0, 1):
+        for dz in (-1, 0, 1):
+            if dx == 0 and dz == 0:
+                continue
+            nb = f"{tag}{(cx + dx) & 0xFF:02X}{(cz + dz) & 0xFF:02X}"
+            if nb in known_rooms:
+                neighbors.append({"dx": dx, "dz": dz, "room": nb,
+                                  "file": nb + ".glb"})
+    return {
+        "tag": tag, "chunkX": cx, "chunkZ": cz,
+        "activeChunks": info[1], "isExterior": info[2],
+        "neighbors": neighbors,
+        "probe": "consumers probe <tag><hexXX><hexZZ>.glb at runtime; "
+                 "missing file = silent no-op (mapLink task 6)",
+        "src": "MAP_INFOS map_info.c:515-532; WorldMap_MakeGrid map.c:386-419",
+    }
+
+
+def _room_prop_anims(room_name):
+    """v3 propAnims — catalog entries whose ENGINE positions fall inside
+    this room's 40m cell (cell from the filename digits, CHUNK_SIZE 40).
+    Table-driven entries (TV/FAN0 pos=None) ride the overlay manifest,
+    not room GLBs (their placement tables are not in the IPD)."""
+    out = []
+    tag = _room_tag(room_name)
+    if len(room_name) != len(tag) + 4 or len(tag) == 0:
+        return out
+    hexpart = room_name[len(tag):len(tag) + 4].upper()
+    if len(hexpart) != 4 or not all(c in "0123456789ABCDEF" for c in hexpart):
+        return out
+    try:
+        hx = int(hexpart[:2], 16)
+        hz = int(hexpart[2:4], 16)
+    except ValueError:
+        return out
+    rcx = hx - 256 if hx > 127 else hx
+    rcz = hz - 256 if hz > 127 else hz
+    for overlay, entries in _PROP_ANIMS.items():
+        if _OVERLAY_TO_TAG.get(overlay) != tag:
+            continue
+        for e in entries:
+            pos = e.get("pos")
+            if not pos or not isinstance(pos, list):
+                continue
+            pcx = int(pos[0] // 40)
+            pcz = int(pos[2] // 40)
+            if pcx == rcx and pcz == rcz:
+                entry = dict(e)
+                entry["overlay"] = overlay
+                entry["posUnits"] = "engine Q12 meters (y-down)"
+                out.append(entry)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # TIM texture decoding (PS1 4bpp CLUT images)
 # ---------------------------------------------------------------------------
 class TimFile:
@@ -3453,17 +3706,25 @@ def _b64(b):
     return _b64mod.b64encode(bytes(b)).decode("ascii")
 
 
-def build_sh1x(room, resolver, report):
+def build_sh1x(room, resolver, report, known_rooms=None):
     """Assemble the SH1X verbatim extras container for one room.
 
     Every field is the RAW source value (Q7.8/Q23.8/s16 units as stored).
     Byte-identical IPD+PLM reconstruction is possible from the `raw` blobs
     alone (see tools/sh1x_roundtrip.py); the decoded fields exist for
     consumer convenience and are pure functions of the raws.
+
+    v3: adds the engine FX blocks (envEffects, waterZones, mapLink,
+    propAnims, userLight defaults) — hardcoded decomp table values with
+    per-field source citations (docs/SH1X_EXTRAS_V3_FX.md). All v3 fields
+    are OPTIONAL for consumers: an absent/empty block = feature off, the
+    pre-v3 render behavior unchanged (graceful no-op contract).
+    `known_rooms` (optional set of room names in this conversion) enables
+    mapLink neighbor emission; None skips mapLink.
     """
     inst_key = {id(i): n for n, i in enumerate(room.instances)}
     sh1x = {
-        "schema": "SH1X", "version": 2,
+        "schema": "SH1X", "version": 3,
         "room": room.name,
         "file": {"name": room.name + ".IPD", "size": room.file_size,
                  "sha256": room.file_sha256},
@@ -3503,6 +3764,34 @@ def build_sh1x(room, resolver, report):
         "collision": _sh1x_collision(room),
         # ---- the embedded PLM (s_LmHeader), verbatim ---------------------
         "plm": _sh1x_plm(room.plm),
+    }
+    # ---- v3 engine FX blocks (docs/SH1X_EXTRAS_V3_FX.md) ----------------
+    env_fx, water_zones = _room_env_fx(room.name)
+    if env_fx:
+        sh1x["envEffects"] = env_fx
+    if water_zones:
+        sh1x["waterZones"] = water_zones
+    if known_rooms is not None:
+        ml = _room_maplink(room.name, known_rooms)
+        if ml is not None:
+            sh1x["mapLink"] = ml
+    pa = _room_prop_anims(room.name)
+    if pa:
+        sh1x["propAnims"] = pa
+    # userLight defaults: the engine's flashlight attribs (Game_Flashlight
+    # AttribsSet effects.c:210-218) — consumers may override everything;
+    # the PoC's standing directive (light rides the CAMERA) is the default
+    # consumer behavior, so only the verbatim constants ride here.
+    sh1x["userLight"] = {
+        "mode": "Spot",
+        "localOffset": [-0.08, -0.28, 0.12],   # meters, engine frame
+        "rotation": [-15.0, 0.0, 0.0],          # degrees (pitch, yaw, roll)
+        "intensityDefault": 1.0,                # g_SysWork.lightIntensity
+        "ramp": {"ratePerSec": 4.0, "range": [0, 4096],
+                 "units": "Q12; WorldEnv_Update effects.c:417-426"},
+        "dayModes": "never Spot (preset table; isFlashlightUnavailable)",
+        "src": "Game_FlashlightAttribsSet effects.c:210-218; "
+               "WorldEnv_Update effects.c:417-426",
     }
     for pi, br in enumerate(room.model_buffer_raws):
         buf = {
@@ -3665,7 +3954,8 @@ def _sh1x_plm(plm):
     }
 
 
-def export_room(room, resolver, out_dir, include_unused=False, builder=None):
+def export_room(room, resolver, out_dir, include_unused=False, builder=None,
+                known_rooms=None):
     """Export one room to <name>.glb (default) or append it into a shared
     whole-map builder (--whole-map mode).
 
@@ -3994,11 +4284,16 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
         # ---- SH1X verbatim extras: whole-map mode stores per-room SH1X
         # containers on the per-room ROOT node's extras (each room is
         # self-contained); the per-room file mode puts the SAME container
-        # on scenes[0].extras.SH1X (below).
+        # on scenes[0].extras.SH1X (below). v3: known_rooms = every room
+        # of this map (the shared builder's roster) so mapLink neighbors
+        # resolve within the combined world.
         room_root_node = builder.json["nodes"][report["map_parent_node"]]
         room_root_node["extras"] = room_root_node.get("extras") or {}
         try:
-            room_root_node["extras"]["SH1X"] = build_sh1x(room, resolver, report)
+            room_root_node["extras"]["SH1X"] = build_sh1x(
+                room, resolver, report,
+                known_rooms={r.name for r in
+                             map_rooms.get(room_prefix(room.name), ())})
         except Exception as e:
             report["problems"].append(f"SH1X emission failed: {e}")
             raise
@@ -4031,10 +4326,14 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None):
         # ---- SH1X verbatim extras on the scene (the room's whole IPD+PLM
         # data, byte-identical; docs/SH1X_EXTRAS_SCHEMA.md).  A stock glTF
         # viewer ignores it; the engine-exact consumer paints from it.
+        # v3: known_rooms = the caller-provided input-dir roster (the full
+        # grid available to THIS conversion — neighbors not converted are
+        # simply absent; consumers probe filenames at runtime anyway).
         scene0 = builder.json["scenes"][0]
         scene0["extras"] = scene0.get("extras") or {}
         try:
-            scene0["extras"]["SH1X"] = build_sh1x(room, resolver, report)
+            scene0["extras"]["SH1X"] = build_sh1x(
+                room, resolver, report, known_rooms=known_rooms)
         except Exception as e:
             report["problems"].append(f"SH1X emission failed: {e}")
             raise
@@ -5160,6 +5459,11 @@ def main(argv=None):
         for e in rep["validation"]["errors"]:
             log.error("  %s VALIDATION: %s", stemx, e)
 
+    # v3 (mapLink): the input-dir room roster — every IPD stem present (the
+    # full grid THIS conversion can see; neighbors outside it are simply
+    # omitted from mapLink.neighbors, consumers probe at runtime anyway).
+    input_room_names = {f[:-4].upper() for f in all_ipds}
+
     for f in selected:
         path = os.path.join(in_dir, f)
         stem = f[:-4]
@@ -5180,7 +5484,8 @@ def main(argv=None):
         try:
             rep = export_room(room, resolver, out_dir,
                               include_unused=args.include_unused,
-                              builder=map_builders.get(pref))
+                              builder=map_builders.get(pref),
+                              known_rooms=input_room_names)
         except Exception as e:
             log.error("%s: export failed: %s", stem, e)
             failed.append({"room": stem, "error": str(e)})
