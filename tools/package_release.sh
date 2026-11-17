@@ -31,6 +31,12 @@ LINUX_BIN="${3:?missing linux binary}"
 WIN_BIN="${4:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# absolutize OUT up front: the zip steps run inside subshells that cd into
+# the staging dir, so a relative out-dir would resolve INSIDE the staging
+# tree (or fail to create the zip at all).
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
+
 TMP="$OUT/pkg"
 rm -rf "$TMP"
 mkdir -p "$TMP/input"
