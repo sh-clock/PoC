@@ -3471,8 +3471,12 @@ def build_sh1x(room, resolver, report):
         "header": {
             "magic": room.header_raw[0],
             "isLoaded": room.header_raw[1],
-            "chunkX": s16(room.header_raw, 2),
-            "chunkZ": s16(room.header_raw, 3),
+            "chunkX": room.x_pos,   # s8 @2 (decomp ipd.h: s8 chunkX @2; the
+            "chunkZ": room.y_pos,   # s8 @3  Room() already reads s8 — the old
+                                    # s16() here OVERLAPPED bytes 3..4: e.g.
+                                    # HP0003 chunkZ read 0x0314=788 instead
+                                    # of 3 — the painter consumer would have
+                                    # computed WRONG chunk edges + subcells)
             "lmHdrOff": u32(room.header_raw, 4),
             "modelInfoCount": room.header_raw[8],
             "modelBufferCount": room.header_raw[9],
