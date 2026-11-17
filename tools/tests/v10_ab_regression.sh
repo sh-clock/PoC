@@ -8,7 +8,7 @@
 set -u
 V9="${V9_BIN:-./fog_poc}"
 V10="${V10_BIN:-./fog_poc}"
-OUT=/home/z/my-project/scripts/v10_tests/ab
+OUT="${V10_TESTS_OUT:-/tmp/v10_tests/ab}"
 mkdir -p "$OUT"
 cd "$(dirname "$0")/.."   # both read the same input/ via --glb
 GLB=input/THRF9FD.glb

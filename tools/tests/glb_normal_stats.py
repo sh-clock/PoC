@@ -3,7 +3,8 @@
 (all-up walls, zero normals, non-unit clusters) that would break N.L."""
 import json, struct, sys, collections, math
 
-path = "/home/z/my-project/poc_v5/input/THRF9FD.glb"
+import sys
+path = sys.argv[1] if len(sys.argv) > 1 else "../../input/THRF9FD.glb"
 data = open(path, "rb").read()
 jlen = struct.unpack("<I", data[12:16])[0]
 j = json.loads(data[20:20 + jlen].decode("utf-8"))

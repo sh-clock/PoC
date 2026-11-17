@@ -1,32 +1,43 @@
-Drop the app inputs here:
+Base rip files + camera tracks. All sample assets are Konami-copyrighted,
+non-commercial testing only — produce your own via TOOLS.md.
 
-  THRF9FD.glb    - ipd2gltf rip of the original BG/THRF9FD.IPD room
-                   (filetable USA index 1291). The app loads this GLB
-                   DIRECTLY - no extraction step, no external assets.
-  camdat.json    - CamTrack Editor 1.0.0 camera track ("Line 1",
-                   pingPong, 49.88s, y=3.43 street-cam) + per-model flags:
-                   fogon=false, nighton=true, flashlighton=true.
-  camdat_eye.json - v6 DEMO: the SAME track at eye height (y=1.75, i.e.
-                   +1.60m over the 0.148m walkway datum). The engine's
-                   flashlight (func_80057658, ~1/d^2 value falloff, anchor
-                   ~1.2-1.5m above the street on Harry's torso bone) puts
-                   its visible road pool at 4-6m from an eye-height anchor:
-                   run  ./fog_poc --camdat input/camdat_eye.json --night --flashlight
-                   to see the classic SH1 pool (VLM 9/10). At the 3.43m
-                   street-cam height the same authentic math places the
-                   beam core ~12m out (value ~13/255 -> black) and only
-                   fence/wall bases glow (+74..+107 measured) - engine-
-                   exact behavior for a high camera. See README.md v6 section + CHANGES_v7.md (v7: the realtime window now ticks Gfx_EffectsUpdate every frame, so the flashlight beam is live in the interactive window at ANY camera height).
+The repo tracks ONLY the base files; the GLBs are not committed. Convert
+them with the current tools/ipd2gltf.py (the release zips do exactly this):
 
-The executable looks for these in ./input/ or next to itself.
-Optional (debug only, NOT required by the app):
-  BG_ETC.TIM / FLAME.TIM / WATER.TIM - viewable with --tim-file.
-  updated_test_camdat.json - the UPDATED v2 camdat from the CDN (Sept 20):
-                   model THRF9FD.glb with env { pair [6,3] (night street ->
-                   flashlight), weatherTarget 4, flashlightOn, psxWobble,
-                   dither, particles, engine } + the line track
-                   "Line 1" pingPong (-256.347,1.1169,110.9005) ->
-                   (-256.1334,1.5052,85.7087), speedMS 1.7012, lookMode
-                   path, fov 60. The v14 showcase for the FENCE/BUSH
-                   layering fix:
-                   ./fog_poc --camdat input/updated_test_camdat.json
+  python3 tools/ipd2gltf.py --input input --output glbs --rooms THRF9FD,HP0003
+
+(--output must NOT be the input dir: the converter always excludes the
+output directory from texture scanning, so an in-place conversion drops
+every texture reference and emits a degraded GLB.)
+
+THRF9FD (outdoor street scene, filetable USA index 1291):
+  THRF9FD.IPD     - the room (embedded PLM + collision + render data)
+  THR_GLB.PLM     - the shared THR map geometry library (trees etc.)
+  THR0001F.TIM    - the 4 street textures the room references
+  THR0002F.TIM
+  THR0003F.TIM
+  THR0004F.TIM
+  THR7201F.TIM    - the fence/sign textures
+  THR7201H.TIM
+  BG_ETC.TIM      - the engine's billboard/weather sprite sheet
+  camdat.json     - CamTrack Editor camera track ("Line 1", pingPong,
+                    49.88s, y=3.43 street-cam) + per-model flags
+                    fogon=false, nighton=true, flashlighton=true and the
+                    env object (pair [6,3], flashlight on, wobble, dither).
+
+HP0003 (hospital interior):
+  HP0003.IPD      - the room (roundtrip-proven converter output).
+                    Interior scene: the engine runs no weather particles
+                    indoors (load_screen.c per-map weather), and its camdat
+                    sets particles:false to match.
+  HP1F011.TIM     - the 3 room textures it references
+  HP1F012.TIM
+  HP1F01H.TIM
+  hp_camdat.json  - the hospital corridor camera track ("HP corridor",
+                    line, pingPong, 12s).
+
+Both conversions reconstruct their source IPDs byte-identically
+(tools/tests/sh1x_roundtrip.py) and are deterministic across runs.
+
+Optional debug flag (no file needed): --tim-file views any TIM, e.g.
+BG_ETC.TIM above.

@@ -14,7 +14,7 @@
 > drawing clip and the display window are 224 rows — screen_draw.c:45-46;
 > SetGeomScreen(gsScreenHeight)=224). The Y vertex-snap lattice is
 > fb_h/224 (exactly 1.0 at native). ps1-mode texture sampling is the
-> DuckStation-verbatim fixed-point DDA (integer-position evaluation,
+> SwanStation/DuckStation-verbatim fixed-point DDA (integer-position evaluation,
 > +0.5-texel Init bias, truncating Q12 ATTRIB_STEP gradients, the u8
 > texcoord wrap) — the engine's own wire/hole crawl rate on the fence.
 > The far cull is 0x79C<<3 (the outdoor WorldGfx_Draw(1) otShift chain —
@@ -71,7 +71,7 @@
 > (opaque + MASK + BLEND) now ride the engine's per-quad OT walk
 > (Gfx_MeshDraw MAX-vertex-SZ Q8>>3 buckets, far->near, LIFO within a
 > bucket; the engine's per-QUAD far cull `> field_1C`) — the PSX has NO
-> depth buffer (DuckStation gpu_sw_rasterizer.inl), so per-pixel depth
+> depth buffer (SwanStation/DuckStation gpu_sw_rasterizer.inl), so per-pixel depth
 > testing between quads is gone entirely; the only reported true
 > z-fighting (float depth-comparison flips) is eliminated. DITHER is now
 > ON by default (the DTE hardware behavior; D key / --no-dither /
@@ -113,7 +113,7 @@
 > a hole; alpha-127 STP texels write OPAQUE (the room's STP quads are
 > ST-clear — Gfx_MeshDraw's STP branch never calls setSemiTrans on the
 > textured quad, and func_8005AC50's ST-bit path needs a field_B_0 model,
-> which THRF9FD.IPD's 32 objects all lack) — DuckStation
+> which THRF9FD.IPD's 32 objects all lack) — SwanStation/DuckStation
 > gpu_sw_rasterizer.inl:88. All 21 modes render with the fixed layering;
 > see CHANGES_v14.md.
 

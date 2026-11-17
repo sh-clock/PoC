@@ -263,10 +263,10 @@ flags nighton + flashlighton riding with fogon in camdat.json.
 
 ## 12. Ground-truth audit (C++ vs camtrack.html JS — the actual file's code)
 
-`tools/camtrack_audit.js` extracts the pure playback math VERBATIM from the
+`tools/tests/camtrack_audit.js` extracts the pure playback math VERBATIM from the
 downloaded camtrack.html (utils, phase01/angleAt, curve/polyline/zigzag LUTs,
 normalFromTangent, evalTrack, cycleDuration, sanitizeTrack) and runs it over
-`tools/camtest_tracks.json` — 30 tracks covering all 8 types x all 5 look
+`tools/tests/camtest_tracks.json` — 30 tracks covering all 8 types x all 5 look
 modes x all 3 loop modes + per-type defaults + degenerate inputs (zero-length
 line, zero-length polyline segments, bad values, lanes rounding, turns
 clamping). The PoC dumps the same 401 samples/track via `--cam-dump`.
@@ -304,7 +304,7 @@ Scope: the env preset system (world_effects.c), the per-vertex flashlight
 tables (bodyprog_80055028.c func_80055648/func_80055D78), and the snow↔env
 interaction (particle.c + func_8003EDB8). GTE opcode semantics (DPCS/DPCL/
 RTPS/UNRDivide, sf flags, IR clamps, the OFX 16.16 encoding) verified
-against DuckStation's cycle-accurate implementation.
+against SwanStation/DuckStation's cycle-accurate implementation (SwanStation is the GPL-3.0 maintained fork of the DuckStation core).
 
 ## 1. Env presets + blend (world_effects.c)
 
@@ -348,7 +348,7 @@ anchor lands it at the game-authentic ~5 m.
 
 ## 3. v4 verification (all PASS)
 
-* **Math audit** (`tools/env_audit.py`, independent Python reference
+* **Math audit** (`tools/tests/env_audit.py`, independent Python reference
   transcribed from the decomp): 539/539 samples — func_80057658 grid
   (384: 4 beams x 4 normals x 8 deltas x 3 DQA), DPCL (100), DPCS+veil
   (40), UNRDivide (15). **0 mismatches.**

@@ -19,6 +19,19 @@ jobs:
       - name: Build (make)
         run: make -C . all V=1
 
+      - name: Convert sample scenes (GLBs are not committed)
+        run: |
+          # input/ tracks only the base rip files; regenerate the GLBs with
+          # the converter at THIS commit so CI always exercises the
+          # tools/ipd2gltf.py it ships.
+          # NOTE: --output must NOT be the input dir — the converter always
+          # excludes the output directory from texture scanning (writing
+          # into input/ would drop every texture reference -> degraded GLB).
+          python3 tools/ipd2gltf.py --input input --output glbs \
+              --rooms THRF9FD,HP0003
+          test -s glbs/THRF9FD.glb
+          test -s glbs/HP0003.glb
+
       - name: Smoke test — engine renders a PNG headlessly
         run: |
           # --shot t=0 renders one deterministic frame (320x224) to
@@ -26,10 +39,24 @@ jobs:
           # binary actually runs, not just links.
           # (--shot REQUIRES a value: "t=SECONDS[,file=NAME.png]" —
           # a bare --shot exits with "unknown arg".)
-          ./fog_poc --glb input/THRF9FD.glb --camdat input/camdat.json \
+          ./fog_poc --glb glbs/THRF9FD.glb --camdat input/camdat.json \
                     --input input --shot t=0
           test -s shots/shot_00000.00.png
           file shots/shot_00000.00.png
+
+      - name: Package one-click test zip (linux)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          bash tools/package_release.sh "$TAG" dist ./fog_poc
+          # prove the zip is REALLY one-click: unzip, run --test, check PNG
+          mkdir -p /tmp/ziptest && cd /tmp/ziptest
+          unzip -q "$GITHUB_WORKSPACE/dist/sh1x-poc-$TAG-linux.zip"
+          ./RUN_THR.sh --test
+          ./RUN_HP0003.sh --test
+          test -s shots/SELFTEST_THR.png
+          test -s shots/SELFTEST_HP0003.png
+          echo "one-click zip verified: both self-tests rendered"
 
       - name: Upload release assets (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -37,8 +64,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            fog_poc
-            shots/shot_00000.00.png
+            dist/sh1x-poc-${{ github.ref_name }}-linux.zip
 
   build-windows:
     runs-on: ubuntu-latest
@@ -56,12 +82,20 @@ jobs:
             -o fog_poc.exe src/fog_poc.c -luser32 -lgdi32
           file fog_poc.exe
 
+      - name: Package one-click test zip (windows)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # "" skips the linux binary/zip; only the -win zip is produced.
+          bash tools/package_release.sh "$TAG" dist NONE ./fog_poc.exe
+          unzip -l "dist/sh1x-poc-$TAG-win.zip"
+
       - name: Upload release assets (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: fog_poc.exe
+          files: dist/sh1x-poc-${{ github.ref_name }}-win.zip
 
       - name: Build source tarball (any ref)
         if: startsWith(github.ref, 'refs/tags/v')
