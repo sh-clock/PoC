@@ -431,50 +431,308 @@ _OVERLAY_TO_TAG = {
 # the standard axis map (x,-y,-z). NOTE: no windmills exist in SH1
 # (verified zero decomp hits — the user's example is aspirational).
 _PROP_ANIMS = {
-    "MAP1_S02": [  # map1_s02.c:1446-1451 (init) + 1564-1583 (per-frame)
+    # ---- map0_s00: Balkan wheelchair (map0_s00_2.c:1215-1220 init,
+    # 1259-1286 update — the verbatim RNG spin with |1| doubled add) ----
+    "MAP0_S00": [
+        {"object": "WHEEL1_H", "pos": [-268.32, -0.44, 245.72],
+         "rot0": [-43.0, -115.0, 0.0],
+         "driver": "spinRng", "axis": "z", "rngBase": -90.0, "rngMask": 0x1FF,
+         "chunkGate": [-7, "5|6"], "eventGate": 24,
+         "sound": "Sfx_Unk1358",
+         "src": "map0_s00_2.c:1259-1267"},
+        {"object": "WHEEL2_H", "pos": [-268.32, -0.44, 245.72],
+         "rot0": [-43.0, -115.0, 0.0],
+         "driver": "spinRng", "axis": "z", "rngBase": -90.0, "rngMask": 0x1FF,
+         "chunkGate": [-7, "5|6"], "eventGate": 24, "sharedRot": "WHEEL1_H",
+         "sound": "Sfx_Unk1358",
+         "src": "map0_s00_2.c:1259-1267"},
+    ],
+    # ---- map1_s01 reception rattling doors (map1_s01.c:1229-1290) ----
+    "MAP1_S01": [
+        {"object": "TOBIRA00", "pos": [-58.81, -1.3, 18.0198],
+         "rot0": [0, 0, 0], "driver": "doorRattle",
+         "oneIn": 32, "kickMin": 2, "kickMax": 9,
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9, "mirrorTo": "TOBIRA01",
+         "chunkGate": [-2, 0], "eventGate": 76,
+         "sound": "Sfx_Unk1435",
+         "src": "map1_s01.c:1229-1290"},
+        {"object": "SILVER_H", "pos": [-98.8, 0.0, 22.8],
+         "rot0": [-90.0, 28.5, 0.0], "driver": "cutscene",
+         "cutscene": "silverDrop (orbit+gravity, map1_s01.c:469-485)",
+         "src": "map1_s01.c:469-485"},
+    ],
+    # ---- map1_s02 nightmare school (fans + doors + waterfall) ----
+    "MAP1_S02": [
         {"object": "FAN_HIDE", "pos": [100.0, -1.6, 142.9],
-         "rot0": [0, 0, 0],
-         "driver": "spin", "axis": "z", "rate": "rng180",
+         "rot0": [0, 0, 0], "driver": "spinRng", "axis": "z",
          "rngBase": -180.0, "rngMask": 0x1FF, "chunkGate": [2, 3],
          "sound": "Sfx_Unk1455",
-         "src": "map1_s02.c:1564-1583"},
+         "src": "map1_s02.c:1564-1591"},
         {"object": "FAN_HIDE", "pos": [100.0, -1.6, 145.25],
-         "rot0": [0, 0, 0],
-         "driver": "spin", "axis": "z", "rate": "rng205",
+         "rot0": [0, 0, 0], "driver": "spinRng", "axis": "z",
          "rngBase": -205.0, "rngMask": 0x1FF, "chunkGate": [2, 3],
          "sound": "Sfx_Unk1455",
          "src": "map1_s02.c:1575-1583"},
+        {"object": "DOOR_HID", "pos": [18.37, -0.8, 59.51],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "bathroomDoor ramp to -112.5deg (map1_s02.c:983-1017)",
+         "holdFlag": 96,
+         "src": "map1_s02.c:983-1017"},
+        {"object": "DOOR1_HI", "pos": [58.4, 0.0, -59.6],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "clockTowerDoor ramp+snap 90deg (map1_s02.c:1173-1297)",
+         "src": "map1_s02.c:1173-1297"},
+        {"object": "DOOR2_HI", "pos": [58.4, 0.0, -60.4],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "clockTowerDoor ramp+snap 180deg (map1_s02.c:1173-1297)",
+         "src": "map1_s02.c:1173-1297"},
     ],
-    "MAP4_S02": [  # map4_s02.c:52-53 + 108-158 (16 blades, alt direction)
-        {"object": "FAN0_HID", "pos": None,          # from placement tables
+    # ---- map1_s03 locker suite (map1_s03.c:1928-2153) ----
+    "MAP1_S03": [
+        {"object": "TOBIRA2_", "pos": [-61.0, -1.05, 20.97],
+         "rot0": [0, 0, 0], "driver": "dampedSwing",
+         "kick": -11.3, "openLimit": -168.8, "settle": -157.4,
+         "chunkGate": [-2, 0],
+         "sound": "Sfx_Unk1460",
+         "src": "map1_s03.c:1956-1999"},
+        {"object": "TOBIRA01", "pos": [-58.81, -1.4, 18.02],
+         "rot0": [0, 0, 0], "driver": "doorRattle",
+         "oneIn": 32, "kickMin": 2, "kickMax": 9,
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9, "mirrorTo": "TOBIRA00",
+         "chunkGate": [-2, 0], "sound": "Sfx_Unk1435",
+         "src": "map1_s03.c:2002-2046"},
+        {"object": "VALVE_HI", "pos": [-10.49, -0.7, -12.92],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "valve hand-tracking (map1_s03.c:890-988)",
+         "src": "map1_s03.c:890-988"},
+    ],
+    # ---- map1_s05 boiler (map1_s05.c:398-402: ungated const spins) ----
+    "MAP1_S05": [
+        {"object": "SPHERE_H", "pos": [19.7, 1.58, -19.1],
+         "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
+         "rate": -90.0, "src": "map1_s05.c:398-399"},
+        {"object": "WHEEL_HI", "pos": [19.7, -0.06, -19.1],
+         "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
+         "rate": 15.0, "src": "map1_s05.c:401-402"},
+        {"object": "<light>", "pos": [19.7, -3.0, -19.1],
+         "driver": "lightFlicker",
+         "base": 1.35, "ampA": 0.9, "ampB": 0.6,
+         "rerollA": 64.0, "rerollB": [32, 95],
+         "eventGate": 129,
+         "src": "map1_s05.c:371-396"},
+    ],
+    # ---- map2_s00 streets west (drawbridge + chain door) ----
+    "MAP2_S00": [
+        {"object": "AXIS1_HI", "pos": [205.0, 0.0, -80.0],
+         "rot0": [0, 0, -49.94], "driver": "cutscene",
+         "cutscene": "drawbridge press1 dt*0x88 / press2 dt*Q12(0.1/3) to 0",
+         "eventGate": 166, "sharedRot": "AXIS2_BA",
+         "sound": "Sfx_Unk1481-1485",
+         "src": "map2_s00.c:1638-1646, 1745-1752"},
+        {"object": "AXIS2_BA", "pos": [205.0, 0.0, -80.0],
+         "rot0": [0, 0, -49.94], "driver": "cutscene", "sharedRot": "AXIS1_HI",
+         "cutscene": "drawbridge (paired deck)",
+         "eventGate": 166,
+         "src": "map2_s00.c:1638-1646, 1745-1752"},
+        {"object": "DOOR1_BA", "pos": [-263.0, 0.0, -104.0],
+         "rot0": [0, 8.0, 0.0], "driver": "dampedSwing",
+         "angVelMax": -0.0137, "rest": -0.02222,
+         "eventGate": 168, "sharedRot": "CHAIN2_1",
+         "sound": "Sfx_Unk1393/1394",
+         "src": "map2_s00.c:1913-1944"},
+        {"object": "CHAIN2_1", "pos": [-263.0, 0.0, -104.0],
+         "rot0": [0, 8.0, 0.0], "driver": "dampedSwing",
+         "angVelMax": -0.0137, "rest": -0.02222, "eventGate": 168,
+         "sharedRot": "DOOR1_BA",
+         "src": "map2_s00.c:1913-1944"},
+    ],
+    # ---- map3 hospital elevators + cabinet (SHARED slide code) ----
+    "MAP3_S01": [
+        {"object": "DR1L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35,
+         "accel": 0.8, "resetZ": 19.1, "chunkGate": [1, 0],
+         "sound": "Sfx_Unk1499-1502",
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "DR1R_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "chunkGate": [1, 0], "dir": -1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "TANA_HID", "pos": [60.0, 0.0, -21.6],
+         "rot0": [0, 180.0, 0], "driver": "cutscene",
+         "cutscene": "cabinetPush dt*playerRadius clamp 61.25",
+         "sound": "Sfx_Unk1535",
+         "src": "map3_s05.c:858-905 (TANA in s05; listed here s01-family)"},
+    ],
+    "MAP3_S03": [
+        {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s03.c:941-956"},
+        {"object": "DR1R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1], "dir": -1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s03.c:941-956"},
+    ],
+    "MAP3_S04": [
+        {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s04_2.c:539-554"},
+        {"object": "DR1R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1], "dir": -1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s04_2.c:539-554"},
+    ],
+    "MAP3_S05": [
+        {"object": "TANA_HID", "pos": [60.0, 0.0, -21.6],
+         "rot0": [0, 180.0, 0], "driver": "cutscene",
+         "cutscene": "cabinetPush dt*playerRadius clamp 61.25 (map3_s05)",
+         "eventGate": "M3S05_CabinetPushed", "sound": "Sfx_Unk1535",
+         "src": "map3_s05.c:858-905, 935-940, 995-1009"},
+        {"object": "DR1L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:950-955"},
+        {"object": "DR1R_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "dir": -1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:950-955"},
+    ],
+    # ---- map4_s01/2/3 hospital objects ----
+    "MAP4_S01": [
+        {"object": "MOV1_HID", "pos": [178.2681, -0.387, 63.6814],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "cabinetPush dt*0.22 clamp 63.6814 (pre-push 62.7466)",
+         "eventGate": 302, "sound": "Sfx_Unk1538",
+         "src": "map4_s01_2.c:301-322, 1302-1334"},
+    ],
+    "MAP4_S02": [
+        {"object": "FAN0_HID", "pos": None, "rot0": [0, 0, 0],
          "driver": "fanArray", "axis": "x",
-         "bladeCount": 16, "rate": 90.0,             # dt * Q12_ANGLE(90deg)
+         "bladeCount": 16, "rate": 90.0,
          "alternate": True, "chunkGate": [1, 0],
          "sound": "Sfx_Unk1542",
          "src": "map4_s02.c:108-158"},
     ],
-    "MAP4_S03": [  # map4_s03.c:427-464 (TIM load) + 696-799 (state machine)
-        {"object": "TV", "tim": ["TV1.TIM", "TV2.TIM", "TV3.TIM"],
-         "driver": "tvNoise",
+    "MAP4_S03": [
+        {"object": "REF_NEAR", "pos": "table:D_800DB7D4/D_800DB7E4",
+         "rot0": [0, 0, 0], "driver": "tvNoise",
          "lcgA": 0x7169AC35, "lcgXorA": 0xA547B39E,
          "lcgB": 0x892D719C, "lcgXorB": 0xC65A4B97,
          "durationShift": 5, "durationBase": 0x555,
-         "pos": "table:D_800DB7D4/D_800DB7E4",
-         "src": "map4_s03.c:405-464,696-799"},
+         "tim": ["TV1.TIM", "TV2.TIM", "TV3.TIM"],
+         "chunkGate": ["3|4", 1], "eventGate": 324,
+         "src": "map4_s03.c:405-464, 527-595, 696-828, 1252-1409"},
+        {"object": "FENCE_HI", "pos": [130.5, 0.0, -93.0],
+         "rot0": [0, 0, 0], "driver": "fallOnce",
+         "rotLimit": 90.0, "vyMax": 15.0,
+         "eventGate": 320, "chunkGate": ["3|4", -3],
+         "sound": "Sfx_Unk1555",
+         "src": "map4_s03.c:1692-1716, 1637"},
     ],
-    "MAP5_S03": [  # map5_s03_2.c:712 (init) + 664-693 (move) + 743 (add)
+    # ---- map5_s03 roaches (map5_s03_2.c:664-693, 712, 743) ----
+    "MAP5_S03": [
         {"object": "MOVACHES", "pos": [104.2225, -0.1683, 60.0667],
-         "driver": "translate", "axis": "z", "speed": 0.14,  # dt * 0.14 m/s
-         "chunkGate": [2, 1],
-         "src": "map5_s03_2.c:664-743"},
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "translate dt*0.14 clamp 60.35/60.44 (player+object)",
+         "chunkGate": [2, 1], "sound": "Sfx_Unk1520/1538",
+         "src": "map5_s03_2.c:664-693, 710-791"},
+    ],
+    # ---- map5_s00 ripples: NON-WorldObject 2D (12 particles) ----
+    "MAP5_S00": [
+        {"object": "<ripples>", "driver": "waterRipple",
+         "count": 12, "box": [-92.75, -91.25, 7.35, 8.85], "y": 0.5,
+         "walkMin": -32, "walkMax": 31, "tMax": 4095,
+         "halfSizeK": 1.5, "clutBase": 160, "clutSel": 3,
+         "gate": "player x<=-80 z>=0 AND !(flashlightAllowed&&darkness)",
+         "src": "map5_s00.c:20-48, 89-94, 154-157"},
+    ],
+    # ---- map6_s03 corpse (map6_s03.c:377-444) ----
+    "MAP6_S03": [
+        {"object": "SITAI_NE", "pos": [75.0, 0.5, 19.7],
+         "rot0": [0, 180.0, 0], "driver": "rngWalk",
+         "rotBase": 0x800, "vzBase": 19.7, "dirMask": 0x1F, "dirBias": 0x20,
+         "vzStep": "rand%5-2", "chunkGate": [1, 0],
+         "sound": "Sfx_Unk1614",
+         "src": "map6_s03.c:377-444"},
+    ],
+    # ---- map6_s04 resort park (carousel + ferris + balloon) ----
+    "MAP6_S04": [
+        {"object": "UMA1_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
+         "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
+         "count": 10, "phaseSplit": 6,
+         "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
+         "speedSrc": "D_800EBA30 (0; -0x7A after Cybil)",
+         "src": "map6_s04_2.c:3619-3648, 3553-3554"},
+        {"object": "MGR_KOYA", "pos": [20.0, 1.0, 100.0],
+         "rot0": [0, 0, 0], "driver": "carouselSpin",
+         "radius": 8.0, "chunkGate": [0, 2],
+         "src": "map6_s04_2.c:3650-3697"},
+        {"object": "FW1_BACK", "pos": [8.7, -13.8, -28.0],
+         "rot0": [0, 0, 0], "driver": "ferrisWheel",
+         "rate": 45.511, "wrap": 307.2, "arms": 5, "armStep": 27.0,
+         "boxRadius": [10.0, 11.25], "pendulum": -68.2667,
+         "eventGate": 452,
+         "src": "map6_s04_2.c:3735-3846"},
+        {"object": "WHEEL_BA", "pos": [-16.0, -1.5, -64.0],
+         "rot0": [0, 0, 0], "driver": "lissajousOrbit",
+         "count": 12, "freqA": 0.197, "freqB": 0.275,
+         "radius": 4.0, "yOff": -1.5, "angleDiv": 30,
+         "eventGate": 453,
+         "src": "map6_s04_2.c:3848-3875"},
+    ],
+    # ---- map7 nowhere (stones, beans, bin, belt) ----
+    "MAP7_S00": [
+        {"object": "DR3R_HID", "pos": [60.8, 0.0, -137.45],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "gateDoor slide odd -dt*spd clamp -145.45",
+         "chunkGate": [1, -4], "sound": "Sfx_Unk1640",
+         "src": "map7_s00_2.c:556-588, 728-740, 764-773"},
+        {"object": "DR3L_HID", "pos": [60.8, 0.0, -137.45],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "gateDoor slide even +dt*spd clamp -129.45",
+         "chunkGate": [1, -4],
+         "src": "map7_s00_2.c:556-588, 728-740, 764-773"},
+    ],
+    "MAP7_S01": [
+        {"object": "STONE1_H", "pos": [-139.5, -1.35, -140.6],
+         "rot0": [0, 90.0, 0], "driver": "cutscene",
+         "cutscene": "stoneChoreo slide+drop+wobble(-25deg/s)+tumble(-120deg/s)",
+         "sound": "Sfx_Unk1647/1648/1649",
+         "src": "map7_s01_2.c:1545-1596, 2188-2195"},
+        {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "chunkGate": [0, 1],
+         "src": "map7_s01_2.c:2074-2105, 2218-2235, 2499"},
+        {"object": "DR1R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "chunkGate": [0, 1], "dir": -1,
+         "src": "map7_s01_2.c:2074-2105, 2218-2235, 2499"},
+    ],
+    "MAP7_S02": [
+        {"object": "BEAN1_HI", "pos": [62.3, "rand[-1.45,-1.35)", "rand[-61.07,-60.93)"],
+         "rot0": "rand16(0..4095)", "driver": "cutscene",
+         "cutscene": "gravityScatter vy+=dt*(g+scatter*sin), vz+=dt*(scatter*cos)",
+         "count": 16, "scatterAmp": 2.2, "gravityClamp": 5.0,
+         "sound": "Sfx_Unk1662/1651",
+         "src": "map7_s02_2.c:1170-1189, 3476-3488"},
+        {"object": "STONE2_H", "pos": [-139.5, -1.35, -140.6],
+         "rot0": [0, 90.0, 0], "driver": "cutscene",
+         "cutscene": "stoneChoreo (map7_s02 rates -0.0694/-0.3333)",
+         "src": "map7_s02_2.c:2662-2740"},
+    ],
+    "MAP7_S03": [
+        {"object": "BIN_HIDE", "pos": [140.0, 0.0, -100.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "binSpin rot.vx -= dt/3.6 from -167.6deg",
+         "src": "map7_s03_3.c:8240-8245, 6296-6300"},
+        {"object": "REAL_HID", "pos": [100.0, 0.0, -140.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "scrollBelt vz = base - (dt*2.67 wrap 20), 3 copies",
+         "count": 3, "spacing": 20.0, "speed": 2.67,
+         "src": "map7_s03_3.c:8296-8344, 8185-8189"},
     ],
 }
-
-
-def _room_tag(room_name):
-    """Area tag of a room stem (variable length: THR/SPR/DRU are 3 chars,
-    SC/SU/ER/DR/HP/HU are 2 — room_prefix() already decodes exactly this)."""
-    return room_prefix(room_name)
 
 
 def _room_env_fx(room_name):
@@ -550,11 +808,23 @@ def _room_maplink(room_name, known_rooms):
     }
 
 
-def _room_prop_anims(room_name):
-    """v3 propAnims — catalog entries whose ENGINE positions fall inside
-    this room's 40m cell (cell from the filename digits, CHUNK_SIZE 40).
-    Table-driven entries (TV/FAN0 pos=None) ride the overlay manifest,
-    not room GLBs (their placement tables are not in the IPD)."""
+def _room_tag(room_name):
+    """Area tag of a room stem (variable length: THR/SPR/DRU are 3 chars,
+    SC/SU/ER/DR/HP/HU are 2 — room_prefix() already decodes exactly this)."""
+    return room_prefix(room_name)
+
+
+def _room_prop_anims(room_name, max_entries=64):
+    """v3 propAnims — the FULL animated-WorldObjects catalog
+    (download/session12_evidence/ALL_ANIMATED_OBJECTS_CATALOG.md; 3 parallel
+    decomp sweeps, every value verbatim file:line cited).
+
+    Entries with a concrete pos list attach to the room whose 40m cell
+    contains them (cell from the filename digits, CHUNK_SIZE 40). Entries
+    with pos=None / table refs / cutscene-only / non-object drivers (ripple,
+    flicker) attach to EVERY room of the overlay's AREA TAG as `manifest`
+    entries — consumers render the driver effects regardless of room cell
+    (the engine updates them per overlay, not per room)."""
     out = []
     tag = _room_tag(room_name)
     if len(room_name) != len(tag) + 4 or len(tag) == 0:
@@ -574,16 +844,18 @@ def _room_prop_anims(room_name):
             continue
         for e in entries:
             pos = e.get("pos")
-            if not pos or not isinstance(pos, list):
-                continue
-            pcx = int(pos[0] // 40)
-            pcz = int(pos[2] // 40)
-            if pcx == rcx and pcz == rcz:
-                entry = dict(e)
-                entry["overlay"] = overlay
-                entry["posUnits"] = "engine Q12 meters (y-down)"
-                out.append(entry)
-    return out
+            entry = dict(e)
+            entry["overlay"] = overlay
+            entry["posUnits"] = "engine Q12 meters (y-down)" \
+                if isinstance(pos, list) else "manifest (overlay-level)"
+            if isinstance(pos, list) and len(pos) >= 3 and \
+                    all(isinstance(v, (int, float)) for v in pos):
+                pcx = int(pos[0] // 40)
+                pcz = int(pos[2] // 40)
+                if pcx != rcx or pcz != rcz:
+                    continue
+            out.append(entry)
+    return out[:max_entries]
 
 
 # ---------------------------------------------------------------------------
