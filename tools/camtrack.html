@@ -2930,7 +2930,15 @@ window.SHView = (function () {
                 : (o.userData && o.userData.SH1X && o.userData.SH1X.ot_base !== undefined)
                   ? o.userData.SH1X : null;
       if (ex) {
-        o.renderOrder = -ex.ot_base;   /* deeper section = drawn first    */
+        /* v24.1 FIX (audit): with depthFunc LESS + the SH_VERT 1/32 m depth
+         * snap, an exact depth tie is won by the FIRST-DRAWN quad (it
+         * writes depth; the second fails z<z) — see the v5 note above.
+         * The engine OT walk paints the HIGHER section base FIRST = BELOW
+         * (covered by the lower base). So the higher base must draw LAST
+         * (lose ties): renderOrder ASCENDING = +ot_base. The earlier
+         * -ot_base inverted the layering for same-slab cross-section
+         * pairs — the exact case this port targets.                             */
+        o.renderOrder = ex.ot_base;
         rec.sh1x = true;
       }
       rec.meshes.push(o);
