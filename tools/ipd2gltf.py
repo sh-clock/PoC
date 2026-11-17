@@ -403,24 +403,28 @@ _MAP_INFOS = [
 
 # Overlay (mapN_sXX) -> area tag binding — every src/maps/*/header.c
 # `.mapInfo = &MAP_INFOS[...]` line, verbatim (evidence: ANIMS_MAPLINK.md;
-# map0_s00/header.c:43 THR ... map7_s03/header.c:43 ER2). Rooms belong to
-# AREAS; overlay FX attaches via _PROP_ANIMS by overlay.
+# map0_s00/header.c:43 THR ... map7_s03/header.c:43 ER2).
+# v27 CORRECTION (map_info.c:515-532 read directly): the RUNTIME tag
+# string for BOTH ER-area MAP_INFOS entries (ER and the map7 "ER2") is
+# "ER" — the nowhere overlays bind to the SAME ER-prefixed room files
+# (the second of the two { "ER", ... } rows). Room files are always
+# TAG+4hex; there are no ER2-prefixed files on disc.
 _OVERLAY_TO_TAG = {
     "MAP0_S00": "THR", "MAP0_S01": "THR", "MAP0_S02": "ER",
     "MAP1_S00": "SC",  "MAP1_S01": "SC",  "MAP1_S02": "SU",
     "MAP1_S03": "SU",  "MAP1_S04": "SU",  "MAP1_S05": "SU",
-    "MAP1_S06": "SC",  "MAP2_S00": "THR", "MAP2_S01": "ER2",
+    "MAP1_S06": "SC",  "MAP2_S00": "THR", "MAP2_S01": "ER",
     "MAP2_S02": "SPR", "MAP2_S03": "THR", "MAP2_S04": "ER",
     "MAP3_S00": "HP",  "MAP3_S01": "HP",  "MAP3_S02": "HU",
     "MAP3_S03": "HU",  "MAP3_S04": "HU",  "MAP3_S05": "HU",
     "MAP3_S06": "HP",  "MAP4_S00": "SPR", "MAP4_S01": "ER",
     "MAP4_S02": "SPU", "MAP4_S03": "SPU", "MAP4_S04": "HU",
     "MAP4_S05": "SPU", "MAP4_S06": "SPR", "MAP5_S00": "DR",
-    "MAP5_S01": "RSR", "MAP5_S02": "ER",  "MAP5_S03": "ER2",
+    "MAP5_S01": "RSR", "MAP5_S02": "ER",  "MAP5_S03": "ER",
     "MAP6_S00": "RSU", "MAP6_S01": "ER",  "MAP6_S02": "RSU",
     "MAP6_S03": "DRU", "MAP6_S04": "APU", "MAP6_S05": "APU",
-    "MAP7_S00": "ER2", "MAP7_S01": "ER2", "MAP7_S02": "ER2",
-    "MAP7_S03": "ER2",
+    "MAP7_S00": "ER",  "MAP7_S01": "ER",  "MAP7_S02": "ER",
+    "MAP7_S03": "ER",
 }
 
 # Prop anims — code-driven WorldObjects (decomp map overlay scripts).
@@ -490,8 +494,13 @@ _PROP_ANIMS = {
     # ---- map1_s03 locker suite (map1_s03.c:1928-2153) ----
     "MAP1_S03": [
         {"object": "TOBIRA2_", "pos": [-61.0, -1.05, 20.97],
-         "rot0": [0, 0, 0], "driver": "dampedSwing",
-         "kick": -11.3, "openLimit": -168.8, "settle": -157.4,
+         "rot0": [0, 0, 0], "driver": "kickSwing",
+         "kickVelRaw": -128, "kickVelDeg": -11.25,
+         "openLimitRaw": -1920, "openLimitDeg": -168.75,
+         "bounceHiRaw": -1791, "bounceHiDeg": -157.412,
+         "settleRaw": -1790, "settleDeg": -157.031,
+         "reboundVelRaw": 32, "reboundVelDeg": 2.8125,
+         "cutscene": "locker kick (state 6->7, map1_s03.c:1956-1976)",
          "chunkGate": [-2, 0],
          "sound": "Sfx_Unk1460",
          "src": "map1_s03.c:1956-1999"},
@@ -517,7 +526,8 @@ _PROP_ANIMS = {
         {"object": "<light>", "pos": [19.7, -3.0, -19.1],
          "driver": "lightFlicker",
          "base": 1.35, "ampA": 0.9, "ampB": 0.6,
-         "rerollA": 64.0, "rerollB": [32, 95],
+         "rerollA": [32, 63], "rerollB": [32, 95],
+         "rampThreshRaw": 262144,
          "eventGate": 129,
          "src": "map1_s05.c:371-396"},
     ],
@@ -534,16 +544,30 @@ _PROP_ANIMS = {
          "cutscene": "drawbridge (paired deck)",
          "eventGate": 166,
          "src": "map2_s00.c:1638-1646, 1745-1752"},
+        {"object": "AXIS1_HI", "pos": [-35.0, 0.0, 360.0],
+         "rot0": [0, 0, -49.94], "driver": "cutscene",
+         "cutscene": "drawbridge second pair (shared D_800F5344 state)",
+         "eventGate": 166, "sharedRot": "AXIS2_BA#2", "pair": 2,
+         "chunkGate": [-2, 8],
+         "src": "map2_s00.c:2149-2150 (D_800F55DC[1], chunk cell (-2,8))"},
+        {"object": "AXIS2_BA", "pos": [-35.0, 0.0, 360.0],
+         "rot0": [0, 0, -49.94], "driver": "cutscene", "sharedRot": "AXIS1_HI",
+         "cutscene": "drawbridge (paired deck, second)", "pair": 2,
+         "eventGate": 166, "chunkGate": [-2, 8],
+         "src": "map2_s00.c:2149-2150"},
         {"object": "DOOR1_BA", "pos": [-263.0, 0.0, -104.0],
-         "rot0": [0, 8.0, 0.0], "driver": "dampedSwing",
-         "angVelMax": -0.0137, "rest": -0.02222,
+         "rot0": [0, 0, 0], "driver": "dampedSwing",
+         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": 0,
+         "angAccelDeg": -9.931640625, "angVelFloorDeg": -4.921875,
+         "postEventVyDeg": 8.0, "postEventVyRaw": 91,
          "eventGate": 168, "sharedRot": "CHAIN2_1",
          "sound": "Sfx_Unk1393/1394",
-         "src": "map2_s00.c:1913-1944"},
+         "src": "map2_s00.c:1913-1944 (init 2033-2038, 2073-2086)"},
         {"object": "CHAIN2_1", "pos": [-263.0, 0.0, -104.0],
-         "rot0": [0, 8.0, 0.0], "driver": "dampedSwing",
-         "angVelMax": -0.0137, "rest": -0.02222, "eventGate": 168,
-         "sharedRot": "DOOR1_BA",
+         "rot0": [0, 0, 0], "driver": "dampedSwing",
+         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": 0,
+         "postEventVyDeg": 8.0, "postEventVyRaw": 91,
+         "eventGate": 168, "sharedRot": "DOOR1_BA",
          "src": "map2_s00.c:1913-1944"},
     ],
     # ---- map3 hospital elevators + cabinet (SHARED slide code) ----
@@ -557,11 +581,6 @@ _PROP_ANIMS = {
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
          "resetZ": 19.1, "chunkGate": [1, 0], "dir": -1,
          "src": "sharedFunc_800D15F0_3_s01.h:331-365"},
-        {"object": "TANA_HID", "pos": [60.0, 0.0, -21.6],
-         "rot0": [0, 180.0, 0], "driver": "cutscene",
-         "cutscene": "cabinetPush dt*playerRadius clamp 61.25",
-         "sound": "Sfx_Unk1535",
-         "src": "map3_s05.c:858-905 (TANA in s05; listed here s01-family)"},
     ],
     "MAP3_S03": [
         {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
@@ -611,6 +630,19 @@ _PROP_ANIMS = {
          "driver": "fanArray", "axis": "x",
          "bladeCount": 16, "rate": 90.0,
          "alternate": True, "chunkGate": [1, 0],
+         "positions": [[53.211, -2.375, 32.5], [56.575, -2.875, 27.5],
+                        [65.45, -2.875, 27.5], [68.8, -2.375, 32.5]],
+         "posSwitch": "map4_s02.c:108-118: i==0->p0, i==4->p1, i==7->p2(+vy180), i==11->p3 (pos retained otherwise)",
+         "posPerInst": [[53.211, -2.375, 32.5], [53.211, -2.375, 32.5],
+                        [53.211, -2.375, 32.5], [53.211, -2.375, 32.5],
+                        [56.575, -2.875, 27.5], [56.575, -2.875, 27.5],
+                        [56.575, -2.875, 27.5],
+                        [65.45, -2.875, 27.5], [65.45, -2.875, 27.5],
+                        [65.45, -2.875, 27.5], [65.45, -2.875, 27.5],
+                        [68.8, -2.375, 32.5], [68.8, -2.375, 32.5],
+                        [68.8, -2.375, 32.5], [68.8, -2.375, 32.5],
+                        [68.8, -2.375, 32.5]],
+         "rotY180From": 7,
          "sound": "Sfx_Unk1542",
          "src": "map4_s02.c:108-158"},
     ],
@@ -633,8 +665,10 @@ _PROP_ANIMS = {
     # ---- map5_s03 roaches (map5_s03_2.c:664-693, 712, 743) ----
     "MAP5_S03": [
         {"object": "MOVACHES", "pos": [104.2225, -0.1683, 60.0667],
-         "rot0": [0, 0, 0], "driver": "cutscene",
-         "cutscene": "translate dt*0.14 clamp 60.35/60.44 (player+object)",
+         "rot0": [0, 0, 0], "driver": "translate",
+         "axis": "z", "speed": 0.14, "clampState5": 60.35,
+         "clampState6": 60.44,
+         "cutscene": "player+object co-move (map5_s03_2.c:664-693)",
          "chunkGate": [2, 1], "sound": "Sfx_Unk1520/1538",
          "src": "map5_s03_2.c:664-693, 710-791"},
     ],
@@ -663,6 +697,7 @@ _PROP_ANIMS = {
          "count": 10, "phaseSplit": 6,
          "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
          "speedSrc": "D_800EBA30 (0; -0x7A after Cybil)",
+         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — IPD-placed instances bob with phase i*4096/3 (i<6 rule); table mapping assumed 0..N",
          "src": "map6_s04_2.c:3619-3648, 3553-3554"},
         {"object": "MGR_KOYA", "pos": [20.0, 1.0, 100.0],
          "rot0": [0, 0, 0], "driver": "carouselSpin",
@@ -670,15 +705,20 @@ _PROP_ANIMS = {
          "src": "map6_s04_2.c:3650-3697"},
         {"object": "FW1_BACK", "pos": [8.7, -13.8, -28.0],
          "rot0": [0, 0, 0], "driver": "ferrisWheel",
-         "rate": 45.511, "wrap": 307.2, "arms": 5, "armStep": 27.0,
-         "boxRadius": [10.0, 11.25], "pendulum": -68.2667,
-         "eventGate": 452,
+         "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
+         "wrapDeg": 27.0, "wrapPeriodS": 6.75, "arms": 5,
+         "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
+         "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
+         "pendVelRaw": -279620, "pendVelDegPS": -6.0,
+         "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -12.0,
+         "pendSettleRaw": -93206, "pendSettleDeg": -2.0,
+         "triggerRaw": 186413, "eventGate": 452,
          "src": "map6_s04_2.c:3735-3846"},
         {"object": "WHEEL_BA", "pos": [-16.0, -1.5, -64.0],
          "rot0": [0, 0, 0], "driver": "lissajousOrbit",
-         "count": 12, "freqA": 0.197, "freqB": 0.275,
-         "radius": 4.0, "yOff": -1.5, "angleDiv": 30,
-         "eventGate": 453,
+         "count": 12, "freqARaw": 807, "freqBRaw": 1126,
+         "freqADegPS": 70.9, "freqBDegPS": 99.0, "radius": 4.0,
+         "yOff": -1.5, "angleDiv": 30, "eventGate": 453,
          "src": "map6_s04_2.c:3848-3875"},
     ],
     # ---- map7 nowhere (stones, beans, bin, belt) ----
@@ -696,8 +736,13 @@ _PROP_ANIMS = {
     ],
     "MAP7_S01": [
         {"object": "STONE1_H", "pos": [-139.5, -1.35, -140.6],
-         "rot0": [0, 90.0, 0], "driver": "cutscene",
-         "cutscene": "stoneChoreo slide+drop+wobble(-25deg/s)+tumble(-120deg/s)",
+         "rot0": [0, 90.0, 0], "driver": "stoneChoreo",
+         "states": [
+             {"slide": "vz = (step*409)/8192 - 575897 (case 1)"},
+             {"drop": "vel += g>>1 (5209/tick); vy clamps at -4300"},
+             {"wobble": "rotZ -= 284/s; vy = cos(rotZ)*614 - 4914; vz = sin(rotZ)*(-614) - 575488; 0.5s"},
+             {"tumble": "vel += 10419; rotZ -= 1365/s; vy += vel*dt; vz += 1228/s; until vy >= 0"},
+             {"rest": "pos (-139.5,-0.05,-140.0) rotZ -1024"}],
          "sound": "Sfx_Unk1647/1648/1649",
          "src": "map7_s01_2.c:1545-1596, 2188-2195"},
         {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
@@ -710,14 +755,16 @@ _PROP_ANIMS = {
          "src": "map7_s01_2.c:2074-2105, 2218-2235, 2499"},
     ],
     "MAP7_S02": [
-        {"object": "BEAN1_HI", "pos": [62.3, "rand[-1.45,-1.35)", "rand[-61.07,-60.93)"],
-         "rot0": "rand16(0..4095)", "driver": "cutscene",
-         "cutscene": "gravityScatter vy+=dt*(g+scatter*sin), vz+=dt*(scatter*cos)",
-         "count": 16, "scatterAmp": 2.2, "gravityClamp": 5.0,
+        {"object": "BEAN1_HI", "pos": [62.3, -1.4, -61.0],
+         "initRangeY": [-1.45, -1.3501], "initRangeZ": [-61.07, -60.93],
+         "rot0": "rand16(0..4095)", "driver": "gravityScatter",
+         "count": 16, "scatterAmp": 2.2, "gravityRaw": 10419,
+         "vyClampRaw": 20480, "floorY": 0.0,
+         "scatterInit": "amp[i] = FP_FROM(sin(Rng(0,511)|0x200)*Q12(2.2), 12); angle[i] = Rng(0,4095)",
          "sound": "Sfx_Unk1662/1651",
          "src": "map7_s02_2.c:1170-1189, 3476-3488"},
         {"object": "STONE2_H", "pos": [-139.5, -1.35, -140.6],
-         "rot0": [0, 90.0, 0], "driver": "cutscene",
+         "rot0": [0, 90.0, 0], "driver": "stoneChoreo",
          "cutscene": "stoneChoreo (map7_s02 rates -0.0694/-0.3333)",
          "src": "map7_s02_2.c:2662-2740"},
     ],
@@ -846,6 +893,12 @@ def _room_prop_anims(room_name, max_entries=64):
             pos = e.get("pos")
             entry = dict(e)
             entry["overlay"] = overlay
+            # v27: posPerInst entries (fanArray) attach by their FIRST
+            # instance pose cell — the engine adds the array only in that
+            # one chunk (map4_s02 PLAYER_IN_MAP_CHUNK(1,0)).
+            _ppc = e.get("posPerInst")
+            if pos is None and isinstance(_ppc, list) and _ppc:
+                pos = _ppc[0]
             entry["posUnits"] = "engine Q12 meters (y-down)" \
                 if isinstance(pos, list) else "manifest (overlay-level)"
             if isinstance(pos, list) and len(pos) >= 3 and \
@@ -856,6 +909,66 @@ def _room_prop_anims(room_name, max_entries=64):
                     continue
             out.append(entry)
     return out[:max_entries]
+
+
+def _anim_initial_poses(e, rng_seed="sh1x-v27"):
+    """v27: the engine t=0 WorldObject poses for ONE catalog anim entry,
+    as engine meters (y-down). Multi-instance drivers get one pose per
+    instance (the same math the engine runs at update t=0 / its INIT):
+      * default            -> the authored pos
+      * posPerInst         -> the per-instance list (fanArray; the verbatim
+                              switch semantics of map4_s02.c:108-118)
+      * gravityScatter     -> 16 deterministic rolls in the verbatim init
+                              ranges (map7_s02_2.c:3476-3488; engine rolls
+                              Rng_Rand16 at init - unknowable exactly, the
+                              RANGES are verbatim; fixed seed = reproducible
+                              builds)
+      * ferrisWheel        -> the 5 arm poses at master=0 (map6_s04_2.c:
+                              3814-3845: angle = -739+i*307 Q12_ANGLE
+                              counts, pos = (8.7, 10*cos(a)-13.8, 10*sin(a)-28))
+      * lissajousOrbit     -> the 12 balloon poses at master=0 (3856-3874)
+    Entries whose pos is not a concrete list of numbers return [] (no
+    emission - the position data is not in the decomp repo)."""
+    drv = e.get("driver", "")
+    pos = e.get("pos")
+    if drv == "ferrisWheel":
+        out = []
+        for i in range(int(e.get("arms", 5))):
+            a_cnt = e.get("arm0Raw", -739) + i * e.get("armStepRaw", 307)
+            a = math.radians(a_cnt * 360.0 / 4096.0)
+            out.append([8.7, 10.0 * math.cos(a) - 13.8,
+                        10.0 * math.sin(a) - 28.0])
+        return out
+    if drv == "lissajousOrbit":
+        out = []
+        for i in range(int(e.get("count", 12))):
+            # angle = Math_Sin(0 + i<<10)/30 -> Q12 raw: sin_q12*4096/30
+            aq = math.sin(math.radians((i << 10) * 360.0 / 4096.0)) * 4096.0 / 30.0
+            vy = math.sin(aq * math.pi / 2048.0) * 4.0 - 1.5
+            temp = math.cos(aq * math.pi / 2048.0) * 4.0
+            ry_cnt = (i << 12) / 12
+            ry = math.radians(ry_cnt * 360.0 / 4096.0)
+            out.append([temp * math.sin(ry) - 16.0, vy,
+                        temp * math.cos(ry) - 64.0])
+        return out
+    if drv == "gravityScatter":
+        import random as _random
+        rng = _random.Random(f"{rng_seed}:{e.get('object')}")
+        out = []
+        n = int(e.get("count", 16))
+        ry = e.get("initRangeY", [-1.45, -1.3501])
+        rz = e.get("initRangeZ", [-61.07, -60.93])
+        for i in range(n):
+            out.append([float(pos[0]), rng.uniform(ry[0], ry[1]),
+                        rng.uniform(rz[0], rz[1])])
+        return out
+    if isinstance(e.get("posPerInst"), list) and e["posPerInst"]:
+        return [list(p) for p in e["posPerInst"]
+                if isinstance(p, list) and len(p) == 3]
+    if isinstance(pos, list) and len(pos) >= 3 and \
+            all(isinstance(v, (int, float)) for v in pos):
+        return [list(pos)]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -4528,6 +4641,96 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
             builder.json["nodes"].append({"name": "UNPLACED_MESHES",
                                           "children": unused_children})
             builder.json["scenes"][0]["nodes"].append(len(builder.json["nodes"]) - 1)
+
+    # ---- v27: POSED EMISSION of unplaced animated WorldObjects -----------
+    # The engine's animated props (fans, rattling doors, the chain-door set,
+    # the wheelchair, park rides) are NOT IPD instances: map overlay C code
+    # adds them per frame via WorldObjects_Add with an authored pose
+    # (ANIMS_MAPLINK evidence). Their MODELS sit unplaced in the room's
+    # embedded PLM or a sibling library. This block emits each catalog
+    # propAnims entry's object as REAL geometry:
+    #   * local-space meshes (identity rt, t = -chunkOrigin => local verts)
+    #   * glTF node translation = the engine WorldObject pos (axis map
+    #     (x, -y, -z)), NO rotation: the consumer applies the driver's rot0
+    #     and live rotation exactly like WorldObjects_Draw composes one
+    #     matrix from the full rot each frame (fog_poc sh1x_anim_apply).
+    # Objects already placed as room instances animate through the normal
+    # name bind and are NOT re-emitted. Poses with no known position (table
+    # refs whose values are not in the decomp repo) are skipped loudly.
+    try:
+        _pa = _room_prop_anims(room.name)
+    except Exception as ex:                          # never break the export
+        _pa = []
+        report["problems"].append(
+            f"{room.name}: propAnims emission skipped ({ex})")
+    _placed_upper = {n.upper() for n in room.plm.obj_order
+                     if n not in room.unplaced} if room.plm else set()
+    for _e in _pa:
+        _obj_name = _e.get("object", "")
+        if (not _obj_name or _obj_name.startswith("<")
+                or (not isinstance(_e.get("pos"), (list, str))
+                    and not isinstance(_e.get("posPerInst"), list))):
+            continue                    # <light>/<ripples>/None: manifest
+        if _obj_name.upper() in _placed_upper:
+            continue                    # placed: the bind drives it
+        # ---- locate the model (this room's PLM, else the PlmIndex ladder) --
+        _lib = None
+        _lname = _obj_name
+        if room.plm:
+            for _n in room.plm.obj_order:
+                if _n.upper() == _obj_name.upper():
+                    _lib, _lname = room.plm, _n
+                    break
+        if _lib is None and resolver is not None and resolver.plm_index:
+            _cands = resolver.plm_index.by_name.get(_obj_name.upper()) or []
+            if _cands:
+                _cands = sorted(_cands,
+                                key=lambda r: (r["in_archive"],
+                                               len(r["label"]), r["label"]))
+                _lib, _lname = _cands[0]["lib"], _obj_name
+        if _lib is None:
+            report.setdefault("prop_anim_unemitted", []).append({
+                "object": _obj_name, "reason":
+                "model not present in any scanned PLM/IPD (geometry absent "
+                "from the provided sources)"})
+            continue
+        _obj = _lib.objects.get(_lname) if _lib is not None else None
+        if _obj is None or not _obj.meshes:
+            report.setdefault("prop_anim_unemitted", []).append({
+                "object": _obj_name, "reason": "model found but empty"})
+            continue
+        # ---- initial poses (engine t=0) per instance -----------------------
+        _poses = _anim_initial_poses(_e)
+        _mvec = (MAP_CELL * room.x_pos, 0, MAP_CELL * room.y_pos)
+        for _i, _p in enumerate(_poses):
+            _nname = _obj_name if _i == 0 else f"{_obj_name}#{_i}"
+            # NOTE: the Instance carries the PLM OBJECT name (the lookup
+            # key); the glTF NODE name gets the #N instance suffix.
+            _fake = Instance(_lname, "ipd",
+                             (0x1000, 0, 0, 0, 0x1000, 0, 0, 0, 0x1000),
+                             (-_mvec[0], 0, -_mvec[2]), "propAnimPosed")
+            if _lib is not room.plm:
+                _fake.resolved_lib = _lib
+                _fake.resolved_from = getattr(_lib, "source_name", "sibling")
+                _fake.resolved_obj_name = _lname
+            _mi = build_instance_meshes(room, _fake, _lib, resolver,
+                                        builder, report)
+            if not _mi:
+                continue
+            _meta = {"ot_base": _obj.ot_base, "field_B_1": _obj.flag_b1,
+                     "propAnimPosed": True, "animInst": _i}
+            _mn = [builder.add_node(f"{_nname}_m{j}", m, root=False,
+                                    extras=dict(_meta))
+                   for j, m in enumerate(_mi)]
+            _ni = builder.add_node(_nname, None, _mn, extras=_meta)
+            # glTF node translation (meters, axis map (x,-y,-z)); NO rotation:
+            # the consumer's driver owns the full rotation (rot0 at rest).
+            builder.json["nodes"][_ni]["translation"] = [
+                float(_p[0]), float(-_p[1]), float(-_p[2])]
+            report.setdefault("prop_anim_posed", []).append(
+                {"object": _obj_name, "inst": _i,
+                 "pos": [float(v) for v in _p],
+                 "library": getattr(_lib, "source_name", "embedded")})
     # Geometry-only IPD (pos_num == 0, no object name list): the embedded PLM objects
     # ARE the room content - export them at identity transform + map offset, exactly
     # like the legacy tool does for such files. Deterministic rule, documented.
