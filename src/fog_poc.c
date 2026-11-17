@@ -1129,6 +1129,9 @@ typedef struct {
                                 instance (-1 = not tagged: legacy GLB)      */
     int addSeq;               /* v24: engine add slot (WorldMap_Draw order)  */
     int isBillboard;          /* v24: node tagged as billboard anchor mesh    */
+    int animIdx;              /* v26.3: index into Sh1x.anims driving this
+                                 item's rotation (by node name = engine
+                                 WorldObject model name), -1 = none      */
 } DrawItem;
 
 typedef struct {
@@ -1708,6 +1711,7 @@ static void glb_walk_node(Glb *g, const JValue *nodes, int nodeIdx, mat4 parent,
             item.buffer = nodeBuffer;      /* v24: SH1X.buffer (-1 = n/a)  */
             item.addSeq = nodeAddSeq;      /* v24: engine add slot         */
             item.isBillboard = nodeIsBillboard;
+            item.animIdx = -1;   /* v26.3: bound in sh1x_anims_bind */
             item.vbase = (int)(sb->n / 8);
             item.ibase = (int)sb->in;
             for (int i = 0; i < pos.count; i++) {
@@ -7103,6 +7107,108 @@ static int sh_rng_next(void) {
     return (int)(g_propRngSeed >> 17);           /* Rand16 semantics */
 }
 
+
+/* ---- v26.3: driver DRAW path --------------------------------------- */
+/* Bind anims to DrawItems by name (node name = engine model name, e.g.
+ * "FAN_HIDE"/"DOOR1_BA"). v26.3.1: engine semantics — the SAME model
+ * (g_WorldObjectC) is added per frame at MULTIPLE poses (each fan has its
+ * own pos), so a node may be named "FAN_HIDE_0"/"FAN_HIDE_1" (ripper
+ * instance suffixes) while the anim object is "FAN_HIDE". Match rule:
+ * (a) the anim object name is a PREFIX of the node name (or equal), and
+ * (b) among candidates, the one whose engine (x,z) is NEAREST the item's
+ * translation (x,z) — y is flipped between engine (y-down) and glTF
+ * (y-up), so only x/z are comparable. Unmatched anims get no visible
+ * carrier (manifest/cutscene entries: engine-true, their models are not
+ * in this room's IPD). */
+static void sh1x_anims_bind(Scene *sc) {
+    if (!sc || !sc->sh1x.nAnims) return;
+    for (int i = 0; i < sc->itemCount; i++) {
+        DrawItem *it = &sc->item[i];
+        it->animIdx = -1;
+        const size_t nl = strlen(it->name);
+        int best = -1;
+        float bestD = 1e30f;
+        for (int k = 0; k < sc->sh1x.nAnims; k++) {
+            const Sh1xPropAnim *a = &sc->sh1x.anims[k];
+            if (a->driver > 5) continue;         /* idle/no-draw classes  */
+            const size_t ol = strlen(a->object);
+            if (!ol || ol > nl) continue;
+            if (memcmp(it->name, a->object, ol) != 0) continue;
+            /* name matches (prefix or equal): disambiguate by xz distance
+             * to the item translation (it->model is composed; root-level
+             * anims ride nodes whose translation lives in the matrix)      */
+            const float dx = it->model.m[12] - a->pos[0];
+            const float dz = it->model.m[14] - a->pos[2];
+            const float d = dx * dx + dz * dz;
+            if (d < bestD) { bestD = d; best = k; }
+        }
+        it->animIdx = best;
+    }
+}
+
+/* Compose the live driver rotation into the item transform. Engine adds
+ * the object with rot each frame; the AUTHORED node translation stays
+ * (it already equals the engine pos: the ripper emits WorldObject poses
+ * as node translations, and the fan-test GLB does the same). Rot order =
+ * the PoC's node rotation convention: Rx then Ry then Rz (column-major
+ * pre-multiply), matching RotMatrix(vx, vy, vz). */
+static void sh1x_anim_apply(DrawItem *it, const Sh1xPropAnim *a) {
+    if (!it || !a) return;
+    /* angles: engine Q12 angle 4096 = 360 deg; cur[] is stored in DEGREES
+     * (driver math converts at parse: rot0 degrees in, tick adds degrees) */
+    const float rx = a->cur[0] * (float)M_PI / 180.0f;
+    const float ry = a->cur[1] * (float)M_PI / 180.0f;
+    const float rz = a->cur[2] * (float)M_PI / 180.0f;
+    const float cx = cosf(rx), sx_ = sinf(rx);
+    const float cy = cosf(ry), sy = sinf(ry);
+    const float cz = cosf(rz), sz = sinf(rz);
+    mat4 R;
+    memset(&R, 0, sizeof(R));
+    /* Rx*Ry*Rz, column-major */
+    R.m[0]  = cy * cz;
+    R.m[1]  = sx_ * sy * cz + cx * sz;
+    R.m[2]  = -cx * sy * cz + sx_ * sz;
+    R.m[4]  = -cy * sz;
+    R.m[5]  = -sx_ * sy * sz + cx * cz;
+    R.m[6]  = cx * sy * sz + sx_ * cz;
+    R.m[8]  = sy;
+    R.m[9]  = -sx_ * cy;
+    R.m[10] = cx * cy;
+    R.m[15] = 1.0f;
+    it->model = mat4_mul(&it->model, &R);
+}
+
+/* Per-frame: apply bound anims' CURRENT rotation to their items. Call at
+ * the top of render_frame's item loop (before transform_item2), AFTER
+ * sh1x_anims_sync ticked the state. Rotation is composed ONTO the item's
+ * matrix from the SYNC hook each frame — but render_frame may run more
+ * than once per tick (shots at multiple t with a single tick), so apply
+ * from a COPY of the pre-anim matrix each frame, not cumulatively. */
+static mat4 *g_animBase = NULL;      /* snapshot of pre-anim item matrices  */
+static int   g_animBaseN = 0;
+static void sh1x_anims_draw_apply(Scene *sc) {
+    static int boundFor = -1;         /* re-bind if the scene changed      */
+    if (!sc || !sc->sh1x.nAnims) return;
+    if (boundFor != (int)(size_t)(void *)sc || g_animBaseN != sc->itemCount) {
+        boundFor = (int)(size_t)(void *)sc;
+        sh1x_anims_bind(sc);
+    }
+    if (g_animBaseN != sc->itemCount) {
+        free(g_animBase);
+        g_animBase = (mat4 *)malloc(sizeof(mat4) *
+                                    (sc->itemCount ? (size_t)sc->itemCount : 1));
+        g_animBaseN = sc->itemCount;
+        for (int i = 0; i < sc->itemCount; i++)
+            g_animBase[i] = sc->item[i].model;
+    }
+    for (int i = 0; i < sc->itemCount; i++) {
+        DrawItem *it = &sc->item[i];
+        it->model = g_animBase[i];            /* reset to authored pose  */
+        if (it->animIdx >= 0 && it->animIdx < sc->sh1x.nAnims)
+            sh1x_anim_apply(it, &sc->sh1x.anims[it->animIdx]);
+    }
+}
+
 /* ---- v26.2: prop anim drivers — the per-frame engine Update --------
  * VERBATIM math per driver (catalog sources; all Q12 semantics -> float
  * deg here, engine order preserved). Cutscene driver (7) idles — the
@@ -7713,6 +7819,7 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
      * CALLOC'd so the compiler can prove initialization — any vertex an
      * item did not cover reads z=0 and is near-culled, no semantic change) */
     int nItems = sc->itemCount;
+    sh1x_anims_draw_apply(sc);   /* v26.3: live driver rotations -> items */
     RVert *xv = (RVert *)calloc((size_t)(sc->vertCount ? sc->vertCount : 1), sizeof(RVert));
     for (int i = 0; i < nItems; i++) {
         transform_item2(R, &sc->item[i], &view, &viewProj,
@@ -11780,6 +11887,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+            sh1x_anims_sync(&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
             tSim += tickDt;
             haveCp = 1;
         }
@@ -11790,6 +11898,7 @@ int main(int argc, char **argv) {
         }
         if (Vr.active || Vr.returning) cp = r2view_pose(&Vr, &cp);
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+        sh1x_anims_sync(&R.sc->sh1x, P.t);       /* v26.3: driver tick      */
         Frame fb2; frame_alloc(&fb2, w, h);
         render_frame(&fb2, &R, &cp);
         /* THE RESTRICTION PROOF (all values from the verbatim pipeline) */
@@ -11912,6 +12021,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+            sh1x_anims_sync(&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
             tSim += tickDt;
             haveCp = 1;
         }
@@ -11925,6 +12035,7 @@ int main(int argc, char **argv) {
          * also covers the phase wrap/edge cases where the pose should be
          * re-read from the current phase rather than the stepped one      */
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+        sh1x_anims_sync(&R.sc->sh1x, P.t);       /* v26.3: driver tick      */
         render_frame(&fb, &R, &cp);
         char out[1024];
         snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
