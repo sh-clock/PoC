@@ -7138,7 +7138,9 @@ static void sh1x_anims_bind(Scene *sc) {
              * to the item translation (it->model is composed; root-level
              * anims ride nodes whose translation lives in the matrix)      */
             const float dx = it->model.m[12] - a->pos[0];
-            const float dz = it->model.m[14] - a->pos[2];
+            /* glTF z = -engine z (converter axis map (x,-y,-z)): compare
+             * in glTF space by negating the engine anim z (audit A#9)   */
+            const float dz = it->model.m[14] - (-a->pos[2]);
             const float d = dx * dx + dz * dz;
             if (d < bestD) { bestD = d; best = k; }
         }
@@ -7164,16 +7166,22 @@ static void sh1x_anim_apply(DrawItem *it, const Sh1xPropAnim *a) {
     const float cz = cosf(rz), sz = sinf(rz);
     mat4 R;
     memset(&R, 0, sizeof(R));
-    /* Rx*Ry*Rz, column-major */
-    R.m[0]  = cy * cz;
-    R.m[1]  = sx_ * sy * cz + cx * sz;
-    R.m[2]  = -cx * sy * cz + sx_ * sz;
-    R.m[4]  = -cy * sz;
-    R.m[5]  = -sx_ * sy * sz + cx * cz;
-    R.m[6]  = cx * sy * sz + sx_ * cz;
-    R.m[8]  = sy;
-    R.m[9]  = -sx_ * cy;
-    R.m[10] = cx * cy;
+    /* ENGINE ORDER — WorldObjects_Draw -> Math_RotMatrixZxyNeg
+     * (draw.c:577; libkmath.s:360-384, asm-sim verified vs g_SineTable):
+     * Ry(rx')*Rx(ry')*Rz(rz') with all three angles NEGATED. Column-major. */
+    const float nrx = -rx, nry = -ry, nrz = -rz;
+    const float ncy = cosf(nry), nsy = sinf(nry);
+    const float ncz = cosf(nrz), nsz = sinf(nrz);
+    const float ncx = cosf(nrx), nsx_ = sinf(nrx);
+    R.m[0]  = ncy * ncz;
+    R.m[1]  = nsx_ * nsy * ncz + ncx * nsz;
+    R.m[2]  = -ncx * nsy * ncz + nsx_ * nsz;
+    R.m[4]  = -ncy * nsz;
+    R.m[5]  = -nsx_ * nsy * nsz + ncx * ncz;
+    R.m[6]  = ncx * nsy * nsz + nsx_ * ncz;
+    R.m[8]  = nsy;
+    R.m[9]  = -nsx_ * ncy;
+    R.m[10] = ncx * ncy;
     R.m[15] = 1.0f;
     it->model = mat4_mul(&it->model, &R);
 }
