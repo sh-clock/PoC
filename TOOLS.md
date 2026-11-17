@@ -1,13 +1,13 @@
 # TOOLS.md — using the tools on **your own copy of the game**
 
-This project ships sample inputs (`input/THRF9FD.glb`, the hospital
-`HP0003.glb` + `camdat.json` in the wallpaper app) for testing only.
-This guide shows how to produce the same inputs from **your own legally
-obtained disc copy** of Silent Hill 1 (PS1).
+This project ships sample base rips (`input/THRF9FD.IPD` + its textures,
+`input/HP0003.IPD`, + camdat tracks) for testing only. This guide shows
+how to produce the same files from **your own legally obtained disc copy**
+of Silent Hill 1 (PS1).
 
-> **This project is 100% AI Slop / Vibe Coded and is non-commerical**
+> **This project is 100% AI Slop / Vibe Coded and is non-commercial**
 >
-> **This project's **CODE** is licenced under the GPL but any included assets **ARE NOT**. Assets are copywrited by Konami. Using any assets for commerical use is **strictly prohibited** and must be removed immediately** — see
+> **This project's **CODE** is licenced under the GPL but any included assets **ARE NOT**. Assets are copyrighted by Konami. Using any assets for commercial use is **strictly prohibited** and must be removed immediately** — see
 > [Konami's copyright notice](https://eu-support.konami.com/hc/en-gb/articles/9648771731479-Copyrights-Career-Opportunities-Goodies).
 
 ## What you need
@@ -22,7 +22,7 @@ obtained disc copy** of Silent Hill 1 (PS1).
   direct link:
   <https://github.com/shdecompilations/silent-hill-decomp/raw/refs/heads/master/tools/silentassets/extract.py>.
 * This repo's `tools/ipd2gltf.py` and `tools/camtrack.html`.
-* Optionally an emulator (DuckStation) to cross-check your rip against the
+* Optionally an emulator (e.g. SwanStation, the GPL DuckStation core) to cross-check your rip against the
   real game, the way this project's audit trail was built.
 
 ## Step 1 — extract the game files from your disc dump
@@ -66,7 +66,7 @@ late-fix audio swaps.
 After extraction you have the familiar tree, e.g.:
 
 ```
-extracted/BG/THRF9FD.IPD      ← Café 5→2 street room (one .IPD per room)
+extracted/BG/THRF9FD.IPD      ← the street room your PoC copy uses
 extracted/BG/HP0003.IPD       ← hospital interiors (same BG folder)
 extracted/BG/HP1F031.TIM ...  ← textures, also under BG/ (embedded into the GLB for you)
 ```

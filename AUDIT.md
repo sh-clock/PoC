@@ -304,7 +304,7 @@ Scope: the env preset system (world_effects.c), the per-vertex flashlight
 tables (bodyprog_80055028.c func_80055648/func_80055D78), and the snow↔env
 interaction (particle.c + func_8003EDB8). GTE opcode semantics (DPCS/DPCL/
 RTPS/UNRDivide, sf flags, IR clamps, the OFX 16.16 encoding) verified
-against DuckStation's cycle-accurate implementation.
+against SwanStation/DuckStation's cycle-accurate implementation (SwanStation is the GPL-3.0 maintained fork of the DuckStation core).
 
 ## 1. Env presets + blend (world_effects.c)
 

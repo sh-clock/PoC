@@ -8,12 +8,10 @@ replicated line-for-line from the
 sources. No OpenGL, no external assets at runtime: presentation is GDI on
 Windows, SDL2/X11 on Linux, ANativeWindow on Android.
 
-> **This project is 100% AI Slop / Vibe Coded and is non-commerical**
+> **This project is 100% AI Slop / Vibe Coded and is non-commercial**
 >
-> **This project's **CODE** is licenced under the GPL but any included assets **ARE NOT**. Assets are copywrited by Konami. Using any assets for commerical use is **strictly prohibited** and must be removed immediately** — see
+> **This project's **CODE** is licenced under the GPL but any included assets **ARE NOT**. Assets are copyrighted by Konami. Using any assets for commercial use is **strictly prohibited** and must be removed immediately** — see
 > [Konami's copyright notice](https://eu-support.konami.com/hc/en-gb/articles/9648771731479-Copyrights-Career-Opportunities-Goodies).
-
-*This statement is included verbatim as required. Note the correct spelling of the two trademarks concerned: "commercial", "copyrighted".*
 
 **Use your own legally-obtained copy of the game**: the repo ships sample
 inputs for testing only. See [TOOLS.md](TOOLS.md) for the full
@@ -22,10 +20,10 @@ disc-copy → GLB → camera-track pipeline.
 ## What it renders
 
 * **Rooms** — any `.IPD` room converted to `.glb` by `tools/ipd2gltf.py`
-  (the repo ships `input/THRF9FD.glb`, the Café 5→2 alley street, plus the
-  hospital interiors used by the wallpaper app). Textures are embedded in
-  the GLB and decoded in-app with a built-in inflate; nothing is extracted
-  to external files.
+  (the repo ships the base rip files of an outdoor street scene and a
+  hospital interior in `input/`; the release zips carry the converted
+  GLBs). Textures are embedded in the GLB and decoded in-app with a
+  built-in inflate; nothing is extracted to external files.
 * **Camera** — `camdat.json` tracks, played by the complete
   `tools/camtrack.html` reference implementation: all 8 track types
   (line / circle / curve / polyline / spiral / zigzag / figure8 / fixed),
@@ -66,11 +64,12 @@ Universal CRT — standalone, no external DLL downloads.
 
 ## Run
 
-Put `THRF9FD.glb` + `camdat.json` next to the executable (or in `input/`),
-then run with **no arguments** — the realtime window opens and plays the
-camtrack camera live against the engine-exact weather:
+From a repo checkout, first convert the sample scene, then run with
+**no arguments** — the realtime window opens and plays the camtrack camera
+live against the engine-exact weather:
 
 ```
+python3 tools/ipd2gltf.py --input input --output input --rooms THRF9FD
 ./fog_poc                                          # realtime window (native 320x224)
 ./fog_poc --window-size 1920x1080                  # bigger window
 ./fog_poc --res 640x360                            # NON-ENGINE 16:9 mode
@@ -91,7 +90,6 @@ then renders, so it is byte-identical to the realtime benchmark path:
 ```
 ./fog_poc --shot t=10.5,file=shot.png
 ./fog_poc --benchmark --duration 6 --fps 60 --save-final f.png
-./fog_poc --camdat input/camdat_eye.json --night --flashlight   # eye-height pool view
 ```
 
 Rendering is fully deterministic: two runs with the same arguments produce
@@ -125,7 +123,7 @@ running renderer.
 |---|---|
 | `src/fog_poc.c` | the engine — single-file C99 software rasterizer |
 | `src/*.h` | embedded engine data (snow/rain TIM sprites, font, sine table) |
-| `input/` | sample inputs the renderer loads (GLB + camdat tracks) |
+| `input/` | sample base rip files (IPD/TIM/PLM) + camdat tracks the converter turns into the shipped GLBs |
 | `tools/` | `ipd2gltf.py`, `camtrack.html` + asset-prep utilities |
 | `tools/tests/` | audit & regression harnesses (see `tools/tests/README.md`) |
 | `reference_shots/` | deterministic reference renders for regression comparison |

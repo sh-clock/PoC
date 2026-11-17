@@ -19,6 +19,16 @@ jobs:
       - name: Build (make)
         run: make -C . all V=1
 
+      - name: Convert sample scenes (GLBs are not committed)
+        run: |
+          # input/ tracks only the base rip files; regenerate the GLBs with
+          # the converter at THIS commit so CI always exercises the
+          # tools/ipd2gltf.py it ships.
+          python3 tools/ipd2gltf.py --input input --output input \
+              --rooms THRF9FD,HP0003
+          test -s input/THRF9FD.glb
+          test -s input/HP0003.glb
+
       - name: Smoke test — engine renders a PNG headlessly
         run: |
           # --shot t=0 renders one deterministic frame (320x224) to
