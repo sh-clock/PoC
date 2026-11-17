@@ -7241,10 +7241,21 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
             }
             break;
         }
-        case 5: {  /* dampedSwing — angVel decay to rest (map2 chain door)  */
-            if (a->rattleD > a->angVelMax) a->rattleD = a->angVelMax;
-            a->cur[1] += (float)dt * a->rattleD;
-            if (a->restAngle != 0.0f && a->cur[1] < a->restAngle)
+        case 5: {  /* dampedSwing — VERBATIM map2_s00.c:1937-1943:
+                     *   D_800F22AE += dt * Q12(-0.0277);
+                     *   D_800F22AE  = MAX(Q12(-0.0137), D_800F22AE);
+                     *   D_800F538C.vy += dt * D_800F22AE;
+                     *   if (vy < Q12(-0.02222)) vy = Q12(-0.02222);
+                     * angVel ramps from 0 down to the -0.0137 floor at
+                     * -0.0277/s; the swing angle decays toward the rest
+                     * floor. All in Q12 angle units (4096 = 360 deg for
+                     * rot; the velocities are Q12 rad/s equivalents —
+                     * the catalog pre-converts to deg/s floats). */
+            a->kick += (float)dt * (-0.0277f);       /* angVel ramp      */
+            if (a->kick < a->angVelMax)              /* MAX(floor, ang)   */
+                a->kick = a->angVelMax;
+            a->cur[1] += (float)dt * a->kick;
+            if (a->cur[1] < a->restAngle)           /* vy floor          */
                 a->cur[1] = a->restAngle;
             break;
         }
@@ -7820,6 +7831,23 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
      * item did not cover reads z=0 and is near-culled, no semantic change) */
     int nItems = sc->itemCount;
     sh1x_anims_draw_apply(sc);   /* v26.3: live driver rotations -> items */
+    if (getenv("SH1X_ANIM_DEBUG")) {
+        static int dbgN = 0;
+        if (dbgN++ < 400) {
+            for (int i = 0; i < sc->sh1x.nAnims; i++)
+                fprintf(stderr, "[animstate] t? cur=(%.2f,%.2f,%.2f) %s\n",
+                        sc->sh1x.anims[i].cur[0], sc->sh1x.anims[i].cur[1],
+                        sc->sh1x.anims[i].cur[2], sc->sh1x.anims[i].object);
+        }
+        static int once = 0;
+        if (!once) { once = 1;
+            for (int i = 0; i < sc->itemCount; i++)
+                if (sc->item[i].animIdx >= 0)
+                    fprintf(stderr, "[animbind] item %d '%s' -> anim %d (%s)\n", i,
+                            sc->item[i].name, sc->item[i].animIdx,
+                            sc->sh1x.anims[sc->item[i].animIdx].object);
+        }
+    }
     RVert *xv = (RVert *)calloc((size_t)(sc->vertCount ? sc->vertCount : 1), sizeof(RVert));
     for (int i = 0; i < nItems; i++) {
         transform_item2(R, &sc->item[i], &view, &viewProj,
