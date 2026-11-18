@@ -568,14 +568,19 @@ _PROP_ANIMS = {
          "cutscene": "valve hand-tracking (map1_s03.c:890-988)",
          "src": "map1_s03.c:890-988"},
     ],
-    # ---- map1_s05 boiler (map1_s05.c:398-402: ungated const spins) ----
+    # ---- map1_s05 the moving bars (the SU boss-arena contraption: the
+    # SPHERE_H + WHEEL_HI spins, map1_s05.c:398-402 ungated const spins;
+    # user-classified "the moving bars" — the room SU00FF, the SplitHead
+    # finale arena of the alternate school, paper map = school BF) ------
     "MAP1_S05": [
         {"object": "SPHERE_H", "pos": [19.7, 1.58, -19.1],
          "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
-         "rate": -90.0, "src": "map1_s05.c:398-399"},
+         "rate": -90.0, "label": "moving bar (upper)",
+         "src": "map1_s05.c:398-399"},
         {"object": "WHEEL_HI", "pos": [19.7, -0.06, -19.1],
          "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
-         "rate": 15.0, "src": "map1_s05.c:401-402"},
+         "rate": 15.0, "label": "moving bar (lower)",
+         "src": "map1_s05.c:401-402"},
         {"object": "<light>", "pos": [19.7, -3.0, -19.1],
          "driver": "lightFlicker",
          "base": 1.35, "ampA": 0.9, "ampB": 0.6,
@@ -998,7 +1003,22 @@ _PROP_ANIMS = {
          "sound": "Sfx_Unk1614",
          "src": "map6_s03.c:377-444"},
     ],
-    # ---- map6_s04 resort park (carousel + ferris + balloon) ----
+    # ---- map6_s04 the amusement park (carousel + ferris wheel + the
+    # 12-seat spinning carnival ride; user-classified "carnival rides") --
+    # CAROUSEL VERDICT (S20 decomp audit, user question "is the camera ON
+    # the carousel?"): BOTH, in different contexts. Normal play incl. the
+    # Cybil fight: the platform/canopy/fence ring ROTATE IN WORLD SPACE
+    # (one shared accumulator D_800ED5B6, masked 0xFFF; rate = D_800EBA30
+    # + D_800ED5B4 — fresh 0, fight -455 ~= -40deg/s, ending -122) and
+    # the horses stay at FIXED xz/yaw (extern tables D_800EBAAC/EBAD4/
+    # EBAFC), only bobbing +/-0.2 (map6_s04_2.c:3615-3643). The ENDING
+    # CUTSCENE steps 22-27 (func_800E3244, map6_s04_2.c:2684-2697): the
+    # camera ORBITS the center (20,-2,100) at radius 5.2 driven by the
+    # SAME accumulator + the light rides along (radius 4.8, yaw+182.9)
+    # — so the platform is static in camera space and the ENVIRONMENT
+    # appears to rotate (the user's memory). No GsInitCoordinate2/RotMatrix
+    # world rotation anywhere in map6_s04. Speed 0 at engine-fresh: the
+    # carousel stands still until the boss fight / the ending. ---------
     # The 10 carousel horse slots (map6_s04_2.c:3619-3648): i<6 ride
     # g_WorldObject0[1] = UMA2_HID (phase i*4096/3), i>=6 ride
     # g_WorldObject0[0] = UMA1_HID (phase i*2048+2048) — the MODEL split
@@ -1193,6 +1213,10 @@ _PROP_ANIMS = {
          "freqADegPS": 70.9, "freqBDegPS": 99.0, "radius": 4.0,
          "yOff": -1.5, "angleDiv": 30, "eventGate": 453,
          "eventGatePolarity": "clear",
+         "label": "the 12-seat spinning carnival ride (the ride "
+                  "capsules orbit the center at radius 4, bobbing "
+                  "+/-4 y — user-classified 'carnival rides', the "
+                  "'balloons' label was wrong)",
          "src": "map6_s04_2.c:3848-3875; gate :3502-3511 (!Get(453) — drive-while-CLEAR, live at engine-fresh)"},
     ],
     # ---- map7 nowhere (stones, beans, bin, belt) ----
@@ -3936,7 +3960,7 @@ class GltfBuilder:
 
     def add_material(self, key, name, tex_idx=None, has_alpha=False,
                      base_color=(0.5, 0.5, 0.5, 1.0), double_sided=False,
-                     alpha_mode=None, alpha_cutoff=None):
+                     alpha_mode=None, alpha_cutoff=None, extras=None):
         if key in self._material_keys:
             return self._material_keys[key]
         mat = {"name": name,
@@ -3954,6 +3978,8 @@ class GltfBuilder:
             mat["alphaCutoff"] = alpha_cutoff
         if double_sided:
             mat["doubleSided"] = True
+        if extras is not None:
+            mat["extras"] = extras
         self.json["materials"].append(mat)
         self.extensions_used.add("KHR_materials_unlit")
         idx = len(self.json["materials"]) - 1
@@ -4883,7 +4909,19 @@ def _material_for(builder, gk, report):
     img_idx = builder.add_image(png, iname)
     tex_idx = builder.add_texture(img_idx)
     mname = f"{tex_name}_pal{pal_y}" + ("_STP" if stp else "")
-    return builder.add_material(key, mname, tex_idx=tex_idx, has_alpha=has_alpha)
+    # v33 (S20): the DWAVE material — the engine redirects it to the LIVE
+    # animated tile at every chunk load (WorldMap_ChunkPropertiesSet ->
+    # func_8008E4EC matches materials by the name string, lens_flare.c:
+    # 497-502 + map.c:1167-1186; the material table in the sewer IPDs
+    # carries the name "DWAVE"). Consumers with a live-tile port render
+    # the animated water floor; others keep the static art (no-op).
+    extras = ({"SH1X": {"waterLive": True,
+                        "src": "func_8008E4EC lens_flare.c:497-502 "
+                               "+ WorldMap_ChunkPropertiesSet map.c:1181 "
+                               "(the DWAVE material redirect to tpage 13)"}}
+               if tex_name == "DWAVE" else None)
+    return builder.add_material(key, mname, tex_idx=tex_idx,
+                                has_alpha=has_alpha, extras=extras)
 
 
 def _instance_marker_matrix(room, inst):
@@ -4925,6 +4963,176 @@ def _role_assessment(instances):
 def _b64(b):
     import base64 as _b64mod
     return _b64mod.b64encode(bytes(b)).decode("ascii")
+
+
+# ---- v33 (S20): the room's ORIGINAL environment ------------------------
+# WORLD_ENV_PRESETS[21] VERBATIM from src/bodyprog/sys/map_info.c:8-387
+# (decomp, USA 1.1). The pair indices come from WorldEnv_MapPresetSet
+# (effects.c:220-267) + D_800A9F80..A98 (effects.c:22-28) resolved per
+# room from the map overlay headers (src/maps/mapN_sMM/header.c) via
+# scripts/derive_room_env.py -> tools/room_env_table.json.
+_WORLD_ENV_PRESETS = [
+    {"idx": 0, "flags": [], "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 1.15,
+     "worldTint": [1.0, 1.0, 1.0], "fogMode": "Off",
+     "fogDistance": 100.0, "fogColor": [60, 60, 68],
+     "snowColor": [64, 64, 64], "rainColor": [12, 12, 28]},
+    {"idx": 1, "flags": [], "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 1.1,
+     "worldTint": [0.95, 1.0, 1.08], "fogMode": "On",
+     "fogDistance": 13.5, "fogColor": [108, 100, 116],
+     "snowColor": [48, 48, 48], "rainColor": [14, 14, 30]},
+    {"idx": 2, "flags": [], "lightLevelMax": 255, "lightMode": "Directional",
+     "spotLightIntensity": 0.6, "worldLightIntensity": 0.6,
+     "worldTint": [0.9, 1.0, 1.05], "fogMode": "On",
+     "fogDistance": 14.0, "fogColor": [100, 92, 108],
+     "snowColor": [48, 48, 48], "rainColor": [13, 13, 29]},
+    {"idx": 3, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.3, "worldLightIntensity": 0.0,
+     "worldTint": [0.95, 1.0, 1.08], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
+    {"idx": 4, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 0.7, "worldLightIntensity": 0.0,
+     "worldTint": [0.9, 1.0, 1.05], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
+    {"idx": 5, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.3, "worldLightIntensity": 0.1,
+     "worldTint": [0.95, 1.0, 1.08], "fogMode": "FollowLight",
+     "fogDistance": 13.5, "fogColor": [68, 60, 76],
+     "enableTintLightOverlap": True, "pointLightTint": [24, 16, 32],
+     "worldTint2": [85, 75, 75],
+     "snowColor": [32, 32, 40], "rainColor": [12, 12, 28]},
+    {"idx": 6, "flags": ["Dark", "FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 0.44,
+     "worldTint": [0.4, 0.7, 1.0], "fogMode": "On",
+     "fogDistance": 14.0, "fogColor": [0, 0, 0],
+     "snowColor": [16, 16, 24], "rainColor": [8, 8, 20]},
+    {"idx": 7, "flags": ["Dark", "FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 0.44,
+     "worldTint": [0.4, 0.7, 1.0], "fogMode": "On",
+     "fogDistance": 9.29987, "fogColor": [0, 0, 0],
+     "snowColor": [16, 16, 24], "rainColor": [8, 8, 20]},
+    {"idx": 8, "flags": ["FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 80, "lightMode": "Spot",
+     "spotLightIntensity": 0.35, "worldLightIntensity": 0.4,
+     "worldTint": [0.7, 0.8, 1.0], "fogMode": "On",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 64, 64], "rainColor": [12, 12, 12]},
+    {"idx": 9, "flags": ["FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.8, "worldLightIntensity": 0.15,
+     "worldTint": [1.0, 0.7, 0.6], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 32, 16], "rainColor": [24, 12, 12]},
+    {"idx": 10, "flags": ["FlashlightAllowed", "EnableBrightness", "UseLighter"],
+     "lightLevelMax": 146, "lightMode": "Spot",
+     "spotLightIntensity": 0.5, "worldLightIntensity": 0.0,
+     "worldTint": [1.0, 0.8, 0.6], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [32, 24, 16], "rainColor": [18, 8, 8]},
+    {"idx": 11, "flags": ["FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.8, "worldLightIntensity": 0.15,
+     "worldTint": [1.3, 0.4, 0.2], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 32, 16], "rainColor": [24, 12, 12]},
+    {"idx": 12, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.3, "worldLightIntensity": 0.1,
+     "worldTint": [0.95, 1.0, 1.08], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
+    {"idx": 13, "flags": [], "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 0.78,
+     "worldTint": [0.74, 0.85, 1.0], "fogMode": "On",
+     "fogDistance": 13.5, "fogColor": [92, 84, 100],
+     "snowColor": [16, 16, 24], "rainColor": [8, 8, 20]},
+    {"idx": 14, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 56, "lightMode": "Spot",
+     "spotLightIntensity": 0.7, "worldLightIntensity": 0.05,
+     "worldTint": [1.1, 0.6, 0.65], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
+    {"idx": 15, "flags": ["FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 196, "lightMode": "Spot",
+     "spotLightIntensity": 1.2, "worldLightIntensity": 0.2,
+     "worldTint": [0.7, 0.45, 0.45], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 32, 16], "rainColor": [24, 12, 12]},
+    {"idx": 16, "flags": ["FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 1.4, "worldLightIntensity": 0.05,
+     "worldTint": [0.85, 0.6, 0.6], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 32, 16], "rainColor": [24, 12, 12]},
+    {"idx": 17, "flags": [], "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 1.0,
+     "worldTint": [0.95, 0.9, 0.9], "fogMode": "On",
+     "fogDistance": 6.5, "fogColor": [108, 100, 100],
+     "snowColor": [48, 48, 48], "rainColor": [14, 14, 30]},
+    {"idx": 18, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 2.5, "worldLightIntensity": 0.15,
+     "worldTint": [1.0, 0.7, 0.7], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [64, 32, 16], "rainColor": [24, 12, 12]},
+    {"idx": 19, "flags": ["Dark", "FlashlightAllowed", "EnableBrightness"],
+     "lightLevelMax": 255, "lightMode": "None",
+     "spotLightIntensity": 0.0, "worldLightIntensity": 0.55,
+     "worldTint": [0.5, 0.88, 1.25], "fogMode": "On",
+     "fogDistance": 15.0, "fogColor": [0, 0, 0],
+     "snowColor": [16, 16, 24], "rainColor": [8, 8, 20]},
+    {"idx": 20, "flags": ["FlashlightAllowed", "EnableBrightness", "EnableLensFlare"],
+     "lightLevelMax": 255, "lightMode": "Spot",
+     "spotLightIntensity": 0.8, "worldLightIntensity": 0.2,
+     "worldTint": [0.95, 1.0, 1.08], "fogMode": "Off",
+     "fogDistance": 40.0, "fogColor": [0, 0, 0],
+     "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
+]
+
+_ROOM_ENV_TABLE = None
+def _room_env_table():
+    global _ROOM_ENV_TABLE
+    if _ROOM_ENV_TABLE is None:
+        import os as _os
+        p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                          "room_env_table.json")
+        try:
+            _ROOM_ENV_TABLE = json.load(open(p))
+        except Exception:
+            _ROOM_ENV_TABLE = {}
+    return _ROOM_ENV_TABLE
+
+
+def _room_env(room_name):
+    """v33 (S20): SH1X.env — the room's ORIGINAL WorldEnv pair. The map
+    overlay header's field_16/field_17 (decomp src/maps/mapN_sMM/header.c,
+    the ORIGINAL data) + MAP_INFOS flags -> WorldEnv_MapPresetSet
+    (effects.c:220-267) -> the D_800A9F80..A98 pair. The presets are the
+    verbatim WORLD_ENV_PRESETS[21] (map_info.c). Consumers boot this pair
+    by default (the fog/lighting the room ACTUALLY ships with)."""
+    e = _room_env_table().get(room_name.upper())
+    if not e:
+        return None
+    out = {
+        "presetIdx0": e["presetIdx0"], "presetIdx1": e["presetIdx1"],
+        "field16": e["field16"], "field17": e["field17"],
+        "weather": e["weather"], "mapType": e["tag"],
+        "mapFlags": e["mapFlags"], "overlay": e["overlay"],
+        "preset0": _WORLD_ENV_PRESETS[e["presetIdx0"]],
+        "preset1": _WORLD_ENV_PRESETS[e["presetIdx1"]],
+        "src": e["src"],
+    }
+    if e.get("inferredOverlay"):
+        out["overlayInferred"] = True
+    return out
 
 
 def build_sh1x(room, resolver, report, known_rooms=None):
@@ -4992,6 +5200,11 @@ def build_sh1x(room, resolver, report, known_rooms=None):
         sh1x["envEffects"] = env_fx
     if water_zones:
         sh1x["waterZones"] = water_zones
+    # v33 (S20): the room's ORIGINAL environment (the WorldEnv pair + the
+    # map-load weather) — see _room_env above.
+    renv = _room_env(room.name)
+    if renv:
+        sh1x["env"] = renv
     if known_rooms is not None:
         ml = _room_maplink(room.name, known_rooms)
         if ml is not None:

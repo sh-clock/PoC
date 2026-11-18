@@ -3785,6 +3785,8 @@ window.SHUI = (function () {
       <select class="sel" id="env-p1" style="flex:1">${presetOptions}</select></div>
     <div class="wlegend">Slot A = base env · slot B = flashlight-on env. Identical pairs make the
       flashlight engine-unavailable (the authentic auto-off rule).</div>
+    <div class="wrow" id="glb-env-row" style="display:none"><label>Room env (GLB)</label>
+      <div class="wlegend" id="glb-env-info" style="flex:1"></div></div>
   </div>
 </div>
 <div class="wgroup open" id="wg-daynight">
@@ -6281,6 +6283,26 @@ function registerModel(name, gltf) {
   const box = { min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] };
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
   three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims });
+  /* v33 (S20): surface the room's ORIGINAL environment (SH1X.env — the
+   * v33 GLBs carry it; the PoC/wallpaper boot it by default when the
+   * exported camdat leaves the World & Weather pair unselected). */
+  {
+    const env = sh1x && sh1x.env;
+    const row = document.getElementById('glb-env-row');
+    const info = document.getElementById('glb-env-info');
+    if (row && info) {
+      if (env && typeof env.presetIdx0 === 'number') {
+        row.style.display = '';
+        info.textContent = '{' + env.presetIdx0 + ',' + env.presetIdx1 +
+          '} · ' + (env.weather || 'none') + ' weather · ' +
+          (env.overlay || '?') + ' field_16=' + env.field16 +
+          ' — the room\u2019s original pair; leave the World & Weather ' +
+          'selection empty to let the players boot it.';
+      } else {
+        row.style.display = 'none';
+      }
+    }
+  }
 
   let entry = state.doc.models.find(m => m.file === name);
   if (!entry) {

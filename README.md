@@ -83,6 +83,24 @@ Realtime window keys: `ESC` quit · `SPACE` pause · `R` restart · `+/-` speed
 `P` PSX wobble · `S` screenshot · `Tab` mode browser · `[` `]` presets ·
 `,` `.` authentic pairs · `H` HUD · `V` R2 self-view.
 
+### v33: the room's ORIGINAL environment + animations ON by default
+
+GLBs ripped with the v33 ripper carry `SH1X.env` — the room's own WorldEnv
+pair (the map overlay header's `field_16`/`field_17` resolved through
+`WorldEnv_MapPresetSet` + `D_800A9F80..A98`, both presets verbatim). Load
+such a GLB **without an explicit `--camdat`** and the boot env / boot
+weather / flashlight default come FROM THE ROOM — e.g. `SU0203.glb` boots
+the nightmare-school pair `{7,4}` with the flashlight ON, `DR0100.glb`
+boots the sewer `{6,3}` + the rain recipe. An explicit camdat's `env`
+(still) overrides; `--envpair`/`--worldstage`/`--night` still override.
+
+Embedded animations now play BY DEFAULT (the GLB carries them; the players
+play them — the user-facing contract). `--no-anims` opts out for the
+engine-fresh regression state (event-gated drivers idle at their authored
+rot0). The water floor of the sewer rooms (the `DWAVE` materials) renders
+the LIVE animated DR_WAVE tile (the `func_8008E5B4` scroll) while the
+light is inside the water zone.
+
 Deterministic stills (bit-exact, VLM-verifiable). Each shot simulates a
 60 fps playback session from t=0 — turn filter and 30 Hz snow included —
 then renders, so it is byte-identical to the realtime benchmark path:
