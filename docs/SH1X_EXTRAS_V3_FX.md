@@ -28,9 +28,16 @@ SH1X = { ...,                    # v2 fields unchanged
     "tim": "WATER.TIM" | "DR_WAVE.TIM" | ...     # file to load (only when flag)
   },
   "waterZones": [                  # s_WaterZone (map.h:271-281) — ONLY DR/DRU
-    {"enabled": true, "illumination": 8,           # q11_4 = Q4 units raw
-     "minX": -120.0, "maxX": 80.0, "minZ": -120.0, "maxZ": 40.0}
-  ],                               # decoded Q4 meters; also "raw": [u8,q11_4,q11_4,q11_4,q11_4,q11_4]
+    {"enabled": true, "illumination": 8,           # RAW q11_4/Q4 (all 4 rows = 8,
+                                                 # map_info.c:389-401); meters = raw/16
+                                                 # (engine lens_flare.c:88
+                                                 # Q4_TO_Q12(illum) → 0.5 m)
+     "illuminationQ4": 8, "illuminationMeters": 0.5,
+     "minX": -120.0, "maxX": 80.0, "minZ": -120.0, "maxZ": 40.0,
+     "units": "illumination: Q4 (raw); meters = value/16 "}
+  ],                               # bounds decoded Q4 meters; consumers keep
+                                   # the RAW value under "illumination"
+                                   # (fog_poc divides by 16 itself)
   "mapLink": {                     # WorldMap_MakeGrid (map.c:386-419) contract
     "tag": "THR",                  # 3-char area tag (MAP_INFOS row, map_info.c:515-532)
     "activeChunks": 4,             # MapFlag_One/Two/FourActiveChunks -> 1/2/4
@@ -42,12 +49,16 @@ SH1X = { ...,                    # v2 fields unchanged
                                     # runtime so missing neighbor GLBs = no-op
   },
   "propAnims": [                   # code-driven WorldObjects (decomp map scripts)
-    {"object": "FAN_HIDE", "pos": [100.0, -1.6, 142.9],  # Q12 meters
-     "rot0": [0,0,0],
-     "driver": "spin", "axis": "z",                      # g_ObjRotC[0].vz +=
-     "rate": "rng",   # rng0 = -180deg - (Rng_Rand16() & 0x1FF) per frame, * dt
-     "chunkGate": [2,3]}                                  # PLAYER_IN_MAP_CHUNK
-  ],
+    {"object": "FAN_HIDE", "pos": [100.0, -1.6015625, 142.8984375],  # Q12 m,
+     "rot0": [0,0,0],              # then WorldObjects_Add Q8/Q10 grid (draw.c)
+     "driver": "spinRng", "axis": "z", "rngBase": -180.0,
+     "rngMask": 511, "chunkGate": [2,3], "sound": "Sfx_Unk1455",
+     "src": "map1_s02.c:1564-1591"},   # every field verbatim file:line cited
+    {"object": "FW1_BACK", "driver": "ferrisWheel", "arms": 5, ...},   # v3 catalog:
+    {"object": "FAN0_HID", "driver": "fanArray", "count": 16,
+     "posPerInst": [[53.2109375,-2.375,32.5], ...]}   # 16 per-instance poses
+  ],                               # full catalog: ~90 animated WorldObjects
+                                   # + <ripples>/<light>/<waterfall> systems
   "userLight": { ... }             # defaults only — see below; users author overrides
 }
 ```
@@ -101,24 +112,58 @@ Gates (all must hold): lightMode==Spot(1); preset flag EnableLensFlare
 - BG_ETC decode windows (NTSC CLUT_X=192, CLUT_Y=0): core quad CLUT+6,
   streak CLUT+5, ghosts CLUT+6/+7; each sprite UV window as quoted.
 
-## 3. Prop anims (`ANIMS_MAPLINK.md` evidence)
+## 3. Prop anims (`ANIMS_MAPLINK.md` + session 17 audit evidence)
 
 NO windmills exist in SH1 (verified zero hits — user's example is
-aspirational; the catalog covers every REAL animated WorldObject):
+aspirational; the catalog covers every REAL animated WorldObject found in
+the 42-overlay sweep — ~95 entities, `AUDIT_F_DecompSweep.md`):
 - nightmare school fans FAN_HIDE x2 (map1_s02.c:1446-1583): spin vz,
   rng = -180° - (Rng_Rand16()&0x1FF) per frame * dt, chunk gate (2,3).
-- hospital fans FAN0_HID (map4_s02.c:108-158): 16 blades
-  D_800ED8B0[i] ±= dt*Q12_ANGLE(90°), alt direction, gate (1,0).
+- hospital fans FAN0_HID (map4_s02.c:108-165): 16 instances
+  D_800ED8B0[i] ±= dt*Q12_ANGLE(90°), split at i=7, gate (1,0); the loop
+  runs `objPos.vz -= Q12(5.0)` after every add (:162) so each fan sits
+  5 m further -z until the next switch reset (i==0/4/7/11) — the catalog
+  carries the 16 `posPerInst` poses verbatim.
+- resort park rides (map6_s04_2.c): ferris wheel = FW1_BACK + FW2_BACK +
+  FW3WIR_H (all 3 models added at each of the 5 arm poses, :3817-3827)
+  + FWBOX1_B/FWBOX2_B cabins (5 gondolas, parity (D_800EBB34+i)&1,
+  radius 11.25, 3-branch pendulum); carousel = UMA1/UMA2 horses (10
+  slots; the i<6 ride UMA2_HID phase i*4096/3, i>=6 ride UMA1_HID phase
+  i*2048+2048, :3619-3648), MGR_KOYA/MGR_STR_ hub+roof, SAKU2_BA gate +
+  SAK_POL_ x7 fence poles (radius 7.5 ring), MGR_DRL_ + DRL2_ILI x4
+  dolls (radius 0.8), all `rot.vy = master D_800ED5B6 (+offset)`.
+- hospital/nowhere elevators: 36 slideDoor entries (DR1L/R, DR2L/R,
+  DR3L/R per overlay — map3_s01/s03/s04/s05 + map7_s01 + map7_s02),
+  shared slide code sharedFunc_800D15F0_3_s01.h:331-365 (speed 0.35,
+  accel 0.8, ±vz by i-parity; map7's local levitating-door cutscene uses
+  0.1/0.25, map7_s01_2.c:2082-2105; post-ride vz reset -60.9 :385-391).
+- cutscene-discrete objects (driver `cutscene`, `cutsceneOnly: true`
+  where engine-fresh they never draw): DOR1-4_HID dagger-room doors
+  (vy +25/+58/-50/-15, map7_s02_2.c:1546-1549), BDoor1 safe door
+  (-142.21° → -7.5°, map5_s02_2.c:290/311/363/388), ISU_HIDE wake-up
+  chair (vz 141.0/140.8/140.95, map4_s04_2.c:340/372/396), STONE2_H
+  (init pose binary-only 0x800EDF08 — no WorldObjects_Add exists),
+  URA_HIDE/UNDER_HI belt riders (scrollBelt, map7_s03_3.c:8296-8342).
 - town TVs (map4_s03.c:405-799): TV1-3.TIM slots + LCG noise
   `s16 = (((s32)(s2*0x7169AC35)>>3)^0xA547B39E; s2 = (((u32)(s1*0x892D719C)>>3)^0xC65A4B97)`
   channel state machine, durations `(noise>>5)+0x555`.
 - MOVACHES (map5_s03_2.c:664-743): translate vz += dt*0.14.
 - falling fence (map4_s03.c:1705-1734): rot.vx + vy drop (one-shot).
+- non-WorldObject systems: `<ripples>` (map5_s00), `<light>` boiler
+  flicker (map1_s05), `<waterfall>` drain-water particles (map1_s02,
+  gates map1_s02.c:1542-1562; emitter table binary-only).
 Ripper emits `propAnims[]` with VERBATIM driver params (numbers, not
-names, where math is needed); consumers implement the 5 driver types:
-`spin(rng|const90)`, `tvNoise(lcg)`, `translate(0.14)`, `fallOnce`, each
-gated by `chunkGate`. Positions in ENGINE meters (Q12-decoded), consumers
-convert with the standard axis map (x, -y, -z).
+names, where math is needed); consumers implement the driver families:
+`spinRng|spinConst|fanArray|tvNoise|translate|doorRattle|dampedSwing|`
+`kickSwing|gravityScatter|stoneChoreo|lightFlicker|sineBob|carouselSpin|`
+`ferrisWheel|lissajousOrbit|slideDoor|rngWalk|fallOnce|binSpin|`
+`scrollBelt` + `cutscene`/`particles`/`waterRipple` manifests, each
+gated by `chunkGate`/`eventGate(+Polarity)` where the engine gates.
+Positions in ENGINE meters (Q12-decoded, then the engine's own
+WorldObjects_Add Q8/Q10 grid), consumers convert with the standard axis
+map (x, -y, -z). Unplaced animated objects are ALSO emitted as posed
+geometry nodes (`propAnimPosed` extras, one node per instance, t=0
+engine pose) when the model exists in a scanned PLM.
 
 ## 4. mapLink (`ANIMS_MAPLINK.md` B-part evidence)
 
@@ -149,7 +194,7 @@ distinction = normal row + SetLightSourceXYZ (already in the PoC paths).
 |---|---|---|---|---|
 | envEffects+waterZones | emit (hardcoded decomp tables) | shimmer+glint+caustic playback | same as PoC | preview toggle |
 | lens flare spec | emit (tables are consumer-side constants; ripper emits flag only) | full sprite draw (BG_ETC embedded like snow) | same | preview toggle |
-| propAnims | emit catalog | spin/tv/translate drivers | same | preview + authoring notes |
+| propAnims | emit catalog + posed nodes | 14 live driver ticks + cutscene/idle scaffolds | same | preview + authoring notes |
 | mapLink | emit tag/grid/neighbors | ignored (single-room) | load neighbors ≤4.5m edge | ignored |
 | userLight | emit defaults | full impl (already 90% present) | same | authoring fields |
 
