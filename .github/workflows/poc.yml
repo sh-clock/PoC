@@ -30,10 +30,31 @@ jobs:
           # NOTE: --output must NOT be the input dir — the converter always
           # excludes the output directory from texture scanning (writing
           # into input/ would drop every texture reference -> degraded GLB).
+          # v28: SU0203 (nightmare-school FAN room) + SU0300 (corridor
+          # reference) join the CI conversion set.
           python3 tools/ipd2gltf.py --input input --output glbs \
-              --rooms THRF9FD,HP0003
+              --rooms THRF9FD,HP0003,SU0203,SU0300
           test -s glbs/THRF9FD.glb
           test -s glbs/HP0003.glb
+          test -s glbs/SU0203.glb
+          test -s glbs/SU0300.glb
+
+      - name: Animation regression check — the fan actually ticks
+        run: |
+          # TWO deterministic stills one ENGINE TICK apart (1/30 s) with a
+          # FIXED camera: with the camera frozen, any pixel change can only
+          # come from the animated prop (the SU0203 FAN_HIDE spinRng driver,
+          # verbatim map1_s02.c:1564-1591). Guards the whole chain: ripper
+          # propAnims emission -> engine parse -> tick -> draw.
+          ./fog_poc --glb glbs/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --shot t=1.000,file=FAN_A.png
+          ./fog_poc --glb glbs/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --shot t=1.0334,file=FAN_B.png
+          python3 tools/tests/fan_anim_check.py shots/FAN_A.png shots/FAN_B.png 500
 
       - name: Smoke test — engine renders a PNG headlessly
         run: |
@@ -46,6 +67,11 @@ jobs:
                     --input input --shot t=0
           test -s shots/shot_00000.00.png
           file shots/shot_00000.00.png
+          # v28: the fan room smoke — night env pair {7,4} (the authentic
+          # nightmare-school pair) with the flashlight on
+          ./fog_poc --glb glbs/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --shot t=2.0,file=FAN_SMOKE.png
+          test -s shots/FAN_SMOKE.png
 
       - name: Package one-click test zip (linux)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -57,9 +83,22 @@ jobs:
           unzip -q "$GITHUB_WORKSPACE/dist/sh1x-poc-$TAG-linux.zip"
           ./RUN_THR.sh --test
           ./RUN_HP0003.sh --test
+          ./RUN_SU0203.sh --test
           test -s shots/SELFTEST_THR.png
           test -s shots/SELFTEST_HP0003.png
-          echo "one-click zip verified: both self-tests rendered"
+          test -s shots/SELFTEST_SU0203.png
+          echo "one-click zip verified: all three self-tests rendered"
+          # v28: the fan-animation regression proof runs from the UNZIPPED
+          # one-click zip too (same fixed-camera one-tick pixel diff)
+          ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --shot t=1.000,file=FAN_A.png
+          ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --shot t=1.0334,file=FAN_B.png
+          python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/FAN_A.png shots/FAN_B.png 500
 
       - name: Upload release assets (tags only)
         if: startsWith(github.ref, 'refs/tags/v')

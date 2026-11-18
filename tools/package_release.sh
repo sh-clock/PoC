@@ -5,10 +5,11 @@
 #   sh1x-poc-<tag>-linux.zip / sh1x-poc-<tag>-win.zip
 #     RUN_THR.sh / RUN_THR.bat      — one-click: the THR street demo
 #     RUN_HP0003.sh / RUN_HP0003.bat — one-click: the hospital corridor demo
+#     RUN_SU0203.sh / RUN_SU0203.bat — one-click: the nightmare-school FAN demo
 #     fog_poc / fog_poc.exe         — the engine binary
 #     input/THRF9FD.glb + camdat.json   (GLBs are REGENERATED from the
 #     input/HP0003.glb + hp_camdat.json  repo's base IPD/TIM/PLM files by
-#                                        the CURRENT tools/ipd2gltf.py, so
+#     input/SU0203.glb + fan_camdat.json CURRENT tools/ipd2gltf.py, so
 #                                        the release always matches the
 #                                        converter in the repo)
 #     README.txt TESTING.md ACKNOWLEDGEMENTS.md (from the repo, if present)
@@ -16,6 +17,7 @@
 # Base files required in input/ (the ONLY game data the repo tracks):
 #   THRF9FD.IPD THR_GLB.PLM BG_ETC.TIM THR000{1..4}F.TIM THR7201F/H.TIM
 #   HP0003.IPD  HP1F011.TIM HP1F012.TIM HP1F01H.TIM
+#   SU0203.IPD  SU1FTE{1,2,H}.TIM  (the nightmare-school fan room)
 #
 # The Windows zip ships BOTH scripts (.bat calls the exe; .sh kept for
 # Git-Bash/WSL users). In the Linux zip the .bat files are dropped.
@@ -48,17 +50,20 @@ GLB_DIR="$OUT/glbs"
 rm -rf "$GLB_DIR"
 mkdir -p "$GLB_DIR"
 python3 "$ROOT/tools/ipd2gltf.py" --input "$ROOT/input" \
-    --output "$GLB_DIR" --rooms THRF9FD,HP0003 >/dev/null
-for r in THRF9FD HP0003; do
+    --output "$GLB_DIR" --rooms THRF9FD,HP0003,SU0203 >/dev/null
+for r in THRF9FD HP0003 SU0203; do
     [ -f "$GLB_DIR/$r.glb" ] || {
         echo "package_release.sh: converter produced no $r.glb" >&2; exit 1; }
 done
 
-# --- batteries: the two sample scenes (THR street + HP0003 hospital) ---
+# --- batteries: the three sample scenes (THR street + HP0003 hospital
+# + SU0203 nightmare-school fan room) ---
 install -m 644 "$GLB_DIR/THRF9FD.glb" "$TMP/input/"
 install -m 644 "$ROOT/input/camdat.json" "$TMP/input/"
 install -m 644 "$GLB_DIR/HP0003.glb" "$TMP/input/"
 install -m 644 "$ROOT/input/hp_camdat.json" "$TMP/input/"
+install -m 644 "$GLB_DIR/SU0203.glb" "$TMP/input/"
+install -m 644 "$ROOT/input/fan_camdat.json" "$TMP/input/"
 
 # --- the engine ---
 if [ "$LINUX_BIN" = "NONE" ] || [ ! -f "$LINUX_BIN" ]; then
@@ -96,6 +101,21 @@ exec ./fog_poc --glb input/HP0003.glb --camdat input/hp_camdat.json --input inpu
 EOF
 chmod 755 "$TMP/RUN_HP0003.sh"
 }
+write_run_fan_sh() {
+cat > "$TMP/RUN_SU0203.sh" <<'EOF'
+#!/bin/sh
+# One-click: the nightmare-school FAN room (SU0203 — the FAN_HIDE spinRng
+# propAnims, verbatim map1_s02.c; night pair {7,4} + Harry's flashlight).
+# Deterministic self-test:  ./RUN_SU0203.sh --test  (writes shots/SELFTEST_SU0203.png)
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \
+        --input input --shot t=2.0,file=SELFTEST_SU0203.png
+fi
+exec ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json --input input
+EOF
+chmod 755 "$TMP/RUN_SU0203.sh"
+}
 write_run_bats() {
 cat > "$TMP/RUN_THR.bat" <<'EOF'
 @echo off
@@ -119,14 +139,27 @@ goto :eof
 :test
 fog_poc.exe --glb input\HP0003.glb --camdat input\hp_camdat.json --input input --shot t=6,file=SELFTEST_HP0003.png
 EOF
+cat > "$TMP/RUN_SU0203.bat" <<'EOF'
+@echo off
+rem One-click: the nightmare-school FAN room (the FAN_HIDE spinRng propAnims).
+rem Deterministic self-test:  RUN_SU0203.bat --test  (writes shots\SELFTEST_SU0203.png)
+cd /d "%~dp0"
+if "%1"=="--test" goto test
+fog_poc.exe --glb input\SU0203.glb --camdat input\fan_camdat.json --input input
+goto :eof
+:test
+fog_poc.exe --glb input\SU0203.glb --camdat input\fan_camdat.json --input input --shot t=2.0,file=SELFTEST_SU0203.png
+EOF
 }
 
 cat > "$TMP/README.txt" <<'EOF'
 Silent Hill 1 PoC — one-click test build (see TESTING.md).
   Linux/macOS :  ./RUN_THR.sh        (street demo)   ./RUN_HP0003.sh
+                 ./RUN_SU0203.sh    (nightmare-school FAN demo)
   Windows     :  RUN_THR.bat                          RUN_HP0003.bat
+                 RUN_SU0203.bat
 Deterministic self-test (renders a PNG, no window):
-  ./RUN_THR.sh --test ; ./RUN_HP0003.sh --test
+  ./RUN_THR.sh --test ; ./RUN_HP0003.sh --test ; ./RUN_SU0203.sh --test
 This project is 100% AI Slop / Vibe Coded and is non-commercial.
 CODE is GPL; included assets are NOT — they are copyrighted by Konami,
 non-commercial use only. See ACKNOWLEDGEMENTS.md.
@@ -138,6 +171,7 @@ done
 
 write_run_thr_sh
 write_run_hp_sh
+write_run_fan_sh
 write_run_bats
 
 # --- the Linux zip (sh runners + binary + docs; .bat dropped) ---
@@ -145,9 +179,9 @@ if [ "$LINUX_BIN" != "NONE" ] && [ -f "$LINUX_BIN" ]; then
     rm -f "$OUT/sh1x-poc-$TAG-linux.zip"
     ( cd "$TMP" && zip -q -r "$OUT/sh1x-poc-$TAG-linux.zip" \
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
-        RUN_THR.sh RUN_HP0003.sh fog_poc input )
+        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh fog_poc input )
 fi
-rm -f "$TMP/RUN_THR.sh" "$TMP/RUN_HP0003.sh"
+rm -f "$TMP/RUN_THR.sh" "$TMP/RUN_HP0003.sh" "$TMP/RUN_SU0203.sh"
 
 if [ -n "$WIN_BIN" ] && [ -f "$WIN_BIN" ]; then
     install -m 755 "$WIN_BIN" "$TMP/fog_poc.exe"
@@ -174,9 +208,20 @@ fi
 exec ./fog_poc.exe --glb input/HP0003.glb --camdat input/hp_camdat.json --input input
 EOF
     chmod 755 "$TMP/RUN_HP0003.sh"
+    cat > "$TMP/RUN_SU0203.sh" <<'EOF'
+#!/bin/sh
+# Git-Bash/WSL runner for the Windows build (nightmare-school FAN room).
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc.exe --glb input/SU0203.glb --camdat input/fan_camdat.json --input input --shot t=2.0,file=SELFTEST_SU0203.png
+fi
+exec ./fog_poc.exe --glb input/SU0203.glb --camdat input/fan_camdat.json --input input
+EOF
+    chmod 755 "$TMP/RUN_SU0203.sh"
     ( cd "$TMP" && zip -q -r "$OUT/sh1x-poc-$TAG-win.zip" \
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
-        RUN_THR.bat RUN_HP0003.bat RUN_THR.sh RUN_HP0003.sh \
+        RUN_THR.bat RUN_HP0003.bat RUN_SU0203.bat \
+        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh \
         fog_poc.exe input )
 fi
 

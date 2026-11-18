@@ -1,0 +1,25 @@
+# working/output dirs (never shipped)
+cams/
+glbs_out/
+demo/frames_night/
+demo/frames_day/
+demo/video2/
+dist/
+# one-off probe/debug shots (tracked evidence shots stay tracked)
+shots/probe*
+shots/dayfix*
+shots/fantest*
+shots/timing*
+shots/spin_*
+shots/su0300_ev.png
+shots/thr_night*
+shots/FAN_A.png
+shots/FAN_B.png
+shots/FAN_REF.png
+shots/FAN_SMOKE.png
+shots/vp_*
+shots/probe_cam.png
+shots/probe_nofl.png
+shots/probe_x.png
+shots/probe_day.png
+fog_poc binary
