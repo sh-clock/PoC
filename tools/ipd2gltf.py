@@ -442,24 +442,37 @@ _PROP_ANIMS = {
          "rot0": [-43.0, -115.0, 0.0],
          "driver": "spinRng", "axis": "z", "rngBase": -90.0, "rngMask": 0x1FF,
          "chunkGate": [-7, "5|6"], "eventGate": 24,
+         "eventGatePolarity": "clear",
          "sound": "Sfx_Unk1358",
-         "src": "map0_s00_2.c:1259-1267"},
+         "src": "map0_s00_2.c:1259-1267 (!Get(24) — drive-while-CLEAR)"},
         {"object": "WHEEL2_H", "pos": [-268.32, -0.44, 245.72],
          "rot0": [-43.0, -115.0, 0.0],
          "driver": "spinRng", "axis": "z", "rngBase": -90.0, "rngMask": 0x1FF,
-         "chunkGate": [-7, "5|6"], "eventGate": 24, "sharedRot": "WHEEL1_H",
+         "chunkGate": [-7, "5|6"], "eventGate": 24,
+         "eventGatePolarity": "clear", "sharedRot": "WHEEL1_H",
          "sound": "Sfx_Unk1358",
-         "src": "map0_s00_2.c:1259-1267"},
+         "src": "map0_s00_2.c:1259-1267 (!Get(24) — drive-while-CLEAR)"},
     ],
     # ---- map1_s01 reception rattling doors (map1_s01.c:1229-1290) ----
     "MAP1_S01": [
         {"object": "TOBIRA00", "pos": [-58.81, -1.3, 18.0198],
          "rot0": [0, 0, 0], "driver": "doorRattle",
          "oneIn": 32, "kickMin": 2, "kickMax": 9,
-         "bounceLimit": -1.8, "holdAfterFlag": -2.9, "mirrorTo": "TOBIRA01",
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9,
          "chunkGate": [-2, 0], "eventGate": 76,
+         "eventGatePolarity": "clear",
          "sound": "Sfx_Unk1435",
-         "src": "map1_s01.c:1229-1290"},
+         "src": "map1_s01.c:1229-1290 (!Get(76) — drive-while-CLEAR)"},
+        {"object": "TOBIRA01", "pos": [-58.81, -1.3, 18.0198],
+         "rot0": [0, 0, 0], "driver": "doorRattle",
+         "oneIn": 32, "kickMin": 2, "kickMax": 9,
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9,
+         "chunkGate": [-2, 0], "eventGate": 76,
+         "eventGatePolarity": "clear", "sharedRot": "TOBIRA00",
+         "sound": "Sfx_Unk1435",
+         "src": "map1_s01.c:1052,1287-1289 (same pos, rotation COPIED from "
+                "TOBIRA00 — the engine adds both leaves of the double "
+                "door with the one live rotation vector)"},
         {"object": "SILVER_H", "pos": [-98.8, 0.0, 22.8],
          "rot0": [-90.0, 28.5, 0.0], "driver": "cutscene",
          "cutscene": "silverDrop (orbit+gravity, map1_s01.c:469-485)",
@@ -498,7 +511,7 @@ _PROP_ANIMS = {
          "kickVelRaw": -128, "kickVelDeg": -11.25,
          "openLimitRaw": -1920, "openLimitDeg": -168.75,
          "bounceHiRaw": -1791, "bounceHiDeg": -157.412,
-         "settleRaw": -1790, "settleDeg": -157.031,
+         "settleRaw": -1790, "settleDeg": -157.3242,
          "reboundVelRaw": 32, "reboundVelDeg": 2.8125,
          "cutscene": "locker kick (state 6->7, map1_s03.c:1956-1976)",
          "chunkGate": [-2, 0],
@@ -507,9 +520,12 @@ _PROP_ANIMS = {
         {"object": "TOBIRA01", "pos": [-58.81, -1.4, 18.02],
          "rot0": [0, 0, 0], "driver": "doorRattle",
          "oneIn": 32, "kickMin": 2, "kickMax": 9,
-         "bounceLimit": -1.8, "holdAfterFlag": -2.9, "mirrorTo": "TOBIRA00",
-         "chunkGate": [-2, 0], "sound": "Sfx_Unk1435",
-         "src": "map1_s03.c:2002-2046"},
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9,
+         "chunkGate": [-2, 0], "eventGate": 101, "eventGateAlt": 102,
+         "eventGatePolarity": "clear-or",
+         "sound": "Sfx_Unk1435",
+         "src": "map1_s03.c:2002-2046 (own kick state D_800E20E8; gate "
+                "!Get(101)||!Get(102) — drive while EITHER is CLEAR)"},
         {"object": "VALVE_HI", "pos": [-10.49, -0.7, -12.92],
          "rot0": [0, 0, 0], "driver": "cutscene",
          "cutscene": "valve hand-tracking (map1_s03.c:890-988)",
@@ -526,10 +542,13 @@ _PROP_ANIMS = {
         {"object": "<light>", "pos": [19.7, -3.0, -19.1],
          "driver": "lightFlicker",
          "base": 1.35, "ampA": 0.9, "ampB": 0.6,
+         "baseRaw": 5529, "ampARaw": 3686, "ampBRaw": 2457,
+         "per0": 64, "per1": 64, "amp": 48,
          "rerollA": [32, 63], "rerollB": [32, 95],
          "rampThreshRaw": 262144,
-         "eventGate": 129,
-         "src": "map1_s05.c:371-396"},
+         "eventGate": 129, "eventGatePolarity": "set",
+         "src": "map1_s05.c:371-396 (init 319-341: D_800D86FC[0..1]=0x40, "
+                "D_800D86FE=48; Get(129) — drive-while-SET)"},
     ],
     # ---- map2_s00 streets west (drawbridge + chain door) ----
     "MAP2_S00": [
@@ -547,25 +566,32 @@ _PROP_ANIMS = {
         {"object": "AXIS1_HI", "pos": [-35.0, 0.0, 360.0],
          "rot0": [0, 0, -49.94], "driver": "cutscene",
          "cutscene": "drawbridge second pair (shared D_800F5344 state)",
+         "attachRoom": "THRFE08",
          "eventGate": 166, "sharedRot": "AXIS2_BA#2", "pair": 2,
          "chunkGate": [-2, 8],
-         "src": "map2_s00.c:2149-2150 (D_800F55DC[1], chunk cell (-2,8))"},
+         "src": "map2_s00.c:2149-2150 (added from MAP_CHUNK_CELL(-2,8) "
+                "= room THRFE08; the pos cell (-1,9) is room THRFF09 "
+                "which does not exist on disc — the engine adds the pair "
+                "from the PLAYER's room chunk, not the pos cell)"},
         {"object": "AXIS2_BA", "pos": [-35.0, 0.0, 360.0],
          "rot0": [0, 0, -49.94], "driver": "cutscene", "sharedRot": "AXIS1_HI",
          "cutscene": "drawbridge (paired deck, second)", "pair": 2,
+         "attachRoom": "THRFE08",
          "eventGate": 166, "chunkGate": [-2, 8],
          "src": "map2_s00.c:2149-2150"},
         {"object": "DOOR1_BA", "pos": [-263.0, 0.0, -104.0],
          "rot0": [0, 0, 0], "driver": "dampedSwing",
-         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": 0,
+         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": -91,
          "angAccelDeg": -9.931640625, "angVelFloorDeg": -4.921875,
+         "vyFloorDeg": -8.002, "vyFloorUnits": "linear Q12(-0.02222f)="
+                "-91 raw = -8.002deg in Q12_ANGLE (map2_s00.c:1941-1943)",
          "postEventVyDeg": 8.0, "postEventVyRaw": 91,
          "eventGate": 168, "sharedRot": "CHAIN2_1",
          "sound": "Sfx_Unk1393/1394",
          "src": "map2_s00.c:1913-1944 (init 2033-2038, 2073-2086)"},
         {"object": "CHAIN2_1", "pos": [-263.0, 0.0, -104.0],
          "rot0": [0, 0, 0], "driver": "dampedSwing",
-         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": 0,
+         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": -91,
          "postEventVyDeg": 8.0, "postEventVyRaw": 91,
          "eventGate": 168, "sharedRot": "DOOR1_BA",
          "src": "map2_s00.c:1913-1944"},
@@ -606,8 +632,10 @@ _PROP_ANIMS = {
         {"object": "TANA_HID", "pos": [60.0, 0.0, -21.6],
          "rot0": [0, 180.0, 0], "driver": "cutscene",
          "cutscene": "cabinetPush dt*playerRadius clamp 61.25 (map3_s05)",
-         "eventGate": "M3S05_CabinetPushed", "sound": "Sfx_Unk1535",
-         "src": "map3_s05.c:858-905, 935-940, 995-1009"},
+         "eventGate": 282, "eventGatePolarity": "set",
+         "sound": "Sfx_Unk1535",
+         "src": "map3_s05.c:858-905, 935-940, 995-1009 "
+                "(EventFlag_M3S05_CabinetPushed = 282; Get(282))"},
         {"object": "DR1L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
          "resetZ": 19.1,
@@ -628,7 +656,9 @@ _PROP_ANIMS = {
     "MAP4_S02": [
         {"object": "FAN0_HID", "pos": None, "rot0": [0, 0, 0],
          "driver": "fanArray", "axis": "x",
-         "bladeCount": 16, "rate": 90.0,
+         "bladeCount": 16, "count": 16, "rate": 90.0, "spinSplit": 7,
+         "spinSplitUnits": "map4_s02.c:140-149: i<7 angle -= dt*Q12_ANGLE(90), "
+                "i>=7 angle += dt*Q12_ANGLE(90) (per-fan state D_800ED8B0[i])",
          "alternate": True, "chunkGate": [1, 0],
          "positions": [[53.211, -2.375, 32.5], [56.575, -2.875, 27.5],
                         [65.45, -2.875, 27.5], [68.8, -2.375, 32.5]],
@@ -696,7 +726,9 @@ _PROP_ANIMS = {
          "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
          "count": 10, "phaseSplit": 6,
          "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
-         "speedSrc": "D_800EBA30 (0; -0x7A after Cybil)",
+         "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
+                     "Cybil, map6_s04_2.c:2615) - BOTH terms add each tick "
+                     "(3553-3554), then &0xFFF",
          "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — IPD-placed instances bob with phase i*4096/3 (i<6 rule); table mapping assumed 0..N",
          "src": "map6_s04_2.c:3619-3648, 3553-3554"},
         {"object": "MGR_KOYA", "pos": [20.0, 1.0, 100.0],
@@ -710,7 +742,7 @@ _PROP_ANIMS = {
          "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
          "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
          "pendVelRaw": -279620, "pendVelDegPS": -6.0,
-         "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -12.0,
+         "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -3.0,
          "pendSettleRaw": -93206, "pendSettleDeg": -2.0,
          "triggerRaw": 186413, "eventGate": 452,
          "src": "map6_s04_2.c:3735-3846"},
@@ -756,11 +788,22 @@ _PROP_ANIMS = {
     ],
     "MAP7_S02": [
         {"object": "BEAN1_HI", "pos": [62.3, -1.4, -61.0],
+         "objectPerInst": ["BEAN%d_HI" % (i // 2 + 1) for i in range(16)],
+         "objectPerInstSrc": "map7_s02_2.c:3476-3479: beanObjName[4] = "
+                "(i >> 1) + '1' — TWO beans per model, BEAN1_HI..BEAN8_HI",
          "initRangeY": [-1.45, -1.3501], "initRangeZ": [-61.07, -60.93],
          "rot0": "rand16(0..4095)", "driver": "gravityScatter",
          "count": 16, "scatterAmp": 2.2, "gravityRaw": 10419,
+         "gravityUnits": "H_BLANKS_GRAVITY_SCALE Q12(9.8*0.25956907477)="
+                "10419 raw per H-BLANK; the per-tick velocity increment is "
+                "g_GravitySpeed = Q12_MULT(vCount,10419) = 1336 raw at the "
+                "30Hz tick (vCount 526) — game_main.c:132-137,295",
          "vyClampRaw": 20480, "floorY": 0.0,
          "scatterInit": "amp[i] = FP_FROM(sin(Rng(0,511)|0x200)*Q12(2.2), 12); angle[i] = Rng(0,4095)",
+         "cutsceneOnly": True,
+         "cutsceneSrc": "map7_s02_2.c:1093-1210: the beans are added ONLY "
+                "inside the bag cutscene (case 14 loops until "
+                "floorHitCount==16; engine-fresh they never draw)",
          "sound": "Sfx_Unk1662/1651",
          "src": "map7_s02_2.c:1170-1189, 3476-3488"},
         {"object": "STONE2_H", "pos": [-139.5, -1.35, -140.6],
@@ -861,6 +904,23 @@ def _room_tag(room_name):
     return room_prefix(room_name)
 
 
+def _wo_q10_rot(deg):
+    """Engine WorldObjects_Add (world/draw.c:503-504, 572-574): the LIVE
+    rotation x/z are stored Q12_TO_Q10 (arithmetic >>2 = floor) and drawn
+    back Q10_TO_Q12 (<<2); rot vy stays full Q12_ANGLE. Authored
+    WorldObject_Init poses therefore land on the engine's own 0.3515625deg
+    grid for rot x/z when they reach the draw matrix."""
+    raw = int(deg * 4096.0 / 360.0)          # Q12_ANGLE trunc-toward-0
+    return (raw >> 2 << 2) * 360.0 / 4096.0  # floor to the 4-raw grid
+
+
+def _wo_q8_pos(m):
+    """WorldObjects_Add stores the position Q12_TO_Q8 (>>4 = floor) — the
+    engine's own 1/16 m grid on the animated WorldObject translation."""
+    raw = int(m * 4096.0)                   # Q12 trunc-toward-0
+    return (raw >> 4 << 4) / 4096.0
+
+
 def _room_prop_anims(room_name, max_entries=64):
     """v3 propAnims — the FULL animated-WorldObjects catalog
     (download/session12_evidence/ALL_ANIMATED_OBJECTS_CATALOG.md; 3 parallel
@@ -893,6 +953,14 @@ def _room_prop_anims(room_name, max_entries=64):
             pos = e.get("pos")
             entry = dict(e)
             entry["overlay"] = overlay
+            # v27.2: attachRoom override — the engine adds some objects
+            # from the PLAYER's room chunk even when their pos cell maps
+            # to a different (or nonexistent) room (e.g. the drawbridge
+            # second pair: MAP_CHUNK_CELL(-2,8) = THRFE08, pos cell
+            # (-1,9) = THRFF09 which does not exist on disc).
+            _aroom = e.get("attachRoom")
+            if _aroom is not None and room_name.upper() != _aroom.upper():
+                continue
             # v27: posPerInst entries (fanArray) attach by their FIRST
             # instance pose cell — the engine adds the array only in that
             # one chunk (map4_s02 PLAYER_IN_MAP_CHUNK(1,0)).
@@ -903,10 +971,26 @@ def _room_prop_anims(room_name, max_entries=64):
                 if isinstance(pos, list) else "manifest (overlay-level)"
             if isinstance(pos, list) and len(pos) >= 3 and \
                     all(isinstance(v, (int, float)) for v in pos):
-                pcx = int(pos[0] // 40)
-                pcz = int(pos[2] // 40)
-                if pcx != rcx or pcz != rcz:
-                    continue
+                if _aroom is None:
+                    # pos-cell attach (the default); attachRoom entries are
+                    # governed by the override above instead
+                    pcx = int(pos[0] // 40)
+                    pcz = int(pos[2] // 40)
+                    if pcx != rcx or pcz != rcz:
+                        continue
+                # v27.2: the WorldObjects_Add Q8 grid on the emitted pose
+                entry["pos"] = [
+                    _wo_q8_pos(pos[0]), _wo_q8_pos(pos[1]), _wo_q8_pos(pos[2])]
+            # v27.2: rot0 on the engine's WorldObjects_Add Q10 grid (x/z)
+            r0 = entry.get("rot0")
+            if isinstance(r0, list) and len(r0) == 3 and \
+                    all(isinstance(v, (int, float)) for v in r0):
+                entry["rot0"] = [_wo_q10_rot(r0[0]), r0[1], _wo_q10_rot(r0[2])]
+            if isinstance(entry.get("posPerInst"), list):
+                entry["posPerInst"] = [
+                    [_wo_q8_pos(p[0]), _wo_q8_pos(p[1]), _wo_q8_pos(p[2])]
+                    if isinstance(p, list) and len(p) == 3 else p
+                    for p in entry["posPerInst"]]
             out.append(entry)
     return out[:max_entries]
 
@@ -942,11 +1026,14 @@ def _anim_initial_poses(e, rng_seed="sh1x-v27"):
     if drv == "lissajousOrbit":
         out = []
         for i in range(int(e.get("count", 12))):
-            # angle = Math_Sin(0 + i<<10)/30 -> Q12 raw: sin_q12*4096/30
-            aq = math.sin(math.radians((i << 10) * 360.0 / 4096.0)) * 4096.0 / 30.0
+            # engine (map6_s04_2.c:3856-3860): aq = Math_Sin(0 + i<<10)/30
+            # and ryCnt = (i<<12)/12 — INTEGER DIVISION (trunc toward 0,
+            # C semantics; all operands positive here so // is exact)
+            sin_v = int(math.sin((i << 10) * (2.0 * math.pi / 4096.0)) * 4096.0)
+            aq = sin_v // 30                      # int div, verbatim
             vy = math.sin(aq * math.pi / 2048.0) * 4.0 - 1.5
             temp = math.cos(aq * math.pi / 2048.0) * 4.0
-            ry_cnt = (i << 12) / 12
+            ry_cnt = (i << 12) // 12             # int div, verbatim
             ry = math.radians(ry_cnt * 360.0 / 4096.0)
             out.append([temp * math.sin(ry) - 16.0, vy,
                         temp * math.cos(ry) - 64.0])
@@ -956,11 +1043,17 @@ def _anim_initial_poses(e, rng_seed="sh1x-v27"):
         rng = _random.Random(f"{rng_seed}:{e.get('object')}")
         out = []
         n = int(e.get("count", 16))
+        # engine (map7_s02_2.c:3476-3488): position rolls are
+        # Rng_GenerateInt(Q12(lo), Q12(hi) - 1) — INCLUSIVE INTEGER raw
+        # ranges (rng.h:62-63); reproduce them exactly in Q12 raws.
         ry = e.get("initRangeY", [-1.45, -1.3501])
         rz = e.get("initRangeZ", [-61.07, -60.93])
+        ry0, ry1 = int(ry[0] * 4096.0), int(ry[1] * 4096.0) - 1
+        rz0, rz1 = int(rz[0] * 4096.0), int(rz[1] * 4096.0) - 1
+        px = float(pos[0])
         for i in range(n):
-            out.append([float(pos[0]), rng.uniform(ry[0], ry[1]),
-                        rng.uniform(rz[0], rz[1])])
+            out.append([px, rng.randint(ry0, ry1) / 4096.0,
+                        rng.randint(rz0, rz1) / 4096.0])
         return out
     if isinstance(e.get("posPerInst"), list) and e["posPerInst"]:
         return [list(p) for p in e["posPerInst"]
@@ -4622,8 +4715,26 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
                 builder.add_node(f"BILLBOARDS_g{g}_{j}", mi,
                                  extras={"ot_base": 0, "billboard": True})
     if include_unused and room.unplaced:
+        # v27.2: posed-emission objects (fans, rattling doors, the chain-door
+        # set, the wheelchair, park rides, the beans) are UNPLACED models —
+        # --include-unused used to double-emit them (an UNUSED_ node at the
+        # origin PLUS the posed node). Skip every name the posed emission
+        # below will emit.
+        try:
+            _pa_skip = _room_prop_anims(room.name)
+        except Exception:
+            _pa_skip = []
+        _posed_names = set()
+        for _pe in _pa_skip:
+            _pn = _pe.get("object", "")
+            if _pn and not _pn.startswith("<"):
+                _posed_names.add(_pn.upper())
+            for _opn in _pe.get("objectPerInst") or []:
+                _posed_names.add(str(_opn).upper())
         unused_children = []
         for un in room.unplaced:
+            if un.upper() in _posed_names:
+                continue                    # v27.2: posed below, not UNUSED_
             obj = room.plm.objects.get(un)
             if obj is None or not obj.meshes:
                 continue
@@ -4676,6 +4787,7 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
         # ---- locate the model (this room's PLM, else the PlmIndex ladder) --
         _lib = None
         _lname = _obj_name
+        _opi = _e.get("objectPerInst")
         if room.plm:
             for _n in room.plm.obj_order:
                 if _n.upper() == _obj_name.upper():
@@ -4701,24 +4813,55 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
             continue
         # ---- initial poses (engine t=0) per instance -----------------------
         _poses = _anim_initial_poses(_e)
+        if not _poses:
+            # v27.2: LOUD skip — table-ref/no-pos entries (sineBob's horse
+            # tables, tvNoise's screen tables) previously vanished silently
+            report.setdefault("prop_anim_unemitted", []).append({
+                "object": _obj_name,
+                "reason": "no initial pose data (table refs not in the "
+                          "decomp repo — see the entry's data/src fields)"})
+            continue
         _mvec = (MAP_CELL * room.x_pos, 0, MAP_CELL * room.y_pos)
         for _i, _p in enumerate(_poses):
+            # v27.2: per-instance object names (map7_s02 beans: BEAN1_HI..
+            # BEAN8_HI — beanObjName[4] = (i >> 1) + '1'). Resolve the
+            # INSTANCE's model in the room PLM (exact-case name) so each
+            # bean gets ITS geometry, its ot_base and its field_B_1.
+            _ilname, _iobj = _lname, _obj
+            if isinstance(_opi, list) and _i < len(_opi) and _opi[_i]:
+                _in = str(_opi[_i])
+                _ilname = _in
+                if room.plm:
+                    for _n in room.plm.obj_order:
+                        if _n.upper() == _in.upper():
+                            _ilname = _n
+                            break
+                _o2 = _lib.objects.get(_ilname) if _lib is not None else None
+                if _o2 is not None and _o2.meshes:
+                    _iobj = _o2
+                else:
+                    report.setdefault("prop_anim_unemitted", []).append({
+                        "object": _in, "inst": _i,
+                        "reason": "per-instance model missing/empty"})
+                    continue
             _nname = _obj_name if _i == 0 else f"{_obj_name}#{_i}"
             # NOTE: the Instance carries the PLM OBJECT name (the lookup
             # key); the glTF NODE name gets the #N instance suffix.
-            _fake = Instance(_lname, "ipd",
+            _fake = Instance(_ilname, "ipd",
                              (0x1000, 0, 0, 0, 0x1000, 0, 0, 0, 0x1000),
                              (-_mvec[0], 0, -_mvec[2]), "propAnimPosed")
             if _lib is not room.plm:
                 _fake.resolved_lib = _lib
                 _fake.resolved_from = getattr(_lib, "source_name", "sibling")
-                _fake.resolved_obj_name = _lname
+                _fake.resolved_obj_name = _ilname
             _mi = build_instance_meshes(room, _fake, _lib, resolver,
                                         builder, report)
             if not _mi:
                 continue
-            _meta = {"ot_base": _obj.ot_base, "field_B_1": _obj.flag_b1,
+            _meta = {"ot_base": _iobj.ot_base, "field_B_1": _iobj.flag_b1,
                      "propAnimPosed": True, "animInst": _i}
+            if _e.get("cutsceneOnly"):
+                _meta["cutsceneOnly"] = True   # engine-fresh: NOT drawn
             _mn = [builder.add_node(f"{_nname}_m{j}", m, root=False,
                                     extras=dict(_meta))
                    for j, m in enumerate(_mi)]
