@@ -6674,7 +6674,7 @@ static inline void fb_put(Frame *fb, int x, int y, int r, int g, int b,
     p[0] = (uint8_t)r; p[1] = (uint8_t)g; p[2] = (uint8_t)b;
 }
 
-typedef enum { RP_OPAQUE, RP_BLEND_TEX } PassMode;
+typedef enum { RP_OPAQUE, RP_BLEND_TEX, RP_ADD_TEX } PassMode;
 
 /* texture sample: nearest, wrap (glTF sampler wrapS/T = REPEAT; the PS1
  * GPU has no linear filtering — engine-identical sampling).                 */
@@ -6943,6 +6943,36 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
              * UNCONDITIONAL (last-drawn covering quad wins, exactly like
              * the engine's OT paint-over); it never gates visibility.   */
             if (pass == RP_OPAQUE) fb->z[pi] = z;   /* flake-occlusion ref */
+            if (pass == RP_ADD_TEX) {
+                /* v34 WATER: the runtime DWAVE material rewrite (func_8008E4EC
+                 * -> Lm_MaterialFsImageApply1(..., blendMode=1) ->
+                 * Material_FsImageApply: field_E = (tPage[0]&3)<<7 |
+                 * (1<<5) | tPage[1]&0xF = 45 with img0 {tPage{0,13}}) makes
+                 * the water-floor prims SEMI-TRANSPARENT ABR-1 ADDITIVE:
+                 *   dst5 = B5 + F5, F5 = modulate(texel, vcolor) — clamp 31.
+                 * The blend is additive with the BACKGROUND (the fog color
+                 * under it), so the floor adds its animated texels over the
+                 * scene instead of replacing them (the DR street reference:
+                 * near-black water that only brightens where the flashlight
+                 * vcolor lights it — level 4 gray base + green/warm streaks
+                 * near the light, never a flat lit surface). The per-texel
+                 * STP 0x0000 hole is preserved (F=0 -> B+0, a no-op). The
+                 * fog veil (orr) still applies additively BELOW the floor
+                 * texels exactly like the engine's veil-quad-then-GT4 OT
+                 * order in the STP branch. No depth write (semi-trans
+                 * prims never occlude later flakes — engine-true).
+                 * UNITS: the same pre-dither "8-bit-ish" domain as the
+                 * opaque path ((T5*C)>>4 + veil); the CURRENT framebuffer
+                 * value (already expanded 8-bit) is added IN THE SAME
+                 * domain and fb_put's quantize8 clamps the 5-bit sum at
+                 * 31 — B5 + F5 saturating, engine-exact. */
+                const uint8_t *bg = fb->rgb + pi * 3;
+                int r = (((tr >> 3) * vr) >> 4) + orr + (int)bg[0];
+                int g = (((tg >> 3) * vg) >> 4) + og + (int)bg[1];
+                int b = (((tb >> 3) * vb) >> 4) + ob + (int)bg[2];
+                fb_put(fb, x, y, r, g, b, quantize, dither);
+                continue;
+            }
             /* v28.1 (audit C-M1, unified with the wallpaper engine):
              * VERBATIM swanstation modulate — gpu_sw_backend.cpp
              * ShadePixel:
@@ -9588,12 +9618,13 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                  * func_8008E5B4 scroll (the two 32x32 quads into the
                  * live water tile, UV phases (ctr>>1)&0x1F and
                  * ((ctr+1)>>2)&0x1F, tpage 45 CLUT (224,0)) is ported:
-                 * fx_water_tile_update below; the counter increments
-                 * per non-zero dt (lens_flare.c:554-557). The glint quad
+                 * the counter lives on the 30Hz TICK discipline now
+                 * (fx_water_scroll_sync, v34 — moved from here: this
+                 * render pass runs once per OUTPUT frame, wrong for the
+                 * shot / scrub paths); the tile state read here is
+                 * whatever the tick grid advanced. The glint quad
                  * (func_8008E794) + the caustic ring (func_8008EA68)
                  * below are geometry-only: VERBATIM. */
-                g_flaresys.counter++;       /* D_800AFDAC++ per non-zero dt */
-                fx_water_tile_update(g_flaresys.counter);
                 float lx = (float)g_fxLightPos[0] * (1.0f / 4096.0f);
                 float ly = (float)g_fxLightPos[1] * (1.0f / 4096.0f);
                 float lz = (float)g_fxLightPos[2] * (1.0f / 4096.0f);
@@ -10040,6 +10071,63 @@ static void fx_water_live_rgba(void) {
             const unsigned char *s = g_waterTileRGB[y][x];
             d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; d[3] = 255;
         }
+}
+
+/* v34: the water scroll counter advance moved to the TICK discipline.
+ * D_800AFDAC (func_8008E5B4) advances per GAME FRAME while the LIGHT
+ * is inside a water zone (lens_flare.c:76-93: WaterZoneGet(light x,z)
+ * -> func_8008E5B4). The v33 advance lived inside fx_pass (per RENDERED
+ * frame): correct only at the 30fps realtime lockstep — the deterministic
+ * --shot path renders ONCE at the target time, so the scroll NEVER
+ * advanced between shots (a frozen water floor). This helper runs from
+ * the same tick sites as sh1x_anims_sync (the engine's per-frame
+ * Map_WorldObjects_Update discipline); fx_pass keeps only the glint /
+ * caustic paints (draw-time) and reads the tick-advanced tile. */
+static void fx_water_scroll_sync(const Sh1x *sx, const ShEnv *env,
+                                  const CamPose *cam) {
+    if (!sx || !env || !cam || sx->nWaterZones <= 0) return;
+    /* GATE 1 (shLensFlareExec trigger, bodyprog_80055028.c:102-106):
+     * the whole water branch needs Spot mode + flare intensity. */
+    if (!(env->field_0 == SHENUM_1 &&
+          env->cur.flashlightLensFlareIntensity != 0))
+        return;
+    /* the light WORLD pos — the engine anchor chain (identical to the
+     * fx_pass light-position block: the camera-bone offset, the Sh1x
+     * userLight override, the free-world/ahead CLI modes) */
+    float ox = -0.08f, oy = 0.28f, oz = -0.12f;
+    if (sx->hasUserLight) {
+        ox = sx->userLightOffset[0];
+        oy = -sx->userLightOffset[1];
+        oz = -sx->userLightOffset[2];
+    }
+    float wx, wy, wz;
+    if (g_userLightMode == 1) {
+        wx = g_userLightWorld[0]; wy = g_userLightWorld[1];
+        wz = g_userLightWorld[2];
+    } else {
+        float extraAhead = (g_userLightMode == 2) ? g_userLightAheadM : 0.0f;
+        v3 X, Y, Z;
+        quat_axes(cam->q, &X, &Y, &Z);
+        wx = X.x * ox + Y.x * oy + Z.x * oz + cam->pos.x;
+        wy = X.y * ox + Y.y * oy + Z.y * oz + cam->pos.y;
+        wz = X.z * ox + Y.z * oy + Z.z * oz + cam->pos.z;
+        if (extraAhead > 0.0f) {
+            wx -= Z.x * extraAhead; wy -= Z.y * extraAhead;
+            wz -= Z.z * extraAhead;
+        }
+    }
+    /* the zone test (LensFlare_WaterZoneGet on the LIGHT position):
+     * engine x = glTF x; engine z = -glTF z (meters) */
+    for (int zi = 0; zi < sx->nWaterZones; zi++) {
+        const Sh1xWaterZone *wzp = &sx->waterZones[zi];
+        if (!wzp->enabled) continue;
+        if (wx >= wzp->minX && wx < wzp->maxX &&
+            -wz >= wzp->minZ && -wz < wzp->maxZ) {
+            g_flaresys.counter++;          /* D_800AFDAC++ per frame */
+            fx_water_tile_update(g_flaresys.counter);
+            return;
+        }
+    }
 }
 
 static void fx_water_tile_update(int ctr) {
@@ -11118,12 +11206,21 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
              * prims sample the region func_8008E5B4 rewrites per frame
              * (the 32x32 two-quad composite at (832,224)). Sample the
              * ANIMATED tile instead of the static art; u/v wrap mod 32
-             * (the sewer floor prims wrap v 4x — the tiled surface). */
+             * (the sewer floor prims wrap v 4x — the tiled surface).
+             * v34: the redirect ALSO sets field_E = 45 (semi-trans
+             * ABR-1 ADDITIVE — Material_FsImageApply with blendMode=1,
+             * img0 tPage {0,13}) — the floor draws B+F over the scene
+             * (see the RP_ADD_TEX pass in raster_tri), NOT the ripper's
+             * static alphaMode BLEND hole path. */
             fx_water_live_rgba();
             tex = g_waterLiveRGBA;
             tw = th = 32;
         }
-        const PassMode quadPass = (m->alphaMode == 0) ? RP_OPAQUE : RP_BLEND_TEX;
+        /* v34: waterLive forces the ADDITIVE semi-trans pass (the runtime
+         * field_E=45 rewrite); everything else follows the ripper's
+         * alphaMode exactly as before. */
+        const PassMode quadPass = m->waterLive ? RP_ADD_TEX
+            : ((m->alphaMode == 0) ? RP_OPAQUE : RP_BLEND_TEX);
         for (int ti = 0; ti < post[bi].ntri && post[bi].tri0 + ti * 3 + 2 < it->icount; ti++) {
             int k = post[bi].tri0 + ti * 3;
             uint32_t ia = sc->idxs[it->ibase + k], ib = sc->idxs[it->ibase + k + 1],
@@ -12044,6 +12141,7 @@ static void live_render(LiveApp *A) {
                        A->track, A->ovr.useFixed ? &A->ovr : NULL);
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
     sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.t);
+    fx_water_scroll_sync(&A->R.sc->sh1x, &A->env, &cp); /* v34: scroll per tick */
     render_frame(&A->fb, &A->R, &cp);
 }
 
@@ -14144,12 +14242,17 @@ int main(int argc, char **argv) {
             lensFlareType = cd.envLensFlare;
         if (bootWeatherTarget < 0 && cd.envWeatherTarget >= 0)
             bootWeatherTarget = cd.envWeatherTarget;     /* resolved below  */
-        /* v32.2: animsDemo folds like the other env booleans — the CLI
-         * flags win (--anims-demo / --no-anims set g_animsForced), then
-         * the camdat env boolean. v33: the DEFAULT is ON (animations
-         * play; the GLB embeds them). */
-        if (g_animsForced < 0 && cd.envAnimsDemo >= 0)
-            g_animsDemo = cd.envAnimsDemo ? 1 : 0;
+        /* v34: the camdat env animsDemo boolean NO LONGER gates playback.
+         * The user's rule (S21): the GLB EXTRAs field is the AUTHORITY —
+         * "the Whole point of adding to the EXTRAs field is so compatible
+         * players can recognise it and playback animations". The editor
+         * serializes animsDemo:false as a checkbox default, which silently
+         * killed every animation in the PoC/wallpaper while the camtrack
+         * editor's own preview kept playing (the v33 regression the user
+         * tested). NEW rule: the default is ON (v33); ONLY the explicit CLI
+         * flags --anims-demo/--no-anims (g_animsForced) opt out/in; a camdat
+         * envAnimsDemo value is IGNORED (parsed for compatibility, never
+         * folded). The schema doc + editor stop emitting the field. */
     }
 
     /* ---- v4 audit mode: dump the flashlight math primitives over a
@@ -14626,6 +14729,7 @@ int main(int argc, char **argv) {
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
             sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
+            fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             tSim += tickDt;
             haveCp = 1;
         }
@@ -14760,6 +14864,7 @@ int main(int argc, char **argv) {
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
             sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
+            fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             tSim += tickDt;
             haveCp = 1;
         }
