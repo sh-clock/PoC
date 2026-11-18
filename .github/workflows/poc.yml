@@ -1,20 +1,77 @@
 name: poc-ci
 on:
   push:
-    branches: [main]
+    branches: [main]    # v32.2: was the corrupted glob 'ain]' (a plain
+                         # YAML scalar that never matches) — same fix as
+                         # the wallpaper repo's android.yml
     tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write   # create the GitHub Release (release assets are FREE, unlike artifacts)
+  contents: write   # the bump job commits version.txt + pushes the version
+                    # tag; the build jobs publish zips as RELEASE ASSETS
+                    # (free, unlike workflow artifacts)
 
+# ---- v32.2 (S19): one release per push to main --------------------------
+# The user-facing bug this fixes: releases only happened on MANUAL tag
+# pushes, so code versions that existed only in commit messages (v31, v32)
+# never got built or released — the release list said v28.0 while the code
+# said v32. Now EVERY push to main: the bump job bumps version.txt by ONE
+# minor level (32.0 -> 32.1 -> 32.2 ...), commits [skip ci], tags vX.Y and
+# pushes both; the build jobs (needs: bump, ref: main) build that exact
+# tree and publish the Release under the fresh tag. Tag pushes (v31.0,
+# v32.0 backfills, manual v*) keep the classic path. NOTE: a GITHUB_TOKEN
+# push cannot re-trigger workflows (anti-recursion) — that is WHY the
+# build runs in THIS run on main instead of on the tag event.
 jobs:
-  build-linux:
+  bump:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      did: ${{ steps.bump.outputs.did }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bump version.txt by one minor level
+        id: bump
+        run: |
+          set -e
+          CUR=$(tr -d '[:space:]' < version.txt)
+          MAJ="${CUR%%.*}"; MIN="${CUR##*.}"
+          NEW="$MAJ.$((MIN + 1))"
+          printf '%s\n' "$NEW" > version.txt
+          git config user.name  "sh1-release-bot"
+          git config user.email "sh1-release-bot@users.noreply.github.com"
+          git add version.txt
+          git commit -m "bump version to $NEW [skip ci]"
+          git tag "v$NEW"
+          git push origin main "v$NEW"
+          echo "did=1"   >> "$GITHUB_OUTPUT"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "bumped $CUR -> $NEW (tag v$NEW)"
+
+  build-linux:
+    needs: bump
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (main carries the bump commit; tags build the tag; PRs build the PR head)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || (startsWith(github.ref, 'refs/tags/') && github.ref) || github.ref }}
+
+      - name: Resolve the release tag (bump or pushed tag)
+        id: rel
+        run: |
+          if [ "${{ needs.bump.outputs.did }}" = "1" ]; then
+            echo "tag=${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build (make)
         run: make -C . all V=1
@@ -74,9 +131,9 @@ jobs:
           test -s shots/FAN_SMOKE.png
 
       - name: Package one-click test zip (linux)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.rel.outputs.tag }}"
           bash tools/package_release.sh "$TAG" dist ./fog_poc
           # prove the zip is REALLY one-click: unzip, run --test, check PNG
           mkdir -p /tmp/ziptest && cd /tmp/ziptest
@@ -91,28 +148,45 @@ jobs:
           # v28: the fan-animation regression proof runs from the UNZIPPED
           # one-click zip too (same fixed-camera one-tick pixel diff)
           ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \
-                    --input input --envpair 2,2 \
-                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
-                    --shot t=1.000,file=FAN_A.png
+              --input input --envpair 2,2 \
+              --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+              --shot t=1.000,file=FAN_A.png
           ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \
-                    --input input --envpair 2,2 \
-                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
-                    --shot t=1.0334,file=FAN_B.png
+              --input input --envpair 2,2 \
+              --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+              --shot t=1.0334,file=FAN_B.png
           python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/FAN_A.png shots/FAN_B.png 500
 
-      - name: Upload release assets (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload release assets (bump or tag)
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          # bump-driven push releases under the FRESH version tag; a
+          # manual tag push releases under THE PUSHED TAG (never a
+          # mismatched version.properties overwrite).
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
           generate_release_notes: true
           files: |
-            dist/sh1x-poc-${{ github.ref_name }}-linux.zip
+            dist/sh1x-poc-${{ steps.rel.outputs.tag }}-linux.zip
 
   build-windows:
+    needs: bump
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (main carries the bump commit; tags build the tag; PRs build the PR head)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || (startsWith(github.ref, 'refs/tags/') && github.ref) || github.ref }}
+
+      - name: Resolve the release tag (bump or pushed tag)
+        id: rel
+        run: |
+          if [ "${{ needs.bump.outputs.did }}" = "1" ]; then
+            echo "tag=${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build with Zig (cross-compile, no mingw toolchain needed)
         run: |
@@ -125,33 +199,34 @@ jobs:
           file fog_poc.exe
 
       - name: Package one-click test zip (windows)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         run: |
           # the packaging script regenerates the GLBs with the repo converter
           # (numpy + Pillow needed for texture embedding)
           python3 -m pip install --user -q numpy pillow
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.rel.outputs.tag }}"
           # NONE skips the linux binary/zip; only the -win zip is produced.
           bash tools/package_release.sh "$TAG" dist NONE ./fog_poc.exe
           unzip -l "dist/sh1x-poc-$TAG-win.zip"
 
-      - name: Upload release assets (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Upload release assets (bump or tag)
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
           generate_release_notes: true
-          files: dist/sh1x-poc-${{ github.ref_name }}-win.zip
+          files: dist/sh1x-poc-${{ steps.rel.outputs.tag }}-win.zip
 
-      - name: Build source tarball (any ref)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Build source tarball (any release ref)
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         run: |
           git archive --format=tar.gz -o "sh-poc-source.tar.gz" HEAD
-          # attach in the next step
           echo "TARBALL=sh-poc-source.tar.gz" >> "$GITHUB_ENV"
 
       - name: Attach source tarball
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
           generate_release_notes: true
           files: ${{ env.TARBALL }}

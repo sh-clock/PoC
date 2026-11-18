@@ -64,7 +64,10 @@
  *      (Particle_EnvironmentSet at load — the editor's setBootWeather,
  *      applied unconditionally incl. recipe 2), lensFlare, flashlightOn,
  *      psxWobble (--modern when false), dither, particles (--nosnow when
- *      false), engine (--nofog when false). Present-field semantics mirror
+ *      false), engine (--nofog when false), animsDemo (--anims-demo when
+ *      true: the cutscene/event-gated drivers play — the wallpaper's
+ *      demo scenes set it per scene; absent leaves the CLI default).
+ *      Present-field semantics mirror
  *      the editor's sanitizeEnv whitelist verbatim (strict booleans,
  *      clamps 0..20 / 0..8 / -1..6 / 0..5). Priority: CLI flags > camdat
  *      env > camdat legacy flags > engine defaults — the editor's own
@@ -2522,6 +2525,7 @@ typedef struct {
     int envDither;              /* -1 absent; else 0/1                   */
     int envParticles;           /* -1 absent; else 0/1 (0 = --nosnow)    */
     int envEngine;              /* -1 absent; else 0/1 (0 = --nofog)     */
+    int envAnimsDemo;           /* -1 absent; else 0/1 (1 = --anims-demo) */
 } Camdat;
 
 static int camdat_parse_loop(const char *s, int def) {
@@ -2792,6 +2796,7 @@ static int camdat_load(Camdat *cd, const char *path, const char *glbName) {
     cd->envDither = -1;
     cd->envParticles = -1;
     cd->envEngine = -1;
+    cd->envAnimsDemo = -1;
     long len = 0;
     uint8_t *data = read_whole_file(path, &len);
     if (!data) {
@@ -2875,6 +2880,12 @@ static int camdat_load(Camdat *cd, const char *path, const char *glbName) {
             cd->envDither       = jbool(env, "dither", -1);
             cd->envParticles    = jbool(env, "particles", -1);
             cd->envEngine       = jbool(env, "engine", -1);
+            /* v32.2: animsDemo — the demo-gated drivers (cutscene/event-
+             * driven: carousel, elevators, stone, bin, belt, door swing,
+             * waterfall, fence) play per scene. STRICT boolean; absent
+             * leaves the CLI default (0). The wallpaper's special-case
+             * scenes set it; the PoC CLI keeps --anims-demo precedence. */
+            cd->envAnimsDemo    = jbool(env, "animsDemo", -1);
         }
     }
 
@@ -10243,6 +10254,10 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                             da->mvPend[2], da->mvPend[3],
                             da->mvPendVel[0], da->mvPendVel[1],
                             da->mvPendVel[2], da->mvPendVel[3]);
+                if (da->driver == 4 || da->driver == 5 || da->driver == 8)
+                    /* v32.2 debug: the raw swing-family live state */
+                    fprintf(stderr, " rawVy=%d rawVel=%d",
+                            da->rawVy, da->rawVel);
                 fprintf(stderr, "\n");
             }
         }
@@ -13888,12 +13903,12 @@ int main(int argc, char **argv) {
     if (cd.hasEnv) {
         printf("camdat %s: model %s (fogon=%d nighton=%d flashlighton=%d)\n"
                "  v2 env: pair {%d,%d} weatherTarget %d bootWeather %d lensFlare %d "
-               "flashlight %d psx %d dither %d particles %d engine %d\n",
+               "flashlight %d psx %d dither %d particles %d engine %d animsDemo %d\n",
                camdatPath, cd.modelFile, cd.fogon, cd.nighton, cd.flashlighton,
                cd.envPair0, cd.envPair1,
                cd.envWeatherTarget, cd.envBootWeather, cd.envLensFlare,
                cd.envFlashlightOn, cd.envPsxWobble, cd.envDither,
-               cd.envParticles, cd.envEngine);
+               cd.envParticles, cd.envEngine, cd.envAnimsDemo);
     } else {
         printf("camdat %s: model %s (fogon=%d nighton=%d flashlighton=%d), ",
                camdatPath, cd.modelFile, cd.fogon, cd.nighton, cd.flashlighton);
@@ -13945,6 +13960,11 @@ int main(int argc, char **argv) {
             lensFlareType = cd.envLensFlare;
         if (bootWeatherTarget < 0 && cd.envWeatherTarget >= 0)
             bootWeatherTarget = cd.envWeatherTarget;     /* resolved below  */
+        /* v32.2: animsDemo folds like the other env booleans — CLI
+         * --anims-demo wins (no off-flag to distinguish, so the fold
+         * only applies when the CLI left it at the default 0). */
+        if (g_animsDemo == 0 && cd.envAnimsDemo >= 0)
+            g_animsDemo = cd.envAnimsDemo ? 1 : 0;
     }
 
     /* ---- v4 audit mode: dump the flashlight math primitives over a
