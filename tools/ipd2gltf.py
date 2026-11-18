@@ -503,6 +503,23 @@ _PROP_ANIMS = {
          "rot0": [0, 0, 0], "driver": "cutscene",
          "cutscene": "clockTowerDoor ramp+snap 180deg (map1_s02.c:1173-1297)",
          "src": "map1_s02.c:1173-1297"},
+        # Drain-water particle system (the "waterfall" of the school-key
+        # puzzle) — NON-WorldObject 2D particles like <ripples>/<light>;
+        # the emitter/velocity/CLUT tables sharedData_800E30C8_1_s02 are
+        # extern-only binary .data (map1_s02.h) — constants not in the
+        # decomp repo, the GATES are decompiled (map1_s02.c:1542-1562).
+        {"object": "<waterfall>", "driver": "particles",
+         "eventGate": 113, "eventGatePolarity": "set",
+         "chunkGate": [-1, -2],
+         "gate": "PLAYER_IN_MAP_CHUNK(-1,-2) && Get(EventFlag_"
+                 "M1S03_KeyDownTheDrain=113) — spawn on entering the "
+                 "chunk, despawn on leaving (map1_s02.c:1542-1562)",
+         "spawn": "sharedFunc_800CBC98_1_s02 (water.c:70-92): field_74 "
+                 "particles from the extern emitter table "
+                 "sharedData_800E30C8_1_s02",
+         "despawn": "sharedFunc_800CBD58_1_s02 (water.c:94-107)",
+         "src": "map1_s02.c:1542-1562; src/maps/common/particles/"
+                "water.c:20-107"},
     ],
     # ---- map1_s03 locker suite (map1_s03.c:1928-2153) ----
     "MAP1_S03": [
@@ -524,8 +541,21 @@ _PROP_ANIMS = {
          "chunkGate": [-2, 0], "eventGate": 101, "eventGateAlt": 102,
          "eventGatePolarity": "clear-or",
          "sound": "Sfx_Unk1435",
-         "src": "map1_s03.c:2002-2046 (own kick state D_800E20E8; gate "
-                "!Get(101)||!Get(102) — drive while EITHER is CLEAR)"},
+         "src": "map1_s03.c:2002-2046 (kick state D_800E20E8 — set by "
+                "the TOBIRA2_ locker kick at 1961-1966, SHARED with "
+                "TOBIRA2_'s swing; gate !Get(101)||!Get(102) — drive while "
+                "EITHER is CLEAR)"},
+        {"object": "TOBIRA00", "pos": [-58.81, -1.4, 18.02],
+         "rot0": [0, 0, 0], "driver": "doorRattle",
+         "oneIn": 32, "kickMin": 2, "kickMax": 9,
+         "bounceLimit": -1.8, "holdAfterFlag": -2.9,
+         "chunkGate": [-2, 0], "eventGate": 101, "eventGateAlt": 102,
+         "eventGatePolarity": "clear-or", "sharedRot": "TOBIRA01",
+         "sound": "Sfx_Unk1435",
+         "src": "map1_s03.c:1593 (init pos), 2148-2149 (rotation.vy "
+                "COPIED from TOBIRA01's live rotation immediately before "
+                "the add — the follower leaf of the locker double door; "
+                "rattle math shared with TOBIRA01: 2002-2046)"},
         {"object": "VALVE_HI", "pos": [-10.49, -0.7, -12.92],
          "rot0": [0, 0, 0], "driver": "cutscene",
          "cutscene": "valve hand-tracking (map1_s03.c:890-988)",
@@ -595,6 +625,31 @@ _PROP_ANIMS = {
          "postEventVyDeg": 8.0, "postEventVyRaw": 91,
          "eventGate": 168, "sharedRot": "DOOR1_BA",
          "src": "map2_s00.c:1913-1944"},
+        {"object": "CHAIN2_2", "pos": [-263.0, 0.0, -104.0],
+         "rot0": [0, 0, 0], "driver": "dampedSwing",
+         "angAccelRaw": -113, "angVelFloorRaw": -56, "vyFloorRaw": -91,
+         "postEventVyDeg": 8.0, "postEventVyRaw": 91,
+         "eventGate": 168, "sharedRot": "DOOR1_BA",
+         "src": "map2_s00.c:2044 (name), 2210-2211 (added with the LIVE "
+                "swing rot D_800F538C, same pos D_800F56CC[1]=-263/0/-104 "
+                "as CHAIN2_1 — the second animated chain of the set; the "
+                "chain2 half renders while Get(169), !Get(170))"},
+        # CHAIN2_3 / CHAIN2_4: STATIC adds (SVECTOR3_Zero rot, fixed pos
+        # D_800F56CC[0]=-262/0/-104, map2_s00.c:2045-2046, 2212-2213) — no
+        # per-frame mutation; carried for set completeness (render-only
+        # while Get(169) && !Get(170)).
+        {"object": "CHAIN2_3", "pos": [-262.0, 0.0, -104.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "static add with SVECTOR3_Zero rot (map2_s00.c:2212) — "
+                "no per-frame mutation; eventGate 169 set/170 clear",
+         "eventGate": 169, "eventGatePolarity": "set",
+         "src": "map2_s00.c:2045, 2212"},
+        {"object": "CHAIN2_4", "pos": [-262.0, 0.0, -104.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "static add with SVECTOR3_Zero rot (map2_s00.c:2213) — "
+                "no per-frame mutation; eventGate 169 set/170 clear",
+         "eventGate": 169, "eventGatePolarity": "set",
+         "src": "map2_s00.c:2046, 2213"},
     ],
     # ---- map3 hospital elevators + cabinet (SHARED slide code) ----
     "MAP3_S01": [
@@ -607,6 +662,43 @@ _PROP_ANIMS = {
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
          "resetZ": 19.1, "chunkGate": [1, 0], "dir": -1,
          "src": "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "DR3L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "chunkGate": [1, 0],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign -vz (i even, :336/:349)",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map3_s01.c:366 (init 59.1/0/19.1), 462-472 (add+reset "
+                "chunk 1,0), sharedFunc_800D15F0_3_s01.h:331-365 "
+                "(via map3_s01.c:134)"},
+        {"object": "DR3R_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "chunkGate": [1, 0],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign +vz (i odd, :336/:349)",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map3_s01.c:367, 462-472, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "chunkGate": [1, 0],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign -vz (i even, :354)",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map3_s01.c:368, 462-472, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2R_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 19.1, "chunkGate": [1, 0],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign +vz (i odd, :354)",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map3_s01.c:369, 462-472, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
     ],
     "MAP3_S03": [
         {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
@@ -617,6 +709,42 @@ _PROP_ANIMS = {
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
          "resetZ": 59.1, "chunkGate": [0, 1], "dir": -1,
          "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s03.c:941-956"},
+        {"object": "DR3L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign -vz (i even, :336/:349)",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map3_s03.c:896, 941-956 (add+reset chunk 0,1), "
+                "sharedFunc_800D15F0_3_s01.h:331-365 (via :888)"},
+        {"object": "DR3R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign +vz (i odd, :336/:349)",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map3_s03.c:897, 941-956, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign -vz (i even, :354)",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map3_s03.c:898, 941-956, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign +vz (i odd, :354)",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map3_s03.c:899, 941-956, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
     ],
     "MAP3_S04": [
         {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
@@ -627,6 +755,42 @@ _PROP_ANIMS = {
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
          "resetZ": 59.1, "chunkGate": [0, 1], "dir": -1,
          "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s04_2.c:539-554"},
+        {"object": "DR3L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign -vz (i even, :336/:349)",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map3_s04_2.c:505, 539-554 (add+reset chunk 0,1), "
+                "sharedFunc_800D15F0_3_s01.h:331-365 (via :497)"},
+        {"object": "DR3R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign +vz (i odd, :336/:349)",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map3_s04_2.c:506, 539-554, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign -vz (i even, :354)",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map3_s04_2.c:507, 539-554, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign +vz (i odd, :354)",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map3_s04_2.c:508, 539-554, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
     ],
     "MAP3_S05": [
         {"object": "TANA_HID", "pos": [60.0, 0.0, -21.6],
@@ -636,14 +800,57 @@ _PROP_ANIMS = {
          "sound": "Sfx_Unk1535",
          "src": "map3_s05.c:858-905, 935-940, 995-1009 "
                 "(EventFlag_M3S05_CabinetPushed = 282; Get(282))"},
-        {"object": "DR1L_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+        # v28.1 FIX (verified vs decomp): map3_s05's doors are placed at
+        # (19.1, 0, 59.1) — grid cell (0,1), the same cell as map3_s03/
+        # map3_s04 — NOT (59.1, 0, 19.1) as previously catalogued (x/z
+        # had been swapped from map3_s01); resetZ is 59.1
+        # (map3_s05.c:950-955, 1064-1079).
+        {"object": "DR1L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
-         "resetZ": 19.1,
-         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:950-955"},
-        {"object": "DR1R_HID", "pos": [59.1, 0.0, 19.1], "rot0": [0, 0, 0],
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:950-955, "
+                "1064-1079"},
+        {"object": "DR1R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
          "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
-         "resetZ": 19.1, "dir": -1,
-         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:950-955"},
+         "resetZ": 59.1, "chunkGate": [0, 1], "dir": -1,
+         "src": "sharedFunc_800D15F0_3_s01.h:331-365 + map3_s05.c:951, "
+                "1064-1079"},
+        {"object": "DR3L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign -vz (i even, :336/:349)",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map3_s05.c:952, 1064-1079 (add+reset chunk 0,1), "
+                "sharedFunc_800D15F0_3_s01.h:331-365 (via :924)"},
+        {"object": "DR3R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365): outer set i<4, "
+                "slideSign +vz (i odd, :336/:349)",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map3_s05.c:953, 1064-1079, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2L_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign -vz (i even, :354)",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map3_s05.c:954, 1064-1079, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
+        {"object": "DR2R_HID", "pos": [19.1, 0.0, 59.1], "rot0": [0, 0, 0],
+         "driver": "slideDoor", "axis": "z", "speed": 0.35, "accel": 0.8,
+         "resetZ": 59.1, "chunkGate": [0, 1],
+         "cutscene": "elevator ride states 15-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:342-355): inner set i>=4, "
+                "slideSign +vz (i odd, :354)",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map3_s05.c:955, 1064-1079, sharedFunc_800D15F0_3_s01.h:"
+                "331-365"},
     ],
     # ---- map4_s01/2/3 hospital objects ----
     "MAP4_S01": [
@@ -658,23 +865,33 @@ _PROP_ANIMS = {
          "driver": "fanArray", "axis": "x",
          "bladeCount": 16, "count": 16, "rate": 90.0, "spinSplit": 7,
          "spinSplitUnits": "map4_s02.c:140-149: i<7 angle -= dt*Q12_ANGLE(90), "
-                "i>=7 angle += dt*Q12_ANGLE(90) (per-fan state D_800ED8B0[i])",
+                "i>=7 angle += dt*Q12_ANGLE(90) (per-fan state D_800ED8B0[i], "
+                "u16[16] per map4_s02.h:20 — the raw angle WRAPS at 65536, "
+                "not at the Q12_ANGLE 4096 circle)",
          "alternate": True, "chunkGate": [1, 0],
          "positions": [[53.211, -2.375, 32.5], [56.575, -2.875, 27.5],
                         [65.45, -2.875, 27.5], [68.8, -2.375, 32.5]],
-         "posSwitch": "map4_s02.c:108-118: i==0->p0, i==4->p1, i==7->p2(+vy180), i==11->p3 (pos retained otherwise)",
-         "posPerInst": [[53.211, -2.375, 32.5], [53.211, -2.375, 32.5],
-                        [53.211, -2.375, 32.5], [53.211, -2.375, 32.5],
-                        [56.575, -2.875, 27.5], [56.575, -2.875, 27.5],
-                        [56.575, -2.875, 27.5],
-                        [65.45, -2.875, 27.5], [65.45, -2.875, 27.5],
-                        [65.45, -2.875, 27.5], [65.45, -2.875, 27.5],
-                        [68.8, -2.375, 32.5], [68.8, -2.375, 32.5],
-                        [68.8, -2.375, 32.5], [68.8, -2.375, 32.5],
-                        [68.8, -2.375, 32.5]],
+         "posSwitch": "map4_s02.c:113-162: the switch sets the base ONLY at "
+                "i==0->p0 (Math_SetSVectorFast resets rot to 0,0,0), "
+                "i==4->p1, i==7->p2 (+objRot.vy=180, STICKY — cases 11 and "
+                "the default do not touch objRot), i==11->p3; AFTER every "
+                "WorldObjects_Add the loop runs objPos.vz -= Q12(5.0f) "
+                "(map4_s02.c:162) — each fan is 5.0m further -z than the "
+                "previous one until the next switch reset",
+         "posPerInst": [[53.211, -2.375, 32.5], [53.211, -2.375, 27.5],
+                        [53.211, -2.375, 22.5], [53.211, -2.375, 17.5],
+                        [56.575, -2.875, 27.5], [56.575, -2.875, 22.5],
+                        [56.575, -2.875, 17.5],
+                        [65.45, -2.875, 27.5], [65.45, -2.875, 22.5],
+                        [65.45, -2.875, 17.5], [65.45, -2.875, 12.5],
+                        [68.8, -2.375, 32.5], [68.8, -2.375, 27.5],
+                        [68.8, -2.375, 22.5], [68.8, -2.375, 17.5],
+                        [68.8, -2.375, 12.5]],
+         "posPerInstSrc": "map4_s02.c:113-162 (per-iteration "
+                "objPos.vz -= Q12(5.0f) AFTER the add)",
          "rotY180From": 7,
          "sound": "Sfx_Unk1542",
-         "src": "map4_s02.c:108-158"},
+         "src": "map4_s02.c:53, 108-165 (add+decrement loop), 197-205 (sfx)"},
     ],
     "MAP4_S03": [
         {"object": "REF_NEAR", "pos": "table:D_800DB7D4/D_800DB7E4",
@@ -691,6 +908,25 @@ _PROP_ANIMS = {
          "eventGate": 320, "chunkGate": ["3|4", -3],
          "sound": "Sfx_Unk1555",
          "src": "map4_s03.c:1692-1716, 1637"},
+    ],
+    # ---- map4_s04 hospital-nowhere wake-up chair (map4_s04_2.c) ----
+    "MAP4_S04": [
+        {"object": "ISU_HIDE", "pos": [57.8, 0.0, 141.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "wake-up cutscene discrete steps: g_WorldObject0."
+                "position.vz = 141.0 (map4_s04_2.c:340) -> 140.8 (:372) -> "
+                "140.95 (:396); PlacementInit (57.8,0,0) at :681 — the "
+                "placement z is dead data, the chair only ever draws "
+                "during/after the cutscene steps (added in chunk (1,3) "
+                "while Get(337) && !Get(338), :691-697)",
+         "eventGate": 337, "eventGatePolarity": "set",
+         "eventGateAlt": 338, "eventGateAltPolarity": "clear",
+         "cutsceneOnly": True,
+         "chunkGate": [1, 3],
+         "src": "map4_s04_2.c:681 (init), 340, 372, 396 (vz steps), "
+                "691-697 (add); flag 337 set by the map4_s01 event "
+                "(map4_s01/map_events.c), 338 set at cutscene end "
+                "(map4_s04_2.c:420)"},
     ],
     # ---- map5_s03 roaches (map5_s03_2.c:664-693, 712, 743) ----
     "MAP5_S03": [
@@ -711,6 +947,20 @@ _PROP_ANIMS = {
          "gate": "player x<=-80 z>=0 AND !(flashlightAllowed&&darkness)",
          "src": "map5_s00.c:20-48, 89-94, 154-157"},
     ],
+    # ---- map5_s02 green-lion safe door (map5_s02_2.c) ----
+    "MAP5_S02": [
+        {"object": "BDOOR1_H", "pos": [134.5318, 0.0, 59.471],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "safe cutscene discrete steps: g_WorldObject_BDoor1"
+                ".rotation.vy = Q12_ANGLE(-142.21deg) (map5_s02_2.c:290 "
+                "and :363) then -7.5deg (:311 and :388); re-entry state "
+                "rot.vy=-7.5 while Get(M5S02_UsedSafeKey) (:884-887); added "
+                "in chunk (3,1) unconditionally (:901, :928)",
+         "chunkGate": [3, 1],
+         "src": "map5_s02_2.c:861 (WorldObject_Init \"BDOOR1_H\", "
+                "134.5318, 0.0, 59.471, 0,0,0), 884-887, 290, 311, 363, "
+                "388, 901, 928"},
+    ],
     # ---- map6_s03 corpse (map6_s03.c:377-444) ----
     "MAP6_S03": [
         {"object": "SITAI_NE", "pos": [75.0, 0.5, 19.7],
@@ -721,20 +971,104 @@ _PROP_ANIMS = {
          "src": "map6_s03.c:377-444"},
     ],
     # ---- map6_s04 resort park (carousel + ferris + balloon) ----
+    # The 10 carousel horse slots (map6_s04_2.c:3619-3648): i<6 ride
+    # g_WorldObject0[1] = UMA2_HID (phase i*4096/3), i>=6 ride
+    # g_WorldObject0[0] = UMA1_HID (phase i*2048+2048) — the MODEL split
+    # is per the WorldObjects_Add(&g_WorldObject0[var_a0_2]) index at
+    # :3641 (var_a0_2 = 1 for i<6, 0 for i>=6).
     "MAP6_S04": [
-        {"object": "UMA1_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
+        {"object": "UMA2_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
          "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
-         "count": 10, "phaseSplit": 6,
+         "count": 6, "instRange": [0, 5],
+         "phaseFormula": "Math_Sin((D_800ED5B6*4) + (Q12(1.0f)*i)/3) — "
+                 "map6_s04_2.c:3628 (the i<6 branch; var_a0_2=1 -> "
+                 "g_WorldObject0[1] = UMA2_HID, :3430/:3641)",
+         "phasePerInst": [0, 1365, 2730, 4096, 5461, 6826],
          "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
          "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
                      "Cybil, map6_s04_2.c:2615) - BOTH terms add each tick "
                      "(3553-3554), then &0xFFF",
-         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — IPD-placed instances bob with phase i*4096/3 (i<6 rule); table mapping assumed 0..N",
-         "src": "map6_s04_2.c:3619-3648, 3553-3554"},
+         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3430, 3619-3648, 3553-3554, 3549"},
+        {"object": "UMA1_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
+         "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
+         "count": 4, "instRange": [6, 9],
+         "phaseFormula": "Math_Sin((D_800ED5B6*4) + (Q12(1.0f)*i)/2 + "
+                 "Q12(0.5f)) — map6_s04_2.c:3634-3635 (the i>=6 branch; "
+                 "var_a0_2=0 -> g_WorldObject0[0] = UMA1_HID, :3429/:3641)",
+         "phasePerInst": [14336, 16384, 18432, 20480],
+         "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
+         "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
+                     "Cybil, map6_s04_2.c:2615) - BOTH terms add each tick "
+                     "(3553-3554), then &0xFFF",
+         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3429, 3619-3648, 3553-3554, 3549"},
         {"object": "MGR_KOYA", "pos": [20.0, 1.0, 100.0],
          "rot0": [0, 0, 0], "driver": "carouselSpin",
          "radius": 8.0, "chunkGate": [0, 2],
-         "src": "map6_s04_2.c:3650-3697"},
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3650-3697, 3549"},
+        {"object": "MGR_STR_", "pos": [20.0, 1.0, 100.0],
+         "rot0": [0, 11.25, 0], "driver": "carouselSpin",
+         "rotOffsetDeg": 11.25,
+         "rotFormula": "rot.vy = D_800ED5B6 + Q12_ANGLE(11.25) — same pos "
+                "as MGR_KOYA (map6_s04_2.c:3662-3664)",
+         "radius": 8.0, "chunkGate": [0, 2],
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3432, 3662-3664, 3549"},
+        {"object": "SAKU2_BA", "pos": [20.0, -0.3, 100.0],
+         "rot0": [0, 90.0, 0], "driver": "carouselSpin",
+         "rotOffsetDeg": 90.0,
+         "rotFormula": "rot.vy = D_800ED5B6 + Q12_ANGLE(90) — the i==0 "
+                "spoke of the 8-spoke fence ring (map6_s04_2.c:3667-3693); "
+                "added at the HUB pos (20,-0.3,100), the ring sectors "
+                "(radius 7.5) live in the model geometry",
+         "radius": 7.5, "chunkGate": [0, 2],
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3433, 3667-3693, 3549"},
+        {"object": "SAK_POL_", "pos": [20.0, 0.0, 100.0],
+         "rot0": [0, 90.0, 0], "driver": "carouselSpin",
+         "count": 7, "instRange": [1, 7],
+         "rotStepDeg": 45.0,
+         "rotFormula": "rot.vy = D_800ED5B6 + Q12_ANGLE(90) + i*Q12_ANGLE(45) "
+                "for the 7 fence-pole sectors i=1..7 (map6_s04_2.c:3670-3697; "
+                "the 8th sector, i==0, is the SAKU2_BA gate); pos.y=0 from "
+                "the 2nd add on (:3695), all added at the HUB pos (20,0,100)",
+         "posPerInst": [[20.0, 0.0, 100.0]] * 7,
+         "radius": 7.5, "chunkGate": [0, 2],
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3434, 3670-3697, 3549"},
+        {"object": "MGR_DRL_", "pos": [20.0, 0.0, 100.0],
+         "rot0": [0, 0, 0], "driver": "carouselSpin",
+         "count": 4, "rotStepDeg": 90.0,
+         "rotFormula": "rot.vy = D_800ED5B6 + i*Q12_ANGLE(90) — 4 doll "
+                "adds (map6_s04_2.c:3699-3720), each ALSO adds DRL2_ILI; "
+                "both models added at &D_800ED740 = (20,0,100) (the hub "
+                "pos; the 0.8 ring is only the visibility AABB)",
+         "posPerInst": [[20.0, 0.0, 100.0]] * 4,
+         "radius": 0.8, "chunkGate": [0, 2],
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3436, 3699-3720, 3549"},
+        {"object": "DRL2_ILI", "pos": [20.0, 0.0, 100.0],
+         "rot0": [0, 0, 0], "driver": "carouselSpin",
+         "count": 4, "rotStepDeg": 90.0,
+         "rotFormula": "rot.vy = D_800ED5B6 + i*Q12_ANGLE(90) — 4 adds "
+                "paired with MGR_DRL_ at the same pose "
+                "(map6_s04_2.c:3714-3716)",
+         "posPerInst": [[20.0, 0.0, 100.0]] * 4,
+         "radius": 0.8, "chunkGate": [0, 2],
+         "gate": "!Get(443) || Get(467) — the whole carousel/horse "
+                "block runs while the compound holds (map6_s04_2.c:3549)",
+         "src": "map6_s04_2.c:3437, 3699-3720, 3549"},
         {"object": "FW1_BACK", "pos": [8.7, -13.8, -28.0],
          "rot0": [0, 0, 0], "driver": "ferrisWheel",
          "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
@@ -744,8 +1078,81 @@ _PROP_ANIMS = {
          "pendVelRaw": -279620, "pendVelDegPS": -6.0,
          "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -3.0,
          "pendSettleRaw": -93206, "pendSettleDeg": -2.0,
-         "triggerRaw": 186413, "eventGate": 452,
-         "src": "map6_s04_2.c:3735-3846"},
+         "eventGate": 452, "eventGatePolarity": "clear",
+         "driveGate": "!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) && "
+                "PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible "
+                "(map6_s04_2.c:3496-3500)",
+         "src": "map6_s04_2.c:3439, 3735-3846"},
+        {"object": "FW2_BACK", "pos": [8.7, -13.8, -28.0],
+         "rot0": [0, 0, 0], "driver": "ferrisWheel",
+         "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
+         "wrapDeg": 27.0, "wrapPeriodS": 6.75, "arms": 5,
+         "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
+         "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
+         "eventGate": 452, "eventGatePolarity": "clear",
+         "driveGate": "!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) && "
+                "PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible "
+                "(map6_s04_2.c:3496-3500)",
+         "src": "map6_s04_2.c:3440, 3817-3827 (all three backing models "
+                "added at each of the 5 arm poses)"},
+        {"object": "FW3WIR_H", "pos": [8.7, -13.8, -28.0],
+         "rot0": [0, 0, 0], "driver": "ferrisWheel",
+         "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
+         "wrapDeg": 27.0, "wrapPeriodS": 6.75, "arms": 5,
+         "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
+         "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
+         "eventGate": 452, "eventGatePolarity": "clear",
+         "driveGate": "!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) && "
+                "PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible "
+                "(map6_s04_2.c:3496-3500)",
+         "src": "map6_s04_2.c:3441, 3817-3827 (all three backing models "
+                "added at each of the 5 arm poses)"},
+        {"object": "FWBOX1_B", "pos": [8.7, -13.8, -28.0],
+         "rot0": [0, 0, 0], "driver": "ferrisWheel", "cabin": True,
+         "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
+         "wrapDeg": 27.0, "wrapPeriodS": 6.75, "arms": 5,
+         "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
+         "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
+         "cabinRadius": 11.25,
+         "pendVelRaw": -279620, "pendVelDegPS": -6.0,
+         "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -3.0,
+         "pendSettleRaw": -93206, "pendSettleDeg": -2.0,
+         "pendulum": "cabin pendulum (3 branches, map6_s04_2.c:3764-3811): "
+                "idle timer, vel += dt*Q12(-68.2667) floored -34.1334, "
+                "angle += dt*vel, settle -22.7554 else vel >>= 1; rot.vx = "
+                "D_800EBB10[i]>>12 (:3832)",
+         "parity": "g_WorldObject7[(D_800EBB34+i)&1] — the wrap counter "
+                "D_800EBB34 + arm index selects FWBOX1_B (even) vs "
+                "FWBOX2_B (odd) at each arm (map6_s04_2.c:3841); t=0 "
+                "(D_800EBB34=0): arms 0,2,4",
+         "eventGate": 452, "eventGatePolarity": "clear",
+         "driveGate": "!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) && "
+                "PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible "
+                "(map6_s04_2.c:3496-3500)",
+         "src": "map6_s04_2.c:3442, 3764-3842"},
+        {"object": "FWBOX2_B", "pos": [8.7, -13.8, -28.0],
+         "rot0": [0, 0, 0], "driver": "ferrisWheel", "cabin": True,
+         "rateRaw": 186413, "rateDegPS": 4.0, "wrapRaw": 1258291,
+         "wrapDeg": 27.0, "wrapPeriodS": 6.75, "arms": 5,
+         "armStepRaw": 307, "armStepDeg": 27.0, "arm0Raw": -739,
+         "arm0Deg": -65.0, "boxRadius": [10.0, 11.25],
+         "cabinRadius": 11.25,
+         "pendVelRaw": -279620, "pendVelDegPS": -6.0,
+         "pendVelFloorRaw": -139810, "pendVelFloorDegPS": -3.0,
+         "pendSettleRaw": -93206, "pendSettleDeg": -2.0,
+         "pendulum": "cabin pendulum (3 branches, map6_s04_2.c:3764-3811): "
+                "idle timer, vel += dt*Q12(-68.2667) floored -34.1334, "
+                "angle += dt*vel, settle -22.7554 else vel >>= 1; rot.vx = "
+                "D_800EBB10[i]>>12 (:3832)",
+         "parity": "g_WorldObject7[(D_800EBB34+i)&1] — the wrap counter "
+                "D_800EBB34 + arm index selects FWBOX1_B (even) vs "
+                "FWBOX2_B (odd) at each arm (map6_s04_2.c:3841); t=0 "
+                "(D_800EBB34=0): arms 1,3",
+         "eventGate": 452, "eventGatePolarity": "clear",
+         "driveGate": "!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) && "
+                "PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible "
+                "(map6_s04_2.c:3496-3500)",
+         "src": "map6_s04_2.c:3443, 3764-3842"},
         {"object": "WHEEL_BA", "pos": [-16.0, -1.5, -64.0],
          "rot0": [0, 0, 0], "driver": "lissajousOrbit",
          "count": 12, "freqARaw": 807, "freqBRaw": 1126,
@@ -779,12 +1186,75 @@ _PROP_ANIMS = {
          "src": "map7_s01_2.c:1545-1596, 2188-2195"},
         {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
-         "speed": 0.1, "accel": 0.25, "chunkGate": [0, 1],
-         "src": "map7_s01_2.c:2074-2105, 2218-2235, 2499"},
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136): case 2 moves the outer 4 "
+                "doors, cases 3/4 all 6; vz += dt*(i&1 ? +D_800E16A8[k] : "
+                "-D_800E16A8[k]), accel dt*Q12(0.25) clamped Q12(0.1); the "
+                "shared elevator slide (0.35/0.8) is ALSO compiled in "
+                "(map7_s01_2.c:2052 include); positions reset to "
+                "(-100.9,0,-60.9) at the end (:2134) — also the post-479 "
+                "PlacementInit pose (:2220-2225; pre-479 it is "
+                "(-20.9,0,-20.9), :2229-2234)",
+         "slideSign": "-vz (i=0, even)",
+         "src": "map7_s01_2.c:2074-2105, 2081-2136, 2218-2235, "
+                "2495-2501 (add chunks (-1,-1)/(-3,-2))"},
         {"object": "DR1R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
-         "speed": 0.1, "accel": 0.25, "chunkGate": [0, 1], "dir": -1,
-         "src": "map7_s01_2.c:2074-2105, 2218-2235, 2499"},
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"], "dir": -1,
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136) — outer set i<4, slideSign +vz "
+                "(i odd, :2086/:2104)",
+         "slideSign": "+vz (i=1, odd)",
+         "src": "map7_s01_2.c:2074-2105, 2081-2136, 2218-2235, 2495-2501"},
+        {"object": "DR3L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136) — outer set i<4, slideSign -vz "
+                "(i even, :2086/:2104); PLUS the shared elevator ride "
+                "states 14-16 (sharedFunc_800D15F0_3_s01.h:331-365 via "
+                "map7_s01_2.c:2052)",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map7_s01_2.c:2222 (init), 2081-2136, 2495-2501, "
+                "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "DR3R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136) — outer set i<4, slideSign +vz "
+                "(i odd, :2086/:2104); PLUS the shared elevator ride "
+                "states 14-16 (sharedFunc_800D15F0_3_s01.h:331-365)",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map7_s01_2.c:2223 (init), 2081-2136, 2495-2501, "
+                "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "DR2L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136) — inner set i>=4 moves only from "
+                "case 3 on (D_800E16A8[1], :2100-2105); PLUS the shared "
+                "elevator ride states 15-16 (inner set, "
+                "sharedFunc_800D15F0_3_s01.h:342-355)",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map7_s01_2.c:2224 (init), 2081-2136, 2495-2501, "
+                "sharedFunc_800D15F0_3_s01.h:331-365"},
+        {"object": "DR2R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "levitating-door cutscene (local, "
+                "map7_s01_2.c:2081-2136) — inner set i>=4 from case 3 on "
+                "(:2100-2105); PLUS the shared elevator ride states 15-16 "
+                "(inner set, sharedFunc_800D15F0_3_s01.h:342-355)",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map7_s01_2.c:2225 (init), 2081-2136, 2495-2501, "
+                "sharedFunc_800D15F0_3_s01.h:331-365"},
     ],
     "MAP7_S02": [
         {"object": "BEAN1_HI", "pos": [62.3, -1.4, -61.0],
@@ -806,10 +1276,172 @@ _PROP_ANIMS = {
                 "floorHitCount==16; engine-fresh they never draw)",
          "sound": "Sfx_Unk1662/1651",
          "src": "map7_s02_2.c:1170-1189, 3476-3488"},
-        {"object": "STONE2_H", "pos": [-139.5, -1.35, -140.6],
-         "rot0": [0, 90.0, 0], "driver": "stoneChoreo",
-         "cutscene": "stoneChoreo (map7_s02 rates -0.0694/-0.3333)",
-         "src": "map7_s02_2.c:2662-2740"},
+        # STONE2_H — v28.1 FIX (audit A M1, re-verified): the previous pos
+        # [-139.5,-1.35,-140.6] + rot0 [0,90,0] were FABRICATED (copied from
+        # map7_s01's STONE1_H at map7_s01_2.c:2194). D_800EBB64 is
+        # extern-only in the repo (map7_s02.h:104; binary .data @
+        # 0x800EDF08 per sym.map7_s02.txt:402) and there is NO
+        # WorldObjects_Add for it anywhere — the only pos values the decomp
+        # pins are the slide-start vz -140.6 (:2687) and the rest pose
+        # (-139.5,-0.05,-140.0) rotZ -0.25 (:2737-2740). No posed node is
+        # emitted (pos=None => manifest-only; cutsceneOnly suppresses
+        # consumer draw).
+        {"object": "STONE2_H", "pos": None,
+         "rot0": None, "driver": "stoneChoreo",
+         "initPose": "BINARY-ONLY: s_WorldObjectPose D_800EBB64 @ "
+                "0x800EDF08 (extern map7_s02.h:104) — the initial pos/rot "
+                "are NOT in the decomp repo; the choreography pins only "
+                "the slide-start vz -140.6 (map7_s02_2.c:2687) and the "
+                "final rest pose (-139.5,-0.05,-140.0) rotZ -0.25 "
+                "(:2737-2740)",
+         "cutscene": "stoneChoreo (map7_s02_2.c:2662-2745): slide "
+                "vz=(step*0.1)/2-140.6; drop vel += g_GravitySpeed>>1, vy "
+                "clamp -1.05; wobble rot.vz += dt*Q12(-0.0694)=-284 raw "
+                "(:2710), vy=cos(rotZ)*0.15-(1.2-1), vz=sin(rotZ)*(-0.15)"
+                "-140.5; tumble rot.vz += dt*Q12(-0.3333)=-1365 raw "
+                "(:2724), vy += vel*dt, vz += dt*0.3; model swaps "
+                "STONE2_H->STONE3_H at step 1 end (:2681); NEVER "
+                "WorldObjects_Add'ed in the decomp (no add call exists)",
+         "cutsceneOnly": True,
+         "src": "map7_s02_2.c:2662-2745 (rates :2710/:2724; model swap "
+                ":2681; rest :2737-2740), map7_s02.h:104, "
+                "sym.map7_s02.txt:402"},
+        # ---- the nowhere elevator doors (6; the same shared set that
+        # map7_s01's levitating-door cutscene slides) — the SHARED
+        # elevator slide code is compiled in (map7_s02_2.c:3153 include)
+        # and IS invokable here: map event [153] (map_events.c:1444-1451,
+        # TouchObbFacing+Button at mapPoint 23 (-102.5,-59.5) — right at
+        # the doors at -100.9/0/-60.9, map7_s02/map_points.h:158-164)
+        # enters SysState_EventCallback with eventParam 42 →
+        # g_MapEventFuncs[42] = sharedFunc_800D15F0_3_s01 (header.c:71
+        # registration; game_sys_states.c:818 dispatch) — the elevator
+        # ride cutscene slides the doors (states 14-16) and resets vz to
+        # -60.9 on exit (shared default case, :385-391). The flag-549-
+        # gated examine event [154] (MAP_MSG(132) "The elevator doesn't
+        # appear to be working", map7_s02_2.c:226) is the BROKEN-elevator
+        # message at mapPoint 14. Engine-fresh (no event run) the doors
+        # sit closed at the authored pose, added in chunks
+        # (-1,-1)/(-3,-2) (map7_s02_2.c:3727-3733).
+        {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
+                "invoked by map event [153] — TouchObbFacing+Button at "
+                "mapPoint 23 (-102.5,-59.5) → eventParam 42 = "
+                "sharedFunc_800D15F0_3_s01 (map_events.c:1444-1451, "
+                "header.c:71); vz resets to -60.9 on exit "
+                "(shared default :385-391))",
+         "slideSign": "-vz (i=0, even)",
+         "src": "map7_s02_2.c:3507, 3728-3733 (add chunks (-1,-1)/"
+                "(-3,-2)), sharedFunc_800D15F0_3_s01.h:331-365, "
+                "map7_s02.h:109"},
+        {"object": "DR1R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
+                "invoked by map event [153] — TouchObbFacing+Button at "
+                "mapPoint 23 (-102.5,-59.5) → eventParam 42 = "
+                "sharedFunc_800D15F0_3_s01 (map_events.c:1444-1451, "
+                "header.c:71); vz resets to -60.9 on exit "
+                "(shared default :385-391))",
+         "slideSign": "+vz (i=1, odd)",
+         "src": "map7_s02_2.c:3508, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+                "331-365, map7_s02.h:109"},
+        {"object": "DR3L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
+                "invoked by map event [153] — TouchObbFacing+Button at "
+                "mapPoint 23 (-102.5,-59.5) → eventParam 42 = "
+                "sharedFunc_800D15F0_3_s01 (map_events.c:1444-1451, "
+                "header.c:71); vz resets to -60.9 on exit "
+                "(shared default :385-391))",
+         "slideSign": "-vz (i=2, even)",
+         "src": "map7_s02_2.c:3509, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+                "331-365, map7_s02.h:109"},
+        {"object": "DR3R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 14-16 (shared code, "
+                "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
+                "invoked by map event [153] — TouchObbFacing+Button at "
+                "mapPoint 23 (-102.5,-59.5) → eventParam 42 = "
+                "sharedFunc_800D15F0_3_s01 (map_events.c:1444-1451, "
+                "header.c:71); vz resets to -60.9 on exit "
+                "(shared default :385-391))",
+         "slideSign": "+vz (i=3, odd)",
+         "src": "map7_s02_2.c:3510, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+                "331-365, map7_s02.h:109"},
+        {"object": "DR2L_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 15-16 (shared code, inner set "
+                "i>=4, sharedFunc_800D15F0_3_s01.h:342-355 via "
+                "map7_s02_2.c:3153; invoked by map event [153] — "
+                "TouchObbFacing+Button at mapPoint 23 (-102.5,-59.5) → "
+                "eventParam 42 = sharedFunc_800D15F0_3_s01 "
+                "(map_events.c:1444-1451, header.c:71); vz resets to "
+                "-60.9 on exit (shared default :385-391))",
+         "slideSign": "-vz (i=4, even)",
+         "src": "map7_s02_2.c:3511, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+                "331-365, map7_s02.h:109"},
+        {"object": "DR2R_HID", "pos": [-100.9, 0.0, -60.9],
+         "rot0": [0, 0, 0], "driver": "slideDoor", "axis": "z",
+         "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
+         "chunkGate": ["-1|-3", "-1|-2"],
+         "cutscene": "elevator ride states 15-16 (shared code, inner set "
+                "i>=4, sharedFunc_800D15F0_3_s01.h:342-355 via "
+                "map7_s02_2.c:3153; invoked by map event [153] — "
+                "TouchObbFacing+Button at mapPoint 23 (-102.5,-59.5) → "
+                "eventParam 42 = sharedFunc_800D15F0_3_s01 "
+                "(map_events.c:1444-1451, header.c:71); vz resets to "
+                "-60.9 on exit (shared default :385-391))",
+         "slideSign": "+vz (i=5, odd)",
+         "src": "map7_s02_2.c:3512, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+                "331-365, map7_s02.h:109"},
+        # ---- dagger-room doors (EventFlag_557) ----
+        {"object": "DOR1_HID", "pos": [21.15, -0.8, -60.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "dagger-room doors fly open (EventFlag_557 set): "
+                "rotation.vy = Q12_ANGLE(+25deg) at cutscene step 5 "
+                "(map7_s02_2.c:1546); added in chunk (0,-2) only while "
+                "Get(557) (:3593-3600)",
+         "eventGate": 557, "eventGatePolarity": "set",
+         "chunkGate": [0, -2],
+         "src": "map7_s02_2.c:3467 (init 21.15/-0.8/-60.0), 1546, "
+                "3593-3600"},
+        {"object": "DOR2_HID", "pos": [21.15, -0.1, -60.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "dagger-room doors fly open: rotation.vy = "
+                "Q12_ANGLE(+58deg) (map7_s02_2.c:1547); added in chunk "
+                "(0,-2) while Get(557)",
+         "eventGate": 557, "eventGatePolarity": "set",
+         "chunkGate": [0, -2],
+         "src": "map7_s02_2.c:3468, 1547, 3593-3600"},
+        {"object": "DOR3_HID", "pos": [21.15, -0.1, -61.5],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "dagger-room doors fly open: rotation.vy = "
+                "Q12_ANGLE(-50deg) (map7_s02_2.c:1548); added in chunk "
+                "(0,-2) while Get(557)",
+         "eventGate": 557, "eventGatePolarity": "set",
+         "chunkGate": [0, -2],
+         "src": "map7_s02_2.c:3469, 1548, 3593-3600"},
+        {"object": "DOR4_HID", "pos": [21.15, -0.8, -61.5],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "dagger-room doors fly open: rotation.vy = "
+                "Q12_ANGLE(-15deg) (map7_s02_2.c:1549); added in chunk "
+                "(0,-2) while Get(557)",
+         "eventGate": 557, "eventGatePolarity": "set",
+         "chunkGate": [0, -2],
+         "src": "map7_s02_2.c:3470, 1549, 3593-3600"},
     ],
     "MAP7_S03": [
         {"object": "BIN_HIDE", "pos": [140.0, 0.0, -100.0],
@@ -821,6 +1453,24 @@ _PROP_ANIMS = {
          "cutscene": "scrollBelt vz = base - (dt*2.67 wrap 20), 3 copies",
          "count": 3, "spacing": 20.0, "speed": 2.67,
          "src": "map7_s03_3.c:8296-8344, 8185-8189"},
+        # Belt riders (map7_s03_3.c:8330-8341): each of the 3 copies adds
+        # REAL_HID (flag D_800F4818), URA_HIDE (D_800F4819) and UNDER_HI
+        # (D_800F481A) — the SAME belt math, gated per-object by the ending
+        # sequence flags; scroll pauses while D_800F4819==2 (:8303).
+        {"object": "URA_HIDE", "pos": [100.0, 0.0, -140.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "scrollBelt vz = base - (dt*2.67 wrap 20), 3 copies "
+                "(-20/0/+20) — the 2nd belt rider (g_WorldObject_Ura, "
+                "model URA_HIDE, map7_s03_3.c:8190; gated D_800F4819)",
+         "count": 3, "spacing": 20.0, "speed": 2.67,
+         "src": "map7_s03_3.c:8190, 8296-8342"},
+        {"object": "UNDER_HI", "pos": [100.0, 0.0, -140.0],
+         "rot0": [0, 0, 0], "driver": "cutscene",
+         "cutscene": "scrollBelt vz = base - (dt*2.67 wrap 20), 3 copies "
+                "(-20/0/+20) — the 3rd belt rider (g_WorldObject_Under, "
+                "model UNDER_HI, map7_s03_3.c:8191; gated D_800F481A)",
+         "count": 3, "spacing": 20.0, "speed": 2.67,
+         "src": "map7_s03_3.c:8191, 8296-8342"},
     ],
 }
 
@@ -840,10 +1490,19 @@ def _room_env_fx(room_name):
         return {}, []
     zones = []
     for z in _WATER_ZONES.get(tag, ()):
+        # illumination is emitted RAW q11_4 (Q4) exactly as stored in
+        # WATER_LIGHT_ZONES (map_info.c:389-401; all 4 rows = 8); the
+        # engine consumes it via Q4_TO_Q12 (lens_flare.c:88) => meters =
+        # raw/16. "illuminationMeters" is the decoded convenience field;
+        # the bounds minX..maxZ are decoded meters (q11_4 raw/16).
         zones.append({
             "enabled": z[0], "illumination": z[1],
+            "illuminationQ4": z[1],
+            "illuminationMeters": z[1] / 16.0,
             "minX": z[2], "maxX": z[3], "minZ": z[4], "maxZ": z[5],
-            "units": "meters (s_WaterZone q11_4 raw / 16)",
+            "units": "illumination: Q4 (raw); meters = value/16 (engine "
+                     "lens_flare.c:88 Q4_TO_Q12(illum)); bounds: meters "
+                     "(s_WaterZone q11_4 raw / 16)",
             "struct": "s_WaterZone map.h:271-281",
         })
     env = {}
@@ -1009,7 +1668,11 @@ def _anim_initial_poses(e, rng_seed="sh1x-v27"):
                               builds)
       * ferrisWheel        -> the 5 arm poses at master=0 (map6_s04_2.c:
                               3814-3845: angle = -739+i*307 Q12_ANGLE
-                              counts, pos = (8.7, 10*cos(a)-13.8, 10*sin(a)-28))
+                              counts, pos = (8.7, 10*cos(a)-13.8, 10*sin(a)-28));
+                              CABIN entries ("cabin": true — FWBOX1_B/
+                              FWBOX2_B) ride radius 11.25 instead of 10
+                              (:3829-3831), pendulum angle 0 at t=0
+                              (D_800EBB10 statics start 0, :3832)
       * lissajousOrbit     -> the 12 balloon poses at master=0 (3856-3874)
     Entries whose pos is not a concrete list of numbers return [] (no
     emission - the position data is not in the decomp repo)."""
@@ -1017,11 +1680,15 @@ def _anim_initial_poses(e, rng_seed="sh1x-v27"):
     pos = e.get("pos")
     if drv == "ferrisWheel":
         out = []
+        # cabins (FWBOX1_B/FWBOX2_B) sit at radius 11.25 on the same arm
+        # angles (map6_s04_2.c:3829-3831); the wheel models at 10
+        # (:3819-3822). Pendulum rot.vx = D_800EBB10[i]>>12 = 0 at t=0.
+        radius = 11.25 if e.get("cabin") else 10.0
         for i in range(int(e.get("arms", 5))):
             a_cnt = e.get("arm0Raw", -739) + i * e.get("armStepRaw", 307)
             a = math.radians(a_cnt * 360.0 / 4096.0)
-            out.append([8.7, 10.0 * math.cos(a) - 13.8,
-                        10.0 * math.sin(a) - 28.0])
+            out.append([8.7, radius * math.cos(a) - 13.8,
+                        radius * math.sin(a) - 28.0])
         return out
     if drv == "lissajousOrbit":
         out = []
