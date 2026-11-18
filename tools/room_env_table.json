@@ -564,6 +564,25 @@
   "weather": "rain+"
  },
  "ER02FD": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP7_S01",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 2,
+    "overlay": "MAP7_S02",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -624,6 +643,25 @@
   "weather": "none"
  },
  "ER03FD": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP7_S01",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 2,
+    "overlay": "MAP7_S02",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 3,
   "field17": 2,
   "inferredOverlay": false,
@@ -792,6 +830,17 @@
   "weather": "rain+"
  },
  "ERFC00": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP6_S01",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -1764,6 +1813,17 @@
   "weather": "none"
  },
  "HUFCFE": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP3_S03",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 0,
   "inferredOverlay": false,
@@ -2664,6 +2724,17 @@
   "weather": "none"
  },
  "SC00FE": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2676,6 +2747,17 @@
   "weather": "snow+"
  },
  "SC00FF": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2688,6 +2770,17 @@
   "weather": "snow+"
  },
  "SC0100": {
+  "alternates": [
+   {
+    "field16": 1,
+    "overlay": "MAP1_S06",
+    "pair": [
+     2,
+     2
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 2,
   "field17": 0,
   "inferredOverlay": false,
@@ -2700,6 +2793,25 @@
   "weather": "none"
  },
  "SC0101": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S01",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 1,
+    "overlay": "MAP1_S06",
+    "pair": [
+     2,
+     2
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 2,
   "field17": 0,
   "inferredOverlay": false,
@@ -2724,6 +2836,17 @@
   "weather": "none"
  },
  "SC0103": {
+  "alternates": [
+   {
+    "field16": 1,
+    "overlay": "MAP1_S06",
+    "pair": [
+     2,
+     2
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 2,
   "field17": 0,
   "inferredOverlay": false,
@@ -2736,6 +2859,17 @@
   "weather": "none"
  },
  "SC01FF": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2748,6 +2882,17 @@
   "weather": "snow+"
  },
  "SC0200": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2760,6 +2905,25 @@
   "weather": "snow+"
  },
  "SC0201": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 2,
+    "overlay": "MAP1_S01",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2796,6 +2960,17 @@
   "weather": "none"
  },
  "SC0300": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2832,6 +3007,17 @@
   "weather": "none"
  },
  "SC0303": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -2928,6 +3114,25 @@
   "weather": "none"
  },
  "SCFD01": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 1,
+    "overlay": "MAP1_S06",
+    "pair": [
+     2,
+     2
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 2,
   "field17": 0,
   "inferredOverlay": false,
@@ -2988,6 +3193,25 @@
   "weather": "none"
  },
  "SCFE01": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S00",
+    "pair": [
+     7,
+     4
+    ]
+   },
+   {
+    "field16": 2,
+    "overlay": "MAP1_S01",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 1,
   "field17": 2,
   "inferredOverlay": false,
@@ -3960,6 +4184,17 @@
   "weather": "none"
  },
  "SU00FF": {
+  "alternates": [
+   {
+    "field16": 2,
+    "overlay": "MAP1_S02",
+    "pair": [
+     7,
+     4
+    ]
+   }
+  ],
+  "contested": true,
   "field16": 3,
   "field17": 0,
   "inferredOverlay": false,

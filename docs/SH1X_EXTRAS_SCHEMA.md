@@ -188,3 +188,49 @@ in the `raw` base64 blobs AND as explicit arrays where their layout is known.
      - semi-transparency from pack b6 bit 7 (engine bit15 of the u16);
    - billboards after the buffer's instances.
 4. OT walk far→near, LIFO within bucket. No z-buffer anywhere.
+
+## v33 additions (S20)
+
+### `sh1x["env"]` — the room's ORIGINAL environment (optional)
+
+Present on v33+ room GLBs. Resolved at rip time from the decomp map
+overlay headers (`src/maps/mapN_sMM/header.c` field_16/field_17 — the
+original data) + `MAP_INFOS` flags + the `WorldEnv_MapPresetSet` switch
+(effects.c:220-267) + the `D_800A9F80..A98` table (effects.c:22-28).
+Both presets are the verbatim `WORLD_ENV_PRESETS[21]` (map_info.c:8-387)
+— decoded floats (Q12 macros evaluated) + 3-component colors, with the
+raw enums alongside the labels (`fogModeRaw`/`lightModeRaw`).
+
+```
+"env": {
+  "presetIdx0": 7, "presetIdx1": 4,     // the pair (off / flashlight-on)
+  "field16": 2, "field17": 0,           // the map header's own fields
+  "weather": "none",                    // field_17 as the boot recipe
+  "mapType": "SU", "mapFlags": "TwoActiveChunks|Interior",
+  "overlay": "MAP1_S02",
+  "preset0": { ...full preset... }, "preset1": { ... },
+  "src": "<the derivation citation>",
+  "contested": true,                    // ONLY when the room cell is
+  "envAlternates": [ ... ]              // claimed by overlays with
+                                        // different field_16 (floors
+                                        // share cells — 17 of 493 rooms)
+}
+```
+Consumers boot `presetIdx0/1` by default (the PoC v33 + the wallpaper
+v10.2 do; CLI/camdat envs still override). `contested` rooms: the
+primary is the share-weighted pick — offer the alternates if desired.
+
+### material `extras.SH1X.waterLive` — the live DR_WAVE tile
+
+The sewer IPDs carry a material named `"DWAVE"`; the engine redirects
+it at EVERY chunk load (`WorldMap_ChunkPropertiesSet` →
+`func_8008E4EC`, lens_flare.c:497-502 + map.c:1167-1186) to tpage 13
+(x=832) — the region `func_8008E5B4` rewrites per frame (the 32x32
+two-quad composite at (832,224)). The ripper flags such materials:
+
+```
+"materials[i]": { ..., "extras": { "SH1X": { "waterLive": true,
+  "src": "func_8008E4EC lens_flare.c:497-502 + ..." } } }
+```
+The PoC v33+ samples the ANIMATED tile for these materials (u/v wrap
+mod 32); other consumers keep the static art (no-op contract).

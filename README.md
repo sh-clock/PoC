@@ -97,7 +97,11 @@ boots the sewer `{6,3}` + the rain recipe. An explicit camdat's `env`
 Embedded animations now play BY DEFAULT (the GLB carries them; the players
 play them — the user-facing contract). `--no-anims` opts out for the
 engine-fresh regression state (event-gated drivers idle at their authored
-rot0). The water floor of the sewer rooms (the `DWAVE` materials) renders
+rot0). NOTE (engine-true): the `spinRng` family's per-tick jitter draws
+from the SAME global RNG as the gated drivers — toggling `--no-anims`
+changes the RNG stream, so RNG-coupled rooms are NOT pixel-comparable
+between the two modes (the engine's fan phase likewise depends on total
+RNG consumption). The water floor of the sewer rooms (the `DWAVE` materials) renders
 the LIVE animated DR_WAVE tile (the `func_8008E5B4` scroll) while the
 light is inside the water zone.
 

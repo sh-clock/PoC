@@ -569,18 +569,18 @@ _PROP_ANIMS = {
          "src": "map1_s03.c:890-988"},
     ],
     # ---- map1_s05 the moving bars (the SU boss-arena contraption: the
-    # SPHERE_H + WHEEL_HI spins, map1_s05.c:398-402 ungated const spins;
+    # SPHERE_H + WHEEL_HI spins, map1_s05.c:383-387 ungated const spins;
     # user-classified "the moving bars" — the room SU00FF, the SplitHead
     # finale arena of the alternate school, paper map = school BF) ------
     "MAP1_S05": [
         {"object": "SPHERE_H", "pos": [19.7, 1.58, -19.1],
          "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
          "rate": -90.0, "label": "moving bar (upper)",
-         "src": "map1_s05.c:398-399"},
+         "src": "map1_s05.c:383-384"},
         {"object": "WHEEL_HI", "pos": [19.7, -0.06, -19.1],
          "rot0": [0, 0, 0], "driver": "spinConst", "axis": "y",
          "rate": 15.0, "label": "moving bar (lower)",
-         "src": "map1_s05.c:401-402"},
+         "src": "map1_s05.c:386-387"},
         {"object": "<light>", "pos": [19.7, -3.0, -19.1],
          "driver": "lightFlicker",
          "base": 1.35, "ampA": 0.9, "ampB": 0.6,
@@ -1019,7 +1019,7 @@ _PROP_ANIMS = {
     # appears to rotate (the user's memory). No GsInitCoordinate2/RotMatrix
     # world rotation anywhere in map6_s04. Speed 0 at engine-fresh: the
     # carousel stands still until the boss fight / the ending. ---------
-    # The 10 carousel horse slots (map6_s04_2.c:3619-3648): i<6 ride
+    # The 10 carousel horse slots (map6_s04_2.c:3615-3644): i<6 ride
     # g_WorldObject0[1] = UMA2_HID (phase i*4096/3), i>=6 ride
     # g_WorldObject0[0] = UMA1_HID (phase i*2048+2048) — the MODEL split
     # is per the WorldObjects_Add(&g_WorldObject0[var_a0_2]) index at
@@ -1034,8 +1034,8 @@ _PROP_ANIMS = {
          "phasePerInst": [0, 1365, 2730, 4096, 5461, 6826],
          "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
          "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
-                     "Cybil, map6_s04_2.c:2615) - BOTH terms add each tick "
-                     "(3553-3554), then &0xFFF",
+                     "Cybil, map6_s04_2.c:2611) - BOTH terms add each tick "
+                     "(3549-3550), then &0xFFF",
          "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
          "gate": "!Get(443) || Get(467) — the whole carousel/horse "
                 "block runs while the compound holds (map6_s04_2.c:3549)",
@@ -1049,8 +1049,8 @@ _PROP_ANIMS = {
          "phasePerInst": [14336, 16384, 18432, 20480],
          "bobDiv": 5, "angleMul": 4, "carousel": "D_800ED5B6",
          "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
-                     "Cybil, map6_s04_2.c:2615) - BOTH terms add each tick "
-                     "(3553-3554), then &0xFFF",
+                     "Cybil, map6_s04_2.c:2611) - BOTH terms add each tick "
+                     "(3549-3550), then &0xFFF",
          "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
          "gate": "!Get(443) || Get(467) — the whole carousel/horse "
                 "block runs while the compound holds (map6_s04_2.c:3549)",
@@ -1217,7 +1217,7 @@ _PROP_ANIMS = {
                   "capsules orbit the center at radius 4, bobbing "
                   "+/-4 y — user-classified 'carnival rides', the "
                   "'balloons' label was wrong)",
-         "src": "map6_s04_2.c:3848-3875; gate :3502-3511 (!Get(453) — drive-while-CLEAR, live at engine-fresh)"},
+         "src": "map6_s04_2.c:3844-3871; gate :3498-3506 (!Get(453) — drive-while-CLEAR, live at engine-fresh)"},
     ],
     # ---- map7 nowhere (stones, beans, bin, belt) ----
     "MAP7_S00": [
@@ -5097,6 +5097,13 @@ _WORLD_ENV_PRESETS = [
      "snowColor": [48, 48, 48], "rainColor": [12, 12, 12]},
 ]
 
+# audit m4: the raw enum values ride alongside the labels (Off=0/On=1/
+# Zero=2/FollowLight=3 — effects.h:39-43; None/Spot/Directional — the
+# UnkGfxEnum game.h SHENUM order) so a consumer never infers from labels.
+for _p in _WORLD_ENV_PRESETS:
+    _p["fogModeRaw"] = {"Off": 0, "On": 1, "Zero": 2, "FollowLight": 3}[_p["fogMode"]]
+    _p["lightModeRaw"] = {"None": 0, "Spot": 1, "Directional": 2}[_p["lightMode"]]
+
 _ROOM_ENV_TABLE = None
 def _room_env_table():
     global _ROOM_ENV_TABLE
@@ -5106,8 +5113,11 @@ def _room_env_table():
                           "room_env_table.json")
         try:
             _ROOM_ENV_TABLE = json.load(open(p))
-        except Exception:
+        except Exception as _e:
             _ROOM_ENV_TABLE = {}
+            print(f"WARNING room_env_table.json: {p} unreadable ({_e}) — "
+                  "SH1X.env will NOT be emitted (re-run "
+                  "scripts/derive_room_env.py)", file=sys.stderr)
     return _ROOM_ENV_TABLE
 
 
@@ -5117,7 +5127,11 @@ def _room_env(room_name):
     the ORIGINAL data) + MAP_INFOS flags -> WorldEnv_MapPresetSet
     (effects.c:220-267) -> the D_800A9F80..A98 pair. The presets are the
     verbatim WORLD_ENV_PRESETS[21] (map_info.c). Consumers boot this pair
-    by default (the fog/lighting the room ACTUALLY ships with)."""
+    by default (the fog/lighting the room ACTUALLY ships with).
+    HONESTY (audit M1): the room->overlay binding is derived from the
+    decomp's map_points/camera coverage — 17 of 493 rooms are CONTESTED
+    (the same room file serves overlays with different field_16; floors
+    share cells); those carry contested:true + envAlternates."""
     e = _room_env_table().get(room_name.upper())
     if not e:
         return None
@@ -5132,6 +5146,14 @@ def _room_env(room_name):
     }
     if e.get("inferredOverlay"):
         out["overlayInferred"] = True
+    if e.get("contested"):
+        # audit M1: the SAME room file serves several overlays whose
+        # field_16 differs (floors/contexts share cells) — the primary is
+        # the share-weighted pick; the alternates are the other overlays'
+        # own pairs. A consumer may offer the alternates; the boot default
+        # stays the primary.
+        out["contested"] = True
+        out["envAlternates"] = e["alternates"]
     return out
 
 
