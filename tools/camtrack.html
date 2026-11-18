@@ -4721,6 +4721,7 @@ window.SHUI = (function () {
     syncWeatherUI();
     const host = document.querySelector('#world-panel');
     if (host) {
+      host.querySelector('#tgl-animsdemo').checked = !!U.animsDemo;
       host.querySelector('#boot-weather').value = String(U.bootWeather);
       host.querySelector('#lensflare-sel').value = String(U.lensFlare);
       host.querySelector('#tgl-psx').checked = SV.V.psxWobble;
@@ -7107,20 +7108,58 @@ function applySh1xPropAnims(t) {
   const rec = three.loaded.get(state.activeFile);
   if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) return;
   if (!rec.sh1xBind) {
-    /* bind once: mesh name minus the _mN instance suffix, prefix-matched
-     * per anim object (the engine's own bind rule); instances in name
-     * order (the ripper emits FAN0_HID, FAN0_HID#1.. each with one _m0
-     * child mesh whose local space is the pivot — rotating the mesh
-     * node IS the engine's rotation apply).                           */
+    /* bind once (v13.3 audit fixes A1/A2/A5):
+     * - the instance index = the node extras' animInst (the ripper's
+     *   authoritative emission index, consumed by the engine at
+     *   fog_poc.c:2085/:7894) — with parent/mesh userData fallbacks,
+     *   then the '#N' name suffix. The v13.2 lexicographic sort misbound
+     *   12/16 fans on SPU0100 (#10 sorts before #2).
+     * - duplicate object names (SU0203's two FAN_HIDE entries) bind by
+     *   NEAREST xz world distance like the engine (fog_poc.c:7838-7860:
+     *   prefix + nearest + already-bound skip), not last-write-wins.
+     * - meshes' local space is the pivot (authored no rotation — the
+     *   ripper's emission contract), so rotating the mesh node IS the
+     *   engine's rotation apply.                                    */
     const meshes = [];
-    rec.scene.traverse(o => { if (o.isMesh) meshes.push(o); });
-    meshes.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    rec.scene.updateMatrixWorld(true);
+    rec.scene.traverse(o => {
+      if (!o.isMesh) return;
+      let inst = null;
+      const ud = o.userData || {};
+      const pud = (o.parent && o.parent.userData) || {};
+      if (ud.animInst != null) inst = +ud.animInst;
+      else if (pud.animInst != null) inst = +pud.animInst;
+      else if (o.name.indexOf('#') >= 0) {
+        const mN = o.name.match(/#(\d+)(?![^_]*_m)/);
+        if (mN) inst = +mN[1];
+      }
+      const wp = o.getWorldPosition(new THREE.Vector3());
+      meshes.push({ o, inst: inst == null ? 0 : inst, wp, name: o.name });
+    });
+    meshes.sort((a, b) => a.inst - b.inst || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    /* v13.3 (A5): duplicate object names (SU0203's two FAN_HIDE entries)
+     * bind like the engine — prefix + NEAREST xz + already-bound skip
+     * (fog_poc.c:7838-7860); a single anim entry keeps ALL matching
+     * meshes (fanArray's 16 instances ride one entry).                  */
+    const perName = {};
+    rec.sh1xAnims.forEach(a => { perName[a.object] = (perName[a.object] || 0) + 1; });
     rec.sh1xBind = rec.sh1xAnims.map(a => {
-      const list = meshes.filter(m => {
+      const cand = meshes.filter(m => {
         const n = m.name.replace(/_m\d+$/, '');
         return n === a.object || n.startsWith(a.object + '#');
       });
-      return { a, list };
+      let list = cand;
+      if (perName[a.object] > 1 && a.pos && isFinite(+a.pos[0]) && isFinite(+a.pos[2])) {
+        /* the extras pos is ENGINE-space -> glTF (x, -y, -z)          */
+        const gx = +a.pos[0], gz = -(+a.pos[2]);
+        const avail = cand.filter(m => !m._taken);
+        avail.sort((p, q) =>
+          ((p.wp.x - gx) ** 2 + (p.wp.z - gz) ** 2) -
+          ((q.wp.x - gx) ** 2 + (q.wp.z - gz) ** 2));
+        list = avail.length ? [avail[0]] : [];
+        if (list.length) list[0]._taken = true;
+      }
+      return { a, list: list.map(m => m.o) };
     });
   }
   const on = state.sh1xAnimPreview !== false;
@@ -7132,11 +7171,21 @@ function applySh1xPropAnims(t) {
       for (const m of list) m.rotation.set(0, 0, 0);
       continue;
     }
+    /* v13.3 (A3): the engine's glTF-space matrix = S·Ry(vy)·Rx(vx)·Rz(vz)·S
+     * with S=diag(1,-1,-1) = Ry(-vy)·Rx(vx)·Rz(-vz) (fog_poc.c:8211-8219,
+     * the verbatim Math_RotMatrixZxyNeg port + the S-conjugation) — so
+     * three Euler order 'YXZ' with NEGATED y/z angles matches the engine
+     * exactly (x preserved). The v13.2 raw-angle write mirrored every
+     * y/z-axis spin (SU0203's z-axis fans span backwards).          */
     if (drv === 'fanArray') {
-      const split = a.fanSplit != null ? a.fanSplit : 7;
+      /* v13.3 (A2): the ripper emits 'spinSplit' (ipd2gltf.py:894) —
+       * the v13.2 read of the nonexistent 'fanSplit' key was a dead
+       * override (always the fallback 7).                             */
+      const split = a.spinSplit != null ? a.spinSplit : 7;
       const yFrom = a.rotY180From != null ? a.rotY180From : 7;
       list.forEach((m, i) => {
         const ang = (i < split ? -90 : 90) * t;
+        m.rotation.order = 'YXZ';
         m.rotation.set(ang * D2R, (i >= yFrom) ? Math.PI : 0, 0);
       });
     } else {
@@ -7148,8 +7197,11 @@ function applySh1xPropAnims(t) {
         ? a.rot0[axis === 'x' ? 0 : axis === 'y' ? 1 : 2] : 0;
       const rot = base + rate * t;
       const r = { x: 0, y: 0, z: 0 };
-      r[axis] = rot * D2R;
-      for (const m of list) m.rotation.set(r.x, r.y, r.z);
+      r[axis] = (axis === 'x' ? rot : -rot) * D2R;   /* S-conjugation */
+      for (const m of list) {
+        m.rotation.order = 'YXZ';
+        m.rotation.set(r.x, r.y, r.z);
+      }
     }
   }
 }

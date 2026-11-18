@@ -1,9 +1,12 @@
 name: poc-ci
 on:
   push:
-    branches: [main]    # v32.2: was the corrupted glob 'ain]' (a plain
-                         # YAML scalar that never matches) — same fix as
-                         # the wallpaper repo's android.yml
+    branches: [main]    # v32.3 comment CORRECTION: the earlier claim that
+                         # this was 'the corrupted glob ain]' was WRONG —
+                         # base64-verified history shows the file on GitHub
+                         # was always [main] (the 'ain]' rendering was a
+                         # terminal display artifact that ate the '[m'
+                         # sequence). Kept explicit, no functional change.
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -12,6 +15,16 @@ permissions:
   contents: write   # the bump job commits version.txt + pushes the version
                     # tag; the build jobs publish zips as RELEASE ASSETS
                     # (free, unlike workflow artifacts)
+
+# v32.3 (audit B1): serialize same-ref pushes — two pushes inside ~2 min
+# both bumped version.txt at their OWN pushed SHA and collided on the
+# same vX.Y tag (the second's git push failed -> its build ran (if:
+# always()) but released NOTHING). The queue re-checks out main after
+# the first bump landed and bumps the NEXT minor. cancel-in-progress is
+# FALSE on purpose: cancelling would eat releases.
+concurrency:
+  group: poc-ci-${{ github.ref }}
+  cancel-in-progress: false
 
 # ---- v32.2 (S19): one release per push to main --------------------------
 # The user-facing bug this fixes: releases only happened on MANUAL tag
@@ -68,7 +81,7 @@ jobs:
         id: rel
         run: |
           if [ "${{ needs.bump.outputs.did }}" = "1" ]; then
-            echo "tag=${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
@@ -161,10 +174,10 @@ jobs:
         if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          # bump-driven push releases under the FRESH version tag; a
-          # manual tag push releases under THE PUSHED TAG (never a
-          # mismatched version.properties overwrite).
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
+          # rel.tag is ALWAYS v-prefixed (v32.2 for bump pushes, the
+          # pushed tag name for manual tags) — the zip names match the
+          # classic tag-path naming exactly (sh1x-poc-vX.Y-*).
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.rel.outputs.tag }}
           generate_release_notes: true
           files: |
             dist/sh1x-poc-${{ steps.rel.outputs.tag }}-linux.zip
@@ -183,7 +196,7 @@ jobs:
         id: rel
         run: |
           if [ "${{ needs.bump.outputs.did }}" = "1" ]; then
-            echo "tag=${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${{ needs.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
@@ -213,7 +226,7 @@ jobs:
         if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.rel.outputs.tag }}
           generate_release_notes: true
           files: dist/sh1x-poc-${{ steps.rel.outputs.tag }}-win.zip
 
@@ -227,6 +240,6 @@ jobs:
         if: needs.bump.outputs.did == '1' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.rel.outputs.tag) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.rel.outputs.tag }}
           generate_release_notes: true
           files: ${{ env.TARBALL }}

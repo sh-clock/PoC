@@ -10088,7 +10088,10 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                     if (!vis) continue;
                     fx_blit_water_quad(fb, sxq, syq, tile,
                                        8 * mj, 8 * mi, 8 * mj + 7, 8 * mi + 7,
-                                       brt, brt, 0, 1);  /* mesh: tpage 43 = ADD */
+                                       brt, 0, 0, 1);  /* mesh: tpage 43 = ADD;
+                                       prim color (field_160, 0, 0) r-only —
+                                       map5_s00.c:223-224 (v32.3 audit fix:
+                                       g channel was brt) */
                 }
             }
             /* the 12 ripple sprites (func_800CB25C:96-164): quad at
