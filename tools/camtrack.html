@@ -3606,6 +3606,11 @@ window.SHUI = (function () {
     phaseFlash: false,     /* the shadowed flashlight state              */
     phaseApplied: -1,      /* last applied phase preset (re-resolve guard) */
     lensFlare: 0,
+    /* v13.2 (aim 5): models[].env.animsDemo — the cutscene/event-gated
+     * SH1X drivers (carousel, elevators, stone, bin, belt, door swing,
+     * waterfall, fence) play when true. The PoC engine parses it
+     * (v32.2); the wallpaper's demo scenes set it per camdat.          */
+    animsDemo: false,
     /* TEMPORARY "Effects Off" view override (env mode 0) — SESSION-ONLY.
        Never serialized: lives exclusively in this module's runtime state,
        is not read by docToJSON/sanitizeEnv (the export whitelist cannot
@@ -3891,6 +3896,10 @@ window.SHUI = (function () {
       <span>Ordered dither</span><span class="sub">PSX dither matrix</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-snow" checked>
       <span>Snow / rain</span><span class="sub">engine particles</span></label>
+    <label class="tgl-row"><input type="checkbox" id="tgl-sh1xanims" checked>
+      <span>SH1X prop anims</span><span class="sub">spin-family preview</span></label>
+    <label class="tgl-row"><input type="checkbox" id="tgl-animsdemo">
+      <span>Cutscene anims</span><span class="sub">env animsDemo (export)</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-engine" checked>
       <span>Engine effects</span><span class="sub">master (--nofog look off)</span></label>
   </div>
@@ -4058,6 +4067,17 @@ window.SHUI = (function () {
     });
     host.querySelector('#tgl-snow').addEventListener('change', e => {
       SV.setParticles(e.target.checked); syncModel();
+    });
+    host.querySelector('#tgl-sh1xanims').addEventListener('change', e => {
+      /* v13.2: the PREVIEW tick of the SH1X prop anims (spin family +
+       * fanArray); independent of the env's animsDemo export field.
+       * state/applySh1xPropAnims live in the MAIN script block — cross-block
+       * via window.__camtrack (this SHUI IIFE cannot see its top-level
+       * consts; same discipline as every other bridge here).          */
+      if (window.__camtrack) window.__camtrack.setSh1xAnimPreview(e.target.checked);
+    });
+    host.querySelector('#tgl-animsdemo').addEventListener('change', e => {
+      U.animsDemo = e.target.checked; syncModel();
     });
     host.querySelector('#tgl-engine').addEventListener('change', e => {
       SV.setEnabled(e.target.checked); syncModel();
@@ -4229,6 +4249,9 @@ window.SHUI = (function () {
         host.querySelector('#tgl-psx').checked = SV.V.psxWobble;
         host.querySelector('#tgl-dither').checked = SV.V.dither;
         host.querySelector('#tgl-snow').checked = SV.V.particlesOn;
+        host.querySelector('#tgl-sh1xanims').checked =
+          !!(window.__camtrack && window.__camtrack.sh1xAnimPreview);
+        host.querySelector('#tgl-animsdemo').checked = !!U.animsDemo;
         host.querySelector('#tgl-engine').checked = SV.V.enabled;
       }
     }
@@ -4478,7 +4501,8 @@ window.SHUI = (function () {
       psxWobble: V.psxWobble,
       dither: V.dither,
       particles: V.particlesOn,
-      engine: V.enabled
+      engine: V.enabled,
+      animsDemo: !!U.animsDemo
     };
     /* the legacy per-model flags (kept for the v12 C++ consumer): derived
        from the live engine state — the new panel SUPERSEDES them as the
@@ -4692,6 +4716,7 @@ window.SHUI = (function () {
     if (typeof e.dither === 'boolean') SV.setDither(e.dither);
     if (typeof e.particles === 'boolean') SV.setParticles(e.particles);
     if (typeof e.engine === 'boolean') SV.setEnabled(e.engine);
+    if (typeof e.animsDemo === 'boolean') U.animsDemo = e.animsDemo;
     syncEnvUI();
     syncWeatherUI();
     const host = document.querySelector('#world-panel');
@@ -4756,7 +4781,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine, animsDemo (v13.2: the cutscene/event-gated SH1X drivers play — the PoC v32.2 engine parses it; the wallpaper demo scenes set it per camdat) }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
@@ -5583,6 +5608,7 @@ function sanitizeEnv(raw) {
   if (typeof raw.dither === 'boolean') e.dither = raw.dither;
   if (typeof raw.particles === 'boolean') e.particles = raw.particles;
   if (typeof raw.engine === 'boolean') e.engine = raw.engine;
+  if (typeof raw.animsDemo === 'boolean') e.animsDemo = raw.animsDemo;
   return Object.keys(e).length ? e : null;
 }
 function num(v, def) { const n = +v; return isFinite(n) ? n : def; }
@@ -6211,7 +6237,11 @@ async function loadModelFiles(files) {
   $('#model-note').innerHTML = 'loading <b>' + esc(name) + '</b>&hellip;';
   try {
     let gltf;
-    if (glb) gltf = await loader.parseAsync(await glb.arrayBuffer(), '');
+    if (glb) {
+      const ab = await glb.arrayBuffer();
+      gltf = await loader.parseAsync(ab, '');
+      gltf._sh1x = glbSceneSh1xExtras(ab);
+    }
     else gltf = await loader.parseAsync(await main.text(), '');
     registerModel(name, gltf);
   } catch (e) {
@@ -6231,17 +6261,25 @@ async function loadModelBase64(name, b64) {
   $('#model-note').innerHTML = 'loading <b>' + esc(name) + '</b>&hellip;';
   const loader = new GLTFLoaderC();
   const gltf = await loader.parseAsync(buf.buffer, '');
+  gltf._sh1x = glbSceneSh1xExtras(buf.buffer);
   registerModel(name, gltf);
 }
 
 function registerModel(name, gltf) {
   const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
   if (!root) { toast('That file has no scene', 'err'); return; }
+  /* v13.2 (aim 5, the 4th component): the scene-level SH1X extras
+   * (propAnims) — extracted from the GLB JSON chunk DIRECTLY (the
+   * buffer is in scope at both load sites; no reliance on what
+   * GLTFLoader copies to userData), with a userData fallback. The
+   * preview tick (applySh1xPropAnims) consumes it per frame.        */
+  const sh1x = gltf._sh1x || (root.userData && root.userData.SH1X) || null;
+  const propAnims = sh1x && Array.isArray(sh1x.propAnims) ? sh1x.propAnims : null;
   const bb = new THREE.Box3().setFromObject(root);
   if (bb.isEmpty()) bb.set(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
   const box = { min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] };
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
-  three.loaded.set(name, { scene: root, box, diag });
+  three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims });
 
   let entry = state.doc.models.find(m => m.file === name);
   if (!entry) {
@@ -7037,6 +7075,84 @@ function render() {
     overlays.forEach((o, i) => { o.visible = overlayVis[i]; });
   }
 }
+/* v13.2 (aim 5): the SH1X scene-extras extraction + the prop-anim
+ * PREVIEW tick. The extraction reads the GLB JSON chunk directly
+ * (glbSceneSh1xExtras) so it works regardless of what GLTFLoader copies
+ * onto userData. The tick animates the spin family (spinRng/spinConst)
+ * + fanArray as a DETERMINISTIC FUNCTION of preview time t (scrub-safe:
+ * no accumulated state — seeks, pauses and wraps are exact):
+ *   spinConst:  rot(axis) = rot0 + rate*t          (engine case 0)
+ *   spinRng:    rot(axis) = rot0 + rngBase*t        (engine case 0 — the
+ *               per-frame Rng jitter is engine-only; the preview shows
+ *               the base rate — documented approximation)
+ *   fanArray:   ang_i = (i < fanSplit ? -90 : +90)*t deg/s, y=180 for
+ *               i >= rotY180From                            (engine case 1
+ *               — map4_s02.c:140-155 VERBATIM constants)
+ * The swing/choreo/water/TV families stay at their authored pose in the
+ * EDITOR preview — the full verbatim set plays in the engine players
+ * (the PoC, the wallpaper app, any SH1X consumer of the extras). The
+ * preview is an authoring aid, not the reference renderer.            */
+function glbSceneSh1xExtras(buf) {
+  try {
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== 0x46546C67) return null;   /* 'glTF' */
+    const jlen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jlen)));
+    const sc = json.scenes && json.scenes[0] && json.scenes[0].extras &&
+               json.scenes[0].extras.SH1X;
+    return sc || null;
+  } catch (e) { return null; }
+}
+function applySh1xPropAnims(t) {
+  const rec = three.loaded.get(state.activeFile);
+  if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) return;
+  if (!rec.sh1xBind) {
+    /* bind once: mesh name minus the _mN instance suffix, prefix-matched
+     * per anim object (the engine's own bind rule); instances in name
+     * order (the ripper emits FAN0_HID, FAN0_HID#1.. each with one _m0
+     * child mesh whose local space is the pivot — rotating the mesh
+     * node IS the engine's rotation apply).                           */
+    const meshes = [];
+    rec.scene.traverse(o => { if (o.isMesh) meshes.push(o); });
+    meshes.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    rec.sh1xBind = rec.sh1xAnims.map(a => {
+      const list = meshes.filter(m => {
+        const n = m.name.replace(/_m\d+$/, '');
+        return n === a.object || n.startsWith(a.object + '#');
+      });
+      return { a, list };
+    });
+  }
+  const on = state.sh1xAnimPreview !== false;
+  const D2R = Math.PI / 180;
+  for (const { a, list } of rec.sh1xBind) {
+    if (!list.length) continue;
+    const drv = a.driver;
+    if (!on || (drv !== 'spinRng' && drv !== 'spinConst' && drv !== 'fanArray')) {
+      for (const m of list) m.rotation.set(0, 0, 0);
+      continue;
+    }
+    if (drv === 'fanArray') {
+      const split = a.fanSplit != null ? a.fanSplit : 7;
+      const yFrom = a.rotY180From != null ? a.rotY180From : 7;
+      list.forEach((m, i) => {
+        const ang = (i < split ? -90 : 90) * t;
+        m.rotation.set(ang * D2R, (i >= yFrom) ? Math.PI : 0, 0);
+      });
+    } else {
+      const rate = drv === 'spinRng'
+        ? (a.rngBase != null ? a.rngBase : (a.rate || 0))
+        : (a.rate || 0);
+      const axis = a.axis === 'y' ? 'y' : a.axis === 'z' ? 'z' : 'x';
+      const base = (a.rot0 && isFinite(a.rot0[axis === 'x' ? 0 : axis === 'y' ? 1 : 2]))
+        ? a.rot0[axis === 'x' ? 0 : axis === 'y' ? 1 : 2] : 0;
+      const rot = base + rate * t;
+      const r = { x: 0, y: 0, z: 0 };
+      r[axis] = rot * D2R;
+      for (const m of list) m.rotation.set(r.x, r.y, r.z);
+    }
+  }
+}
 function startRenderLoop() {
   let uiAcc = 0;
   /* v12: the per-track weather watcher — whenever the EFFECTIVE track
@@ -7062,6 +7178,7 @@ function startRenderLoop() {
     tickFly(dt);
     controls.update();
     tickPlayback(dt);
+    applySh1xPropAnims(state.t);   /* v13.2: the SH1X spin-family preview */
     const tr = playTarget() || selTrack();
     if (tr && tr.id !== lastWeatherTrackId) {
       const fxOff = !!(window.SHUI && window.SHUI.effectsOff);
@@ -8069,6 +8186,14 @@ window.__camtrack = {
   get selection() { return state.selection; },
   get playing() { return state.playing; },
   get time() { return state.t; },
+  /* v13.2 (aim 5): the SH1X prop-anim preview tick control (the SHUI
+   * panel's checkbox bridges here — its IIFE cannot see this block's
+   * top-level bindings)                                          */
+  get sh1xAnimPreview() { return state.sh1xAnimPreview !== false; },
+  setSh1xAnimPreview(on) {
+    state.sh1xAnimPreview = !!on;
+    applySh1xPropAnims(state.t);
+  },
   addTrack, selectTrack,
   get turnInfo() {
     return {
