@@ -434,6 +434,155 @@ _OVERLAY_TO_TAG = {
 # parameters. Coordinates are ENGINE Q12 meters (y-down); consumers apply
 # the standard axis map (x,-y,-z). NOTE: no windmills exist in SH1
 # (verified zero decomp hits — the user's example is aspirational).
+# ---- v36: the TV screen paint tables (func_800D88C8, map4_s03) --------
+# Decoded VERBATIM from VIN/MAP4_S03.BIN (the compiled map overlay, load
+# base g_OvlDynamic = 0x800C9578, main.c:26): D_800DB7D4 @0x1225C,
+# D_800DB7E4[3][3] @0x1226C, D_800DB874[16] @0x122FC (16 entries x 10
+# bytes, ending exactly at D_800DB914 = 0x800DB874+0xA0), plus the static
+# D_800DB91C init (clutX=448). The anchor (Q12(160),Q12(0),Q12(40)) and
+# the flicker 188/164/(pad&0xB) are func_800D7718 literals
+# (map4_s03.c:535-548). Corner pairs are RAW Q8 offsets from the anchor;
+# the cross-wiring (c1=(B.x,A.y,B.z), c2=(A.x,B.y,A.z)) is
+# func_800D761C (map4_s03.c:492-501), applied by the CONSUMERS.
+_TV_PAINT_SCREENS = [
+    {"big": 0, "cA": [1009, -565, 3018], "cB": [782, -394, 3018]},
+    {"big": 0, "cA": [754, -565, 3018], "cB": [526, -394, 3018]},
+    {"big": 0, "cA": [498, -565, 3018], "cB": [269, -394, 3018]},
+    {"big": 0, "cA": [1009, -373, 3018], "cB": [782, -202, 3018]},
+    {"big": 0, "cA": [754, -373, 3018], "cB": [526, -202, 3018]},
+    {"big": 0, "cA": [498, -373, 3018], "cB": [269, -202, 3018]},
+    {"big": 0, "cA": [1009, -181, 3018], "cB": [782, -10, 3018]},
+    {"big": 0, "cA": [754, -181, 3018], "cB": [526, -10, 3018]},
+    {"big": 0, "cA": [498, -181, 3018], "cB": [269, -10, 3018]},
+    {"big": 1, "cA": [1847, -728, 3423], "cB": [1440, -295, 3016]},
+]
+_TV_PAINT_STYLES = [
+    {"tp": 0x1D, "clut": 0x05C, "u0":   8, "v0": 212, "du":   1, "dv":  1, "ru":  0, "rv":  0},
+    {"tp": 0x1D, "clut": 0x01C, "u0":   0, "v0":   0, "du":  40, "dv": 55, "ru": 68, "rv": 60},
+    {"tp": 0x1D, "clut": 0x05C, "u0":   0, "v0": 128, "du": 124, "dv": 62, "ru":  4, "rv":  1},
+    {"tp": 0x1D, "clut": 0x05C, "u0":   0, "v0": 192, "du": 124, "dv": 62, "ru":  2, "rv":  0},
+    {"tp": 0x1D, "clut": 0x01C, "u0": 128, "v0": 128, "du":  96, "dv": 56, "ru": 32, "rv":  8},
+    {"tp": 0x0C, "clut": 0x15C, "u0": 128, "v0":   0, "du": 120, "dv": 62, "ru":  2, "rv":  0},
+    {"tp": 0x0C, "clut": 0x19C, "u0": 128, "v0": 128, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x0C, "clut": 0x19C, "u0": 128, "v0": 192, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x0D, "clut": 0x19C, "u0":   0, "v0":   0, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x0D, "clut": 0x19C, "u0":   0, "v0":  64, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x0D, "clut": 0x19C, "u0":   0, "v0": 128, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x0D, "clut": 0x19C, "u0":   0, "v0": 192, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x1C, "clut": 0x29C, "u0":   0, "v0": 128, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x1C, "clut": 0x29C, "u0":   0, "v0": 192, "du": 122, "dv": 62, "ru":  6, "rv":  0},
+    {"tp": 0x1C, "clut": 0x2DC, "u0": 128, "v0": 128, "du": 125, "dv": 62, "ru":  3, "rv":  0},
+    {"tp": 0x1C, "clut": 0x29C, "u0": 128, "v0": 192, "du": 122, "dv": 62, "ru":  6, "rv":  0},
+]
+
+
+def _tv_paint_extras(room, resolver=None, report=None):
+    """The SH1X.tvPaint block for the tvNoise rooms (the MAP4_S03 overlay's
+    area tag). The palette STRIP reconstructs the paint's 256-entry CLUT
+    bank rows 0..11 (VRAM x 448..703, the SwanStation Palette8Bit readout):
+      x 448..463  = the TV TIMs' own CLUT rows (TV1 0..2, TV2 5..6,
+                    TV3 10..11; rows 3,4,7,8,9 = fresh-boot stale = 0)
+      x 464..511  = the tpage-7 region (the paper-map marking atlas only
+                    loads there AFTER the map screen; fresh-boot stale=0)
+      x 512..703  = the room's streamed fullPage texture slots 0..2
+                    (tpages 8/9/10, Texture_Init map.c:152-167) — filled
+                    from THIS room's first three PLM texture TIMs' pixel
+                    rows 0..11 (the engine's runtime LRU stream content
+                    VARIES per active chunk; the approximation is fixed
+                    and documented here).
+    Everything else (the corner tables, the style table, the flicker
+    constants) is verbatim data. Returns None when the room's overlay
+    has no tvNoise entry."""
+    pa = _room_prop_anims(room.name)
+    if not any(e.get("driver") == "tvNoise" for e in pa):
+        return None
+    # ---- the strip: TV clut rows + the room TIM rows (RAW 8bpp parse —
+    # TimFile is 4bpp-only, so the TV/SPU effect TIMs are read directly) --
+    def _tim8_parts(raw):
+        """(clut_rows [[u16]], pixel_rows [[u16 x img_w]], img_w, img_h) for
+        an 8bpp CLUT TIM, or None on any structural mismatch."""
+        if len(raw) < 20 or raw[0] != 0x10:
+            return None
+        flags = u32(raw, 4)
+        if not (flags & 8) or ((flags >> 3) & 3) != 1:   # need 8bpp CLUT TIM
+            return None
+        clen = u32(raw, 8)
+        cw, ch = u16(raw, 16), u16(raw, 18)
+        clut = raw[20:20 + (clen - 12)]   # data = clen-12 after the 12-byte block hdr
+        io = 8 + clen
+        iw, ih = u16(raw, io + 8), u16(raw, io + 10)
+        pix = raw[io + 12:io + 12 + iw * 2 * ih]
+        if len(clut) < cw * 2 * ch or len(pix) < iw * 2 * ih:
+            return None
+        rows = [list(struct.unpack_from(f"<{cw}H", clut, r * cw * 2))
+                for r in range(ch)]
+        prows = [list(struct.unpack_from(f"<{iw}H", pix, y * iw * 2))
+                 for y in range(ih)]
+        return rows, prows, iw, ih
+
+    def _resolve_bytes(name):
+        if resolver is None:
+            return None
+        try:
+            entry, _rec = resolver.resolve(name, room.name)
+        except Exception:
+            return None
+        if entry is None:
+            return None
+        try:
+            return entry.read_bytes()
+        except Exception:
+            return None
+
+    strip = [[0] * 256 for _ in range(12)]
+    tv_rows = {0: ("TV1.TIM", 0), 1: ("TV1.TIM", 1), 2: ("TV1.TIM", 2),
+               5: ("TV2.TIM", 0), 6: ("TV2.TIM", 1),
+               10: ("TV3.TIM", 0), 11: ("TV3.TIM", 1)}
+    for r, (name, row) in tv_rows.items():
+        parts = _tim8_parts(_resolve_bytes(name))
+        if parts is None:
+            if report is not None:
+                report.setdefault("problems", []).append(
+                    f"{room.name}: tvPaint palette strip: {name} not "
+                    f"resolved/8bpp (its CLUT row emitted as 0)")
+            continue
+        clut_rows, _prows, _w, _h = parts
+        for c in range(16):
+            strip[r][c] = clut_rows[row][c] & 0xFFFF
+    # the room's first three TIMs (the PLM texture-table order = the
+    # engine's material binding order): pixel rows 0..11 (the 8bpp sheets'
+    # rows are img_w halfwords each)
+    if room.plm is not None:
+        for si, tname in enumerate(room.plm.tex_names[:3]):
+            parts = _tim8_parts(_resolve_bytes(tname))
+            if parts is None:
+                if report is not None:
+                    report.setdefault("problems", []).append(
+                        f"{room.name}: tvPaint palette strip: room TIM "
+                        f"{tname} not resolved/8bpp (its slot emitted as 0)")
+                continue
+            _cl, prows, iw, ih = parts
+            base = 48 + si * 64            # strip x 512 + si*64
+            for r in range(min(12, len(prows))):
+                hw = prows[r]
+                for c in range(min(64, len(hw), 256 - base)):
+                    strip[r][base + c] = hw[c] & 0xFFFF
+    return {
+        "anchor": [160.0, 0.0, 40.0],
+        "anchorSrc": "func_800D7718:535 Vw_WorldScreenMatrixAtPositionGet"
+                     "(Q12(160), Q12(0), Q12(40))",
+        "screens": [dict(s) for s in _TV_PAINT_SCREENS],
+        "styles": [dict(s) for s in _TV_PAINT_STYLES],
+        "flickBright": 188, "flickDim": 164, "flickMask": 11,
+        "paletteStrip": strip,
+        "src": "map4_s03.c:1252-1409 (func_800D88C8) + the VIN/"
+               "MAP4_S03.BIN tables (D_800DB7D4/D_800DB7E4/D_800DB874, "
+               "overlay base 0x800C9578) + Fs_QueuePostLoadTim "
+               "(fs_queue.c:643-682, clutX=448 static D_800DB91C) + "
+               "swanstation gpu_sw_backend.cpp ShadePixel (Palette8Bit)",
+    }
+
+
 _PROP_ANIMS = {
     # ---- map0_s00: Balkan wheelchair (map0_s00_2.c:1215-1220 init,
     # 1259-1286 update — the verbatim RNG spin with |1| doubled add) ----
@@ -927,14 +1076,20 @@ _PROP_ANIMS = {
          "src": "map4_s02.c:53, 108-165 (add+decrement loop), 197-205 (sfx)"},
     ],
     "MAP4_S03": [
-        {"object": "REF_NEAR", "pos": "table:D_800DB7D4/D_800DB7E4",
+        {"object": "REF_NEAR", "pos": [164.0, 0.0, 52.0],
          "rot0": [0, 0, 0], "driver": "tvNoise",
+         "cutsceneOnly": True,
          "lcgA": 0x7169AC35, "lcgXorA": 0xA547B39E,
          "lcgB": 0x892D719C, "lcgXorB": 0xC65A4B97,
          "durationShift": 5, "durationBase": 0x555,
          "tim": ["TV1.TIM", "TV2.TIM", "TV3.TIM"],
          "chunkGate": ["3|4", 1], "eventGate": 324,
-         "src": "map4_s03.c:405-464, 527-595, 696-828, 1252-1409"},
+         "src": "map4_s03.c:405-464, 527-595, 696-828, 1252-1409; the "
+                "REF_NEAR WorldObject pose = D_800DB7C8 (Q12(164),Q12(0),"
+                "Q12(52)) decoded from VIN/MAP4_S03.BIN; cutsceneOnly: the "
+                "WorldObjects_Add at func_800D7718:551 fires only when "
+                "D_800E0698.field_0 != 0 (engine-fresh master 0 = not "
+                "drawn; --anims-demo seeds master 3)"},
         {"object": "FENCE_HI", "pos": [130.5, 0.0, -93.0],
          "rot0": [0, 0, 0], "driver": "fallOnce",
          "rotLimit": 90.0, "vyMax": 15.0,
@@ -1025,9 +1180,14 @@ _PROP_ANIMS = {
     # is per the WorldObjects_Add(&g_WorldObject0[var_a0_2]) index at
     # :3641 (var_a0_2 = 1 for i<6, 0 for i>=6).
     "MAP6_S04": [
-        {"object": "UMA2_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
-         "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
+        {"object": "UMA2_HID", "driver": "sineBob",
          "count": 6, "instRange": [0, 5],
+         "posPerInst": [[24.0, 0.0, 105.2], [26.5, 0.0, 99.15],
+                        [22.5, 0.0, 93.95], [16.0, 0.0, 94.8],
+                        [13.5, 0.0, 100.85], [17.5, 0.0, 106.05]],
+         "rot0PerInst": [[0, 37.529296875, 0], [0, 157.5, 0],
+                         [0, 277.470703125, 0], [0, 15.029296875, 0],
+                         [0, 195.029296875, 0], [0, 0.0, 0]],
          "phaseFormula": "Math_Sin((D_800ED5B6*4) + (Q12(1.0f)*i)/3) — "
                  "map6_s04_2.c:3628 (the i<6 branch; var_a0_2=1 -> "
                  "g_WorldObject0[1] = UMA2_HID, :3430/:3641)",
@@ -1036,13 +1196,18 @@ _PROP_ANIMS = {
          "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
                      "Cybil, map6_s04_2.c:2611) - BOTH terms add each tick "
                      "(3549-3550), then &0xFFF",
-         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
+         "data": "posPerInst/rot0PerInst = D_800EBAAC/EBAD4/EBAFC[0..5] "
+                 "decoded VERBATIM from VIN/MAP6_S04.BIN (overlay base "
+                 "0x800C9578; the offsets + the base (20,0,100) "
+                 "Q12, map6_s04_2.c:3617-3618/3420-3422)",
          "gate": "!Get(443) || Get(467) — the whole carousel/horse "
                 "block runs while the compound holds (map6_s04_2.c:3549)",
          "src": "map6_s04_2.c:3430, 3619-3648, 3553-3554, 3549"},
-        {"object": "UMA1_HID", "pos": "table:D_800EBAAC/EBAD4+base(20,0,100)",
-         "rot0": "table:D_800EBAFC[i]", "driver": "sineBob",
+        {"object": "UMA1_HID", "driver": "sineBob",
          "count": 4, "instRange": [6, 9],
+         "posPerInst": [[20.8, 0.0, 103.05], [23.0, 0.0, 99.2],
+                        [19.2, 0.0, 96.95], [17.0, 0.0, 100.8]],
+         "rot0PerInst": [[0, 0.0, 0], [0, 0.0, 0], [0, 0.0, 0], [0, 0.0, 0]],
          "phaseFormula": "Math_Sin((D_800ED5B6*4) + (Q12(1.0f)*i)/2 + "
                  "Q12(0.5f)) — map6_s04_2.c:3634-3635 (the i>=6 branch; "
                  "var_a0_2=0 -> g_WorldObject0[0] = UMA1_HID, :3429/:3641)",
@@ -1051,7 +1216,10 @@ _PROP_ANIMS = {
          "speedSrc": "D_800EBA30 (0) + D_800ED5B4 (0; -0x7A=-122 after "
                      "Cybil, map6_s04_2.c:2611) - BOTH terms add each tick "
                      "(3549-3550), then &0xFFF",
-         "data": "tables D_800EBAAC/EBAD4/EBAFC NOT in decomp repo (map6_s04.h:196-198) — positions/rot0 are binary .data; only the phase formulas are decompiled",
+         "data": "posPerInst/rot0PerInst = D_800EBAAC/EBAD4/EBAFC[6..9] "
+                 "decoded VERBATIM from VIN/MAP6_S04.BIN (overlay base "
+                 "0x800C9578; the offsets + the base (20,0,100) "
+                 "Q12, map6_s04_2.c:3617-3618/3420-3422)",
          "gate": "!Get(443) || Get(467) — the whole carousel/horse "
                 "block runs while the compound holds (map6_s04_2.c:3549)",
          "src": "map6_s04_2.c:3429, 3619-3648, 3553-3554, 3549"},
@@ -5234,6 +5402,10 @@ def build_sh1x(room, resolver, report, known_rooms=None):
     pa = _room_prop_anims(room.name)
     if pa:
         sh1x["propAnims"] = pa
+    # v36: the TV screen paint tables (the tvNoise rooms — MAP4_S03's area)
+    tvp = _tv_paint_extras(room, resolver, report)
+    if tvp is not None:
+        sh1x["tvPaint"] = tvp
     # userLight defaults: the engine's flashlight attribs (Game_Flashlight
     # AttribsSet effects.c:210-218) — consumers may override everything;
     # the PoC's standing directive (light rides the CAMERA) is the default
