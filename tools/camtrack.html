@@ -3606,11 +3606,12 @@ window.SHUI = (function () {
     phaseFlash: false,     /* the shadowed flashlight state              */
     phaseApplied: -1,      /* last applied phase preset (re-resolve guard) */
     lensFlare: 0,
-    /* v13.2 (aim 5): models[].env.animsDemo — the cutscene/event-gated
-     * SH1X drivers (carousel, elevators, stone, bin, belt, door swing,
-     * waterfall, fence) play when true. The PoC engine parses it
-     * (v32.2); the wallpaper's demo scenes set it per camdat.          */
-    animsDemo: false,
+    /* v13.2 (aim 5): models[].env.animsDemo — RETIRED (v13.4/T2): the v34
+     * engines IGNORE the field (the GLB EXTRAS are authoritative — the
+     * editor preview and the players play every SH1X driver regardless);
+     * the import parse still TOLERATES it on old camdats (read-only —
+     * sanitizeEnv keeps it, the export no longer writes it). The old
+     * runtime field, panel checkbox and serialization are removed.        */
     /* TEMPORARY "Effects Off" view override (env mode 0) — SESSION-ONLY.
        Never serialized: lives exclusively in this module's runtime state,
        is not read by docToJSON/sanitizeEnv (the export whitelist cannot
@@ -3899,9 +3900,7 @@ window.SHUI = (function () {
     <label class="tgl-row"><input type="checkbox" id="tgl-snow" checked>
       <span>Snow / rain</span><span class="sub">engine particles</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-sh1xanims" checked>
-      <span>SH1X prop anims</span><span class="sub">spin-family preview</span></label>
-    <label class="tgl-row"><input type="checkbox" id="tgl-animsdemo">
-      <span>Cutscene anims</span><span class="sub">env animsDemo (export)</span></label>
+      <span>SH1X prop anims</span><span class="sub">all drivers · v34 port</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-engine" checked>
       <span>Engine effects</span><span class="sub">master (--nofog look off)</span></label>
   </div>
@@ -4071,15 +4070,13 @@ window.SHUI = (function () {
       SV.setParticles(e.target.checked); syncModel();
     });
     host.querySelector('#tgl-sh1xanims').addEventListener('change', e => {
-      /* v13.2: the PREVIEW tick of the SH1X prop anims (spin family +
-       * fanArray); independent of the env's animsDemo export field.
+      /* v13.2/v13.4: the PREVIEW tick of the SH1X prop anims — the FULL
+       * driver set (the v34 port; the old env animsDemo export field is
+       * retired — the engines ignore it and play the GLB EXTRAS).
        * state/applySh1xPropAnims live in the MAIN script block — cross-block
        * via window.__camtrack (this SHUI IIFE cannot see its top-level
        * consts; same discipline as every other bridge here).          */
       if (window.__camtrack) window.__camtrack.setSh1xAnimPreview(e.target.checked);
-    });
-    host.querySelector('#tgl-animsdemo').addEventListener('change', e => {
-      U.animsDemo = e.target.checked; syncModel();
     });
     host.querySelector('#tgl-engine').addEventListener('change', e => {
       SV.setEnabled(e.target.checked); syncModel();
@@ -4253,7 +4250,6 @@ window.SHUI = (function () {
         host.querySelector('#tgl-snow').checked = SV.V.particlesOn;
         host.querySelector('#tgl-sh1xanims').checked =
           !!(window.__camtrack && window.__camtrack.sh1xAnimPreview);
-        host.querySelector('#tgl-animsdemo').checked = !!U.animsDemo;
         host.querySelector('#tgl-engine').checked = SV.V.enabled;
       }
     }
@@ -4503,8 +4499,7 @@ window.SHUI = (function () {
       psxWobble: V.psxWobble,
       dither: V.dither,
       particles: V.particlesOn,
-      engine: V.enabled,
-      animsDemo: !!U.animsDemo
+      engine: V.enabled
     };
     /* the legacy per-model flags (kept for the v12 C++ consumer): derived
        from the live engine state — the new panel SUPERSEDES them as the
@@ -4718,12 +4713,10 @@ window.SHUI = (function () {
     if (typeof e.dither === 'boolean') SV.setDither(e.dither);
     if (typeof e.particles === 'boolean') SV.setParticles(e.particles);
     if (typeof e.engine === 'boolean') SV.setEnabled(e.engine);
-    if (typeof e.animsDemo === 'boolean') U.animsDemo = e.animsDemo;
     syncEnvUI();
     syncWeatherUI();
     const host = document.querySelector('#world-panel');
     if (host) {
-      host.querySelector('#tgl-animsdemo').checked = !!U.animsDemo;
       host.querySelector('#boot-weather').value = String(U.bootWeather);
       host.querySelector('#lensflare-sel').value = String(U.lensFlare);
       host.querySelector('#tgl-psx').checked = SV.V.psxWobble;
@@ -4784,7 +4777,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine, animsDemo (v13.2: the cutscene/event-gated SH1X drivers play — the PoC v32.2 engine parses it; the wallpaper demo scenes set it per camdat) }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
@@ -5944,6 +5937,7 @@ async function initThree() {
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
   sun.position.set(0.6, 1.0, 0.4);
   scene.add(sun);
+  sh1xSunLight = sun;   /* v13.4 (T2): the lightFlicker preview multiplier applies here */
 
   try {
     const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
@@ -6282,7 +6276,7 @@ function registerModel(name, gltf) {
   if (bb.isEmpty()) bb.set(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
   const box = { min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] };
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
-  three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims });
+  three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims, sh1xHeader: (sh1x && sh1x.header) || null });
   /* v33 (S20): surface the room's ORIGINAL environment (SH1X.env — the
    * v33 GLBs carry it; the PoC/wallpaper boot it by default when the
    * exported camdat leaves the World & Weather pair unselected). */
@@ -7098,23 +7092,11 @@ function render() {
     overlays.forEach((o, i) => { o.visible = overlayVis[i]; });
   }
 }
-/* v13.2 (aim 5): the SH1X scene-extras extraction + the prop-anim
- * PREVIEW tick. The extraction reads the GLB JSON chunk directly
- * (glbSceneSh1xExtras) so it works regardless of what GLTFLoader copies
- * onto userData. The tick animates the spin family (spinRng/spinConst)
- * + fanArray as a DETERMINISTIC FUNCTION of preview time t (scrub-safe:
- * no accumulated state — seeks, pauses and wraps are exact):
- *   spinConst:  rot(axis) = rot0 + rate*t          (engine case 0)
- *   spinRng:    rot(axis) = rot0 + rngBase*t        (engine case 0 — the
- *               per-frame Rng jitter is engine-only; the preview shows
- *               the base rate — documented approximation)
- *   fanArray:   ang_i = (i < fanSplit ? -90 : +90)*t deg/s, y=180 for
- *               i >= rotY180From                            (engine case 1
- *               — map4_s02.c:140-155 VERBATIM constants)
- * The swing/choreo/water/TV families stay at their authored pose in the
- * EDITOR preview — the full verbatim set plays in the engine players
- * (the PoC, the wallpaper app, any SH1X consumer of the extras). The
- * preview is an authoring aid, not the reference renderer.            */
+/* v13.2 (aim 5) / v13.4 (T2): the SH1X scene-extras extraction (reads the
+ * GLB JSON chunk directly so it works regardless of what GLTFLoader copies
+ * onto userData) + the prop-anim PREVIEW of the FULL driver set (every
+ * SH1X family — the VERBATIM fog_poc v34 port in the SH1X-DRIVERS block
+ * below; the spin/fan approximation of v13.2 is retired).            */
 function glbSceneSh1xExtras(buf) {
   try {
     const dv = new DataView(buf);
@@ -7126,107 +7108,1477 @@ function glbSceneSh1xExtras(buf) {
     return sc || null;
   } catch (e) { return null; }
 }
-function applySh1xPropAnims(t) {
-  const rec = three.loaded.get(state.activeFile);
-  if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) return;
-  if (!rec.sh1xBind) {
-    /* bind once (v13.3 audit fixes A1/A2/A5):
-     * - the instance index = the node extras' animInst (the ripper's
-     *   authoritative emission index, consumed by the engine at
-     *   fog_poc.c:2085/:7894) — with parent/mesh userData fallbacks,
-     *   then the '#N' name suffix. The v13.2 lexicographic sort misbound
-     *   12/16 fans on SPU0100 (#10 sorts before #2).
-     * - duplicate object names (SU0203's two FAN_HIDE entries) bind by
-     *   NEAREST xz world distance like the engine (fog_poc.c:7838-7860:
-     *   prefix + nearest + already-bound skip), not last-write-wins.
-     * - meshes' local space is the pivot (authored no rotation — the
-     *   ripper's emission contract), so rotating the mesh node IS the
-     *   engine's rotation apply.                                    */
-    const meshes = [];
-    rec.scene.updateMatrixWorld(true);
-    rec.scene.traverse(o => {
-      if (!o.isMesh) return;
-      let inst = null;
-      const ud = o.userData || {};
-      const pud = (o.parent && o.parent.userData) || {};
-      if (ud.animInst != null) inst = +ud.animInst;
-      else if (pud.animInst != null) inst = +pud.animInst;
-      else if (o.name.indexOf('#') >= 0) {
-        const mN = o.name.match(/#(\d+)(?![^_]*_m)/);
-        if (mN) inst = +mN[1];
-      }
-      const wp = o.getWorldPosition(new THREE.Vector3());
-      meshes.push({ o, inst: inst == null ? 0 : inst, wp, name: o.name });
-    });
-    meshes.sort((a, b) => a.inst - b.inst || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    /* v13.3 (A5): duplicate object names (SU0203's two FAN_HIDE entries)
-     * bind like the engine — prefix + NEAREST xz + already-bound skip
-     * (fog_poc.c:7838-7860); a single anim entry keeps ALL matching
-     * meshes (fanArray's 16 instances ride one entry).                  */
-    const perName = {};
-    rec.sh1xAnims.forEach(a => { perName[a.object] = (perName[a.object] || 0) + 1; });
-    rec.sh1xBind = rec.sh1xAnims.map(a => {
-      const cand = meshes.filter(m => {
-        const n = m.name.replace(/_m\d+$/, '');
-        return n === a.object || n.startsWith(a.object + '#');
-      });
-      let list = cand;
-      if (perName[a.object] > 1 && a.pos && isFinite(+a.pos[0]) && isFinite(+a.pos[2])) {
-        /* the extras pos is ENGINE-space -> glTF (x, -y, -z)          */
-        const gx = +a.pos[0], gz = -(+a.pos[2]);
-        const avail = cand.filter(m => !m._taken);
-        avail.sort((p, q) =>
-          ((p.wp.x - gx) ** 2 + (p.wp.z - gz) ** 2) -
-          ((q.wp.x - gx) ** 2 + (q.wp.z - gz) ** 2));
-        list = avail.length ? [avail[0]] : [];
-        if (list.length) list[0]._taken = true;
-      }
-      return { a, list: list.map(m => m.o) };
-    });
+/* ==== SH1X-DRIVERS-BEGIN ==== */
+/* T2 (v13.4): the FULL SH1X prop-anim driver set — a VERBATIM port of the
+ * PoC engine's anim system (fog_poc.c v34: sh1x_anims_tick / sh1x_anim_pose
+ * / sh1x_anim_apply / sh1x_anims_bind / anim_gate_on / sh1x_load's
+ * propAnims parse / sh_rng_next / the tvNoise state machine), UI-independent
+ * so the SAME block is exercised by the Node tick-match harness
+ * (scripts/t2_camtrack_drivers_test.mjs) and by the editor preview.
+ *
+ * Units & discipline (engine-exact):
+ *  - raw Q12 angle ints, 4096 = 360deg = 1.0 (families 1/4/5/8/13/14/15/17);
+ *  - raw Q12 meters for the movement drivers;
+ *  - the state-machine families step once per 1/30s (the 30Hz game frame);
+ *  - one shared per-scene RNG (seed 1, Rand16 = >>> 17) — the driver draw
+ *    ORDER per tick (anim index order, gated anims skipped) is part of the
+ *    contract: the whole state is a deterministic function of the tick
+ *    count, which makes the editor preview scrub-safe (reset + re-run).
+ *
+ * JS-type caveats (each documented at its site):
+ *  - C int64 products >> shift become Math.floor(a*b/2^sh): JS numbers
+ *    multiply integer products < 2^53 EXACTLY, and floor = the arithmetic
+ *    (int64) shift for every magnitude this driver set can reach;
+ *  - JS `>>`/`<<`/`&`/`|` are 32-bit signed exactly like C int on gcc;
+ *  - the u32 LCG state uses Math.imul + >>> 0 (plain * loses precision at
+ *    2^32);
+ *  - C int division truncates toward zero: TRUNC sites use Math.trunc,
+ *    floor sites (arithmetic shifts) use Math.floor — each call site is
+ *    labeled with its C semantics;
+ *  - the C float32 accumulators (spin cur[], mvTimer, stone cur[]) are
+ *    kept as JS doubles: the ±1-count wobble vs the engine's f32 rounding
+ *    is bounded far below the Q12/Q10/Q8 quantizer steps and the
+ *    [animstate]/APPLY tolerance (verified in the tick-match harness).
+ */
+
+/* The engine's VERBATIM sine LUT (g_SineTable, 5120 s16 Q3.12 entries —
+ * src/sh_sine_table.h, extracted from libkmath.s). Base64 = the exact
+ * little-endian s16 bytes; Math_Sin(a)=T[a&0xFFF], Math_Cos(a)=T[(a&0xFFF)+0x400]. */
+const SH1X_SINE_B64 = 'AAAGAA0AEwAZAB8AJgAsADIAOQA/AEUASwBSAFgAXgBlAGsAcQB3AH4AhACKAJAAlwCdAKMAqgCwALYAvADDAMkAzwDWANwA4gDoAO8A9QD7AAEBCAEOARQBGwEhAScBLQE0AToBQAFGAU0BUwFZAV8BZgFsAXIBeAF/AYUBiwGRAZgBngGkAaoBsQG3Ab0BwwHKAdAB1gHcAeMB6QHvAfUB/AECAggCDgIVAhsCIQInAi0CNAI6AkACRgJNAlMCWQJfAmUCbAJyAngCfgKEAosCkQKXAp0CowKqArACtgK8AsICyQLPAtUC2wLhAugC7gL0AvoCAAMGAw0DEwMZAx8DJQMrAzIDOAM+A0QDSgNQA1YDXQNjA2kDbwN1A3sDgQOIA44DlAOaA6ADpgOsA7IDuQO/A8UDywPRA9cD3QPjA+kD7wP2A/wDAgQIBA4EFAQaBCAEJgQsBDIEOAQ+BEQESwRRBFcEXQRjBGkEbwR1BHsEgQSHBI0EkwSZBJ8EpQSrBLEEtwS9BMMEyQTPBNUE2wThBOcE7QTzBPkE/wQFBQsFEQUXBR0FIwUpBS8FNAU6BUAFRgVMBVIFWAVeBWQFagVwBXYFfAWBBYcFjQWTBZkFnwWlBasFsQW2BbwFwgXIBc4F1AXaBd8F5QXrBfEF9wX9BQIGCAYOBhQGGgYfBiUGKwYxBjcGPAZCBkgGTgZUBlkGXwZlBmsGcAZ2BnwGggaHBo0GkwaZBp4GpAaqBq8GtQa7BsEGxgbMBtIG1wbdBuMG6AbuBvQG+Qb/BgUHCgcQBxUHGwchByYHLAcyBzcHPQdCB0gHTgdTB1kHXgdkB2oHbwd1B3oHgAeFB4sHkAeWB5sHoQemB6wHsge3B70HwgfIB80H0gfYB90H4wfoB+4H8wf5B/4HBAgJCA4IFAgZCB8IJAgqCC8INAg6CD8IRQhKCE8IVQhaCF8IZQhqCG8IdQh6CH8IhQiKCI8IlQiaCJ8IpQiqCK8ItAi6CL8IxAjJCM8I1AjZCN4I5AjpCO4I8wj4CP4IAwkICQ0JEgkYCR0JIgknCSwJMQk3CTwJQQlGCUsJUAlVCVoJXwllCWoJbwl0CXkJfgmDCYgJjQmSCZcJnAmhCaYJqwmwCbUJugm/CcQJyQnOCdMJ2AndCeIJ5wnsCfEJ9gn7Cf8JBAoJCg4KEwoYCh0KIgomCisKMAo1CjoKPwpECkgKTQpSClcKXApgCmUKagpvCnMKeAp9CoIKhgqLCpAKlQqZCp4KowqnCqwKsQq1CroKvwrDCsgKzQrRCtYK2wrfCuQK6ArtCvIK9gr7Cv8KBAsICw0LEQsWCxsLHwskCygLLQsxCzYLOgs+C0MLRwtMC1ALVQtZC14LYgtmC2sLbwt0C3gLfAuBC4ULiQuOC5ILlwubC58LowuoC6wLsAu1C7kLvQvBC8YLygvOC9IL1wvbC98L4wvoC+wL8Av0C/gL/AsBDAUMCQwNDBEMFQwZDB4MIgwmDCoMLgwyDDYMOgw+DEIMRgxKDE4MUgxWDFoMXgxiDGYMagxuDHIMdgx6DH4MggyGDIoMjgyRDJUMmQydDKEMpQypDKwMsAy0DLgMvAzADMMMxwzLDM8M0gzWDNoM3gzhDOUM6QztDPAM9Az4DPsM/wwDDQYNCg0ODRENFQ0YDRwNIA0jDScNKg0uDTINNQ05DTwNQA1DDUcNSg1ODVENVQ1YDVwNXw1iDWYNaQ1tDXANdA13DXoNfg2BDYUNiA2LDY8Nkg2VDZkNnA2fDaINpg2pDawNsA2zDbYNuQ28DcANww3GDckNzA3QDdMN1g3ZDdwN3w3jDeYN6Q3sDe8N8g31DfgN+w3+DQEOBA4HDgoODQ4QDhMOFg4ZDhwOHw4iDiUOKA4rDi4OMQ40DjcOOg48Dj8OQg5FDkgOSw5NDlAOUw5WDlkOWw5eDmEOZA5mDmkObA5vDnEOdA53DnkOfA5/DoEOhA6HDokOjA6PDpEOlA6WDpkOmw6eDqEOow6mDqgOqw6tDrAOsg61DrcOug68Dr8OwQ7DDsYOyA7LDs0Ozw7SDtQO1g7ZDtsO3Q7gDuIO5A7nDukO6w7uDvAO8g70DvcO+Q77Dv0O/w4CDwQPBg8IDwoPDA8ODxEPEw8VDxcPGQ8bDx0PHw8hDyMPJQ8nDykPKw8tDy8PMQ8zDzUPNw85DzsPPQ8/D0EPQw9FD0YPSA9KD0wPTg9QD1EPUw9VD1cPWQ9aD1wPXg9gD2EPYw9lD2cPaA9qD2wPbQ9vD3EPcg90D3YPdw95D3oPfA99D38PgQ+CD4QPhQ+HD4gPig+LD40Pjg+QD5EPkw+UD5UPlw+YD5oPmw+cD54Pnw+hD6IPow+lD6YPpw+oD6oPqw+sD64Prw+wD7EPsw+0D7UPtg+3D7gPug+7D7wPvQ++D78PwA/CD8MPxA/FD8YPxw/ID8kPyg/LD8wPzQ/OD88P0A/RD9IP0w/UD9UP1Q/WD9cP2A/ZD9oP2w/cD9wP3Q/eD98P4A/gD+EP4g/jD+MP5A/lD+YP5g/nD+gP6A/pD+oP6g/rD+wP7A/tD+0P7g/vD+8P8A/wD/EP8Q/yD/IP8w/zD/QP9A/1D/UP9g/2D/cP9w/4D/gP+A/5D/kP+Q/6D/oP+g/7D/sP+w/8D/wP/A/8D/0P/Q/9D/0P/g/+D/4P/g/+D/8P/w//D/8P/w//D/8PABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQ/w//D/8P/w//D/8P/w/+D/4P/g/+D/4P/Q/9D/0P/Q/8D/wP/A/8D/sP+w/7D/oP+g/6D/kP+Q/5D/gP+A/4D/cP9w/2D/YP9Q/1D/QP9A/zD/MP8g/yD/EP8Q/wD/AP7w/vD+4P7Q/tD+wP7A/rD+oP6g/pD+gP6A/nD+YP5g/lD+QP4w/jD+IP4Q/gD+AP3w/eD90P3A/cD9sP2g/ZD9gP1w/WD9UP1Q/UD9MP0g/RD9APzw/OD80PzA/LD8oPyQ/ID8cPxg/FD8QPww/CD8APvw++D70PvA+7D7oPuA+3D7YPtQ+0D7MPsQ+wD68Prg+sD6sPqg+oD6cPpg+lD6MPog+hD58Png+cD5sPmg+YD5cPlQ+UD5MPkQ+QD44PjQ+LD4oPiA+HD4UPhA+CD4EPfw99D3wPeg95D3cPdg90D3IPcQ9vD20PbA9qD2gPZw9lD2MPYQ9gD14PXA9aD1kPVw9VD1MPUQ9QD04PTA9KD0gPRg9FD0MPQQ8/Dz0POw85DzcPNQ8zDzEPLw8tDysPKQ8nDyUPIw8hDx8PHQ8bDxkPFw8VDxMPEQ8ODwwPCg8IDwYPBA8CD/8O/Q77DvkO9w70DvIO8A7uDusO6Q7nDuQO4g7gDt0O2w7ZDtYO1A7SDs8OzQ7LDsgOxg7DDsEOvw68DroOtw61DrIOsA6tDqsOqA6mDqMOoQ6eDpsOmQ6WDpQOkQ6PDowOiQ6HDoQOgQ5/DnwOeQ53DnQOcQ5vDmwOaQ5mDmQOYQ5eDlsOWQ5WDlMOUA5NDksOSA5FDkIOPw48DjoONw40DjEOLg4rDigOJQ4iDh8OHA4ZDhYOEw4QDg0OCg4HDgQOAQ7+DfsN+A31DfIN7w3sDekN5g3jDd8N3A3ZDdYN0w3QDcwNyQ3GDcMNwA28DbkNtg2zDbANrA2pDaYNog2fDZwNmQ2VDZINjw2LDYgNhQ2BDX4Neg13DXQNcA1tDWkNZg1iDV8NXA1YDVUNUQ1ODUoNRw1DDUANPA05DTUNMg0uDSoNJw0jDSANHA0YDRUNEQ0ODQoNBg0DDf8M+wz4DPQM8AztDOkM5QzhDN4M2gzWDNIMzwzLDMcMwwzADLwMuAy0DLAMrAypDKUMoQydDJkMlQyRDI4MigyGDIIMfgx6DHYMcgxuDGoMZgxiDF4MWgxWDFIMTgxKDEYMQgw+DDoMNgwyDC4MKgwmDCIMHgwZDBUMEQwNDAkMBQwBDPwL+Av0C/AL7AvoC+ML3wvbC9cL0gvOC8oLxgvBC70LuQu1C7ALrAuoC6MLnwubC5cLkguOC4kLhQuBC3wLeAt0C28LawtmC2ILXgtZC1ULUAtMC0cLQws+CzoLNgsxCy0LKAskCx8LGwsWCxELDQsICwQL/wr7CvYK8grtCugK5ArfCtsK1grRCs0KyArDCr8Kugq1CrEKrAqnCqMKngqZCpUKkAqLCoYKggp9CngKcwpvCmoKZQpgClwKVwpSCk0KSApECj8KOgo1CjAKKwomCiIKHQoYChMKDgoJCgQK/wn7CfYJ8QnsCecJ4gndCdgJ0wnOCckJxAm/CboJtQmwCasJpgmhCZwJlwmSCY0JiAmDCX4JeQl0CW8JagllCV8JWglVCVAJSwlGCUEJPAk3CTEJLAknCSIJHQkYCRIJDQkICQMJ/gj4CPMI7gjpCOQI3gjZCNQIzwjJCMQIvwi6CLQIrwiqCKUInwiaCJUIjwiKCIUIfwh6CHUIbwhqCGUIXwhaCFUITwhKCEUIPwg6CDQILwgqCCQIHwgZCBQIDggJCAQI/gf5B/MH7gfoB+MH3QfYB9IHzQfIB8IHvQe3B7IHrAemB6EHmweWB5AHiweFB4AHegd1B28HagdkB14HWQdTB04HSAdCBz0HNwcyBywHJgchBxsHFQcQBwoHBQf/BvkG9AbuBugG4wbdBtcG0gbMBsYGwQa7BrUGrwaqBqQGngaZBpMGjQaHBoIGfAZ2BnAGawZlBl8GWQZUBk4GSAZCBjwGNwYxBisGJQYfBhoGFAYOBggGAgb9BfcF8QXrBeUF3wXaBdQFzgXIBcIFvAW2BbEFqwWlBZ8FmQWTBY0FhwWBBXwFdgVwBWoFZAVeBVgFUgVMBUYFQAU6BTQFLwUpBSMFHQUXBREFCwUFBf8E+QTzBO0E5wThBNsE1QTPBMkEwwS9BLcEsQSrBKUEnwSZBJMEjQSHBIEEewR1BG8EaQRjBF0EVwRRBEsERAQ+BDgEMgQsBCYEIAQaBBQEDgQIBAIE/AP2A+8D6QPjA90D1wPRA8sDxQO/A7kDsgOsA6YDoAOaA5QDjgOIA4EDewN1A28DaQNjA10DVgNQA0oDRAM+AzgDMgMrAyUDHwMZAxMDDQMGAwAD+gL0Au4C6ALhAtsC1QLPAskCwgK8ArYCsAKqAqMCnQKXApECiwKEAn4CeAJyAmwCZQJfAlkCUwJNAkYCQAI6AjQCLQInAiECGwIVAg4CCAICAvwB9QHvAekB4wHcAdYB0AHKAcMBvQG3AbEBqgGkAZ4BmAGRAYsBhQF/AXgBcgFsAWYBXwFZAVMBTQFGAUABOgE0AS0BJwEhARsBFAEOAQgBAQH7APUA7wDoAOIA3ADWAM8AyQDDALwAtgCwAKoAowCdAJcAkACKAIQAfgB3AHEAawBlAF4AWABSAEsARQA/ADkAMgAsACYAHwAZABMADQAGAAAA+v/z/+3/5//h/9r/1P/O/8f/wf+7/7X/rv+o/6L/m/+V/4//if+C/3z/dv9w/2n/Y/9d/1b/UP9K/0T/Pf83/zH/Kv8k/x7/GP8R/wv/Bf///vj+8v7s/uX+3/7Z/tP+zP7G/sD+uv6z/q3+p/6h/pr+lP6O/oj+gf57/nX+b/5o/mL+XP5W/k/+Sf5D/j3+Nv4w/ir+JP4d/hf+Ef4L/gT+/v34/fL96/3l/d/92f3T/cz9xv3A/br9s/2t/af9of2b/ZT9jv2I/YL9fP11/W/9af1j/V39Vv1Q/Ur9RP0+/Tf9Mf0r/SX9H/0Y/RL9DP0G/QD9+vzz/O385/zh/Nv81fzO/Mj8wvy8/Lb8sPyq/KP8nfyX/JH8i/yF/H/8ePxy/Gz8Zvxg/Fr8VPxO/Ef8Qfw7/DX8L/wp/CP8HfwX/BH8CvwE/P77+Pvy++z75vvg+9r71PvO+8j7wvu8+7X7r/up+6P7nfuX+5H7i/uF+3/7eftz+237Z/th+1v7VftP+0n7Q/s9+zf7Mfsr+yX7H/sZ+xP7DfsH+wH7+/r1+u/66frj+t361/rR+sz6xvrA+rr6tPqu+qj6ovqc+pb6kPqK+oT6f/p5+nP6bfpn+mH6W/pV+k/6SvpE+j76OPoy+iz6Jvoh+hv6FfoP+gn6A/r++fj58vns+eb54fnb+dX5z/nJ+cT5vvm4+bL5rPmn+aH5m/mV+ZD5ivmE+X75eflz+W35Z/li+Vz5VvlR+Uv5Rfk/+Tr5NPku+Sn5I/kd+Rj5EvkM+Qf5Afn7+Pb48Pjr+OX43/ja+NT4zvjJ+MP4vvi4+LL4rfin+KL4nPiW+JH4i/iG+ID4e/h1+HD4avhl+F/4WvhU+E74SfhD+D74OPgz+C74KPgj+B34GPgS+A34B/gC+Pz39/fy9+z35/fh99z31vfR98z3xvfB97v3tvex96v3pveh95v3lveR94v3hveB93v3dvdx92v3Zvdh91v3VvdR90z3RvdB9zz3N/cx9yz3J/ci9xz3F/cS9w33CPcC9/32+Pbz9u726Pbj9t722fbU9s/2yfbE9r/2uva19rD2q/am9qH2m/aW9pH2jPaH9oL2ffZ49nP2bvZp9mT2X/Za9lX2UPZL9kb2QfY89jf2MvYt9ij2I/Ye9hn2FPYP9gr2BfYB9vz19/Xy9e316PXj9d712vXV9dD1y/XG9cH1vPW49bP1rvWp9aT1oPWb9Zb1kfWN9Yj1g/V+9Xr1dfVw9Wv1Z/Vi9V31WfVU9U/1S/VG9UH1PfU49TP1L/Uq9SX1IfUc9Rj1E/UO9Qr1BfUB9fz0+PTz9O/06vTl9OH03PTY9NP0z/TK9Mb0wvS99Ln0tPSw9Kv0p/Si9J70mvSV9JH0jPSI9IT0f/R79Hf0cvRu9Gn0ZfRh9F30WPRU9FD0S/RH9EP0P/Q69Db0MvQu9Cn0JfQh9B30GPQU9BD0DPQI9AT0//P78/fz8/Pv8+vz5/Pi897z2vPW89LzzvPK88bzwvO+87rztvOy867zqvOm86LznvOa85bzkvOO84rzhvOC837zevN283Lzb/Nr82fzY/Nf81vzV/NU81DzTPNI80TzQPM98znzNfMx8y7zKvMm8yLzH/Mb8xfzE/MQ8wzzCPMF8wHz/fL68vby8vLv8uvy6PLk8uDy3fLZ8tby0vLO8svyx/LE8sDyvfK58rbysvKv8qvyqPKk8qHynvKa8pfyk/KQ8ozyifKG8oLyf/J78njydfJx8m7ya/Jn8mTyYfJe8lryV/JU8lDyTfJK8kfyRPJA8j3yOvI38jTyMPIt8iryJ/Ik8iHyHfIa8hfyFPIR8g7yC/II8gXyAvL/8fzx+fH28fPx8PHt8erx5/Hk8eHx3vHb8djx1fHS8c/xzPHJ8cbxxPHB8b7xu/G48bXxs/Gw8a3xqvGn8aXxovGf8ZzxmvGX8ZTxkfGP8YzxifGH8YTxgfF/8XzxefF38XTxcfFv8WzxavFn8WXxYvFf8V3xWvFY8VXxU/FQ8U7xS/FJ8UbxRPFB8T/xPfE68TjxNfEz8THxLvEs8SrxJ/El8SPxIPEe8RzxGfEX8RXxEvEQ8Q7xDPEJ8QfxBfED8QHx/vD88Prw+PD28PTw8vDv8O3w6/Dp8Ofw5fDj8OHw3/Dd8Nvw2fDX8NXw0/DR8M/wzfDL8Mnwx/DF8MPwwfC/8L3wu/C68LjwtvC08LLwsPCv8K3wq/Cp8KfwpvCk8KLwoPCf8J3wm/CZ8JjwlvCU8JPwkfCP8I7wjPCK8Inwh/CG8ITwg/CB8H/wfvB88HvwefB48HbwdfBz8HLwcPBv8G3wbPBr8GnwaPBm8GXwZPBi8GHwX/Be8F3wW/Ba8FnwWPBW8FXwVPBS8FHwUPBP8E3wTPBL8ErwSfBI8EbwRfBE8EPwQvBB8EDwPvA98DzwO/A68DnwOPA38DbwNfA08DPwMvAx8DDwL/Au8C3wLPAr8CvwKvAp8CjwJ/Am8CXwJPAk8CPwIvAh8CDwIPAf8B7wHfAd8BzwG/Aa8BrwGfAY8BjwF/AW8BbwFfAU8BTwE/AT8BLwEfAR8BDwEPAP8A/wDvAO8A3wDfAM8AzwC/AL8ArwCvAJ8AnwCPAI8AjwB/AH8AfwBvAG8AbwBfAF8AXwBPAE8ATwBPAD8APwA/AD8ALwAvAC8ALwAvAB8AHwAfAB8AHwAfAB8ADwAPAA8ADwAPAA8ADwAPAA8ADwAPAA8ADwAPAA8ADwAPAA8ADwAPAA8AHwAfAB8AHwAfAB8AHwAvAC8ALwAvAC8APwA/AD8APwBPAE8ATwBPAF8AXwBfAG8AbwBvAH8AfwB/AI8AjwCPAJ8AnwCvAK8AvwC/AM8AzwDfAN8A7wDvAP8A/wEPAQ8BHwEfAS8BPwE/AU8BTwFfAW8BbwF/AY8BjwGfAa8BrwG/Ac8B3wHfAe8B/wIPAg8CHwIvAj8CTwJPAl8CbwJ/Ao8CnwKvAr8CvwLPAt8C7wL/Aw8DHwMvAz8DTwNfA28DfwOPA58DrwO/A88D3wPvBA8EHwQvBD8ETwRfBG8EjwSfBK8EvwTPBN8E/wUPBR8FLwVPBV8FbwWPBZ8FrwW/Bd8F7wX/Bh8GLwZPBl8GbwaPBp8GvwbPBt8G/wcPBy8HPwdfB28HjwefB78HzwfvB/8IHwg/CE8Ibwh/CJ8IrwjPCO8I/wkfCT8JTwlvCY8Jnwm/Cd8J/woPCi8KTwpvCn8Knwq/Ct8K/wsPCy8LTwtvC48Lrwu/C98L/wwfDD8MXwx/DJ8MvwzfDP8NHw0/DV8Nfw2fDb8N3w3/Dh8OPw5fDn8Onw6/Dt8O/w8vD08Pbw+PD68Pzw/vAB8QPxBfEH8QnxDPEO8RDxEvEV8RfxGfEc8R7xIPEj8SXxJ/Eq8SzxLvEx8TPxNfE48TrxPfE/8UHxRPFG8UnxS/FO8VDxU/FV8VjxWvFd8V/xYvFl8WfxavFs8W/xcfF08XfxefF88X/xgfGE8YfxifGM8Y/xkfGU8ZfxmvGc8Z/xovGl8afxqvGt8bDxs/G18bjxu/G+8cHxxPHG8cnxzPHP8dLx1fHY8dvx3vHh8eTx5/Hq8e3x8PHz8fbx+fH88f/xAvIF8gjyC/IO8hHyFPIX8hryHfIh8iTyJ/Iq8i3yMPI08jfyOvI98kDyRPJH8kryTfJQ8lTyV/Ja8l7yYfJk8mfya/Ju8nHydfJ48nvyf/KC8obyifKM8pDyk/KX8prynvKh8qTyqPKr8q/ysvK28rnyvfLA8sTyx/LL8s7y0vLW8tny3fLg8uTy6PLr8u/y8vL28vry/fIB8wXzCPMM8xDzE/MX8xvzH/Mi8ybzKvMu8zHzNfM58z3zQPNE80jzTPNQ81TzV/Nb81/zY/Nn82vzb/Ny83bzevN+84LzhvOK847zkvOW85rznvOi86bzqvOu87LztvO6877zwvPG88rzzvPS89bz2vPe8+Lz5/Pr8+/z8/P38/vz//ME9Aj0DPQQ9BT0GPQd9CH0JfQp9C70MvQ29Dr0P/RD9Ef0S/RQ9FT0WPRd9GH0ZfRp9G70cvR39Hv0f/SE9Ij0jPSR9JX0mvSe9KL0p/Sr9LD0tPS59L30wvTG9Mr0z/TT9Nj03PTh9OX06vTv9PP0+PT89AH1BfUK9Q71E/UY9Rz1IfUl9Sr1L/Uz9Tj1PfVB9Ub1S/VP9VT1WfVd9WL1Z/Vr9XD1dfV69X71g/WI9Y31kfWW9Zv1oPWk9an1rvWz9bj1vPXB9cb1y/XQ9dX12vXe9eP16PXt9fL19/X89QH2BfYK9g/2FPYZ9h72I/Yo9i32MvY39jz2QfZG9kv2UPZV9lr2X/Zk9mn2bvZz9nj2ffaC9of2jPaR9pb2m/ah9qb2q/aw9rX2uva/9sT2yfbP9tT22fbe9uP26Pbu9vP2+Pb99gL3CPcN9xL3F/cc9yL3J/cs9zH3N/c890H3RvdM91H3Vvdb92H3Zvdr93H3dvd794H3hveL95H3lveb96H3pver97H3tve798H3xvfM99H31vfc9+H35/fs9/L39/f89wL4B/gN+BL4GPgd+CP4KPgu+DP4OPg++EP4SfhO+FT4Wvhf+GX4avhw+HX4e/iA+Ib4i/iR+Jb4nPii+Kf4rfiy+Lj4vvjD+Mn4zvjU+Nr43/jl+Ov48Pj2+Pv4AfkH+Qz5EvkY+R35I/kp+S75NPk6+T/5RflL+VH5Vvlc+WL5Z/lt+XP5efl++YT5ivmQ+ZX5m/mh+af5rPmy+bj5vvnE+cn5z/nV+dv54fnm+ez58vn4+f75A/oJ+g/6Ffob+iH6Jvos+jL6OPo++kT6SvpP+lX6W/ph+mf6bfpz+nn6f/qE+or6kPqW+pz6ovqo+q76tPq6+sD6xvrM+tH61/rd+uP66frv+vX6+/oB+wf7DfsT+xn7H/sl+yv7Mfs3+z37Q/tJ+0/7Vftb+2H7Z/tt+3P7eft/+4X7i/uR+5f7nfuj+6n7r/u1+7z7wvvI+8771Pva++D75vvs+/L7+Pv++wT8CvwR/Bf8Hfwj/Cn8L/w1/Dv8QfxH/E78VPxa/GD8Zvxs/HL8ePx//IX8i/yR/Jf8nfyj/Kr8sPy2/Lz8wvzI/M781fzb/OH85/zt/PP8+vwA/Qb9DP0S/Rj9H/0l/Sv9Mf03/T79RP1K/VD9Vv1d/WP9af1v/XX9fP2C/Yj9jv2U/Zv9of2n/a39s/26/cD9xv3M/dP92f3f/eX96/3y/fj9/v0E/gv+Ef4X/h3+JP4q/jD+Nv49/kP+Sf5P/lb+XP5i/mj+b/51/nv+gf6I/o7+lP6a/qH+p/6t/rP+uv7A/sb+zP7T/tn+3/7l/uz+8v74/v/+Bf8L/xH/GP8e/yT/Kv8x/zf/Pf9E/0r/UP9W/13/Y/9p/3D/dv98/4L/if+P/5X/m/+i/6j/rv+1/7v/wf/H/87/1P/a/+H/5//t//P/+v8AAAYADQATABkAHwAmACwAMgA5AD8ARQBLAFIAWABeAGUAawBxAHcAfgCEAIoAkACXAJ0AowCqALAAtgC8AMMAyQDPANYA3ADiAOgA7wD1APsAAQEIAQ4BFAEbASEBJwEtATQBOgFAAUYBTQFTAVkBXwFmAWwBcgF4AX8BhQGLAZEBmAGeAaQBqgGxAbcBvQHDAcoB0AHWAdwB4wHpAe8B9QH8AQICCAIOAhUCGwIhAicCLQI0AjoCQAJGAk0CUwJZAl8CZQJsAnICeAJ+AoQCiwKRApcCnQKjAqoCsAK2ArwCwgLJAs8C1QLbAuEC6ALuAvQC+gIAAwYDDQMTAxkDHwMlAysDMgM4Az4DRANKA1ADVgNdA2MDaQNvA3UDewOBA4gDjgOUA5oDoAOmA6wDsgO5A78DxQPLA9ED1wPdA+MD6QPvA/YD/AMCBAgEDgQUBBoEIAQmBCwEMgQ4BD4ERARLBFEEVwRdBGMEaQRvBHUEewSBBIcEjQSTBJkEnwSlBKsEsQS3BL0EwwTJBM8E1QTbBOEE5wTtBPME+QT/BAUFCwURBRcFHQUjBSkFLwU0BToFQAVGBUwFUgVYBV4FZAVqBXAFdgV8BYEFhwWNBZMFmQWfBaUFqwWxBbYFvAXCBcgFzgXUBdoF3wXlBesF8QX3Bf0FAgYIBg4GFAYaBh8GJQYrBjEGNwY8BkIGSAZOBlQGWQZfBmUGawZwBnYGfAaCBocGjQaTBpkGngakBqoGrwa1BrsGwQbGBswG0gbXBt0G4wboBu4G9Ab5Bv8GBQcKBxAHFQcbByEHJgcsBzIHNwc9B0IHSAdOB1MHWQdeB2QHagdvB3UHegeAB4UHiweQB5YHmwehB6YHrAeyB7cHvQfCB8gHzQfSB9gH3QfjB+gH7gfzB/kH/gcECAkIDggUCBkIHwgkCCoILwg0CDoIPwhFCEoITwhVCFoIXwhlCGoIbwh1CHoIfwiFCIoIjwiVCJoInwilCKoIrwi0CLoIvwjECMkIzwjUCNkI3gjkCOkI7gjzCPgI/ggDCQgJDQkSCRgJHQkiCScJLAkxCTcJPAlBCUYJSwlQCVUJWglfCWUJaglvCXQJeQl+CYMJiAmNCZIJlwmcCaEJpgmrCbAJtQm6Cb8JxAnJCc4J0wnYCd0J4gnnCewJ8Qn2CfsJ/wkECgkKDgoTChgKHQoiCiYKKwowCjUKOgo/CkQKSApNClIKVwpcCmAKZQpqCm8Kcwp4Cn0KggqGCosKkAqVCpkKngqjCqcKrAqxCrUKugq/CsMKyArNCtEK1grbCt8K5AroCu0K8gr2CvsK/woECwgLDQsRCxYLGwsfCyQLKAstCzELNgs6Cz4LQwtHC0wLUAtVC1kLXgtiC2YLawtvC3QLeAt8C4ELhQuJC44LkguXC5sLnwujC6gLrAuwC7ULuQu9C8ELxgvKC84L0gvXC9sL3wvjC+gL7AvwC/QL+Av8CwEMBQwJDA0MEQwVDBkMHgwiDCYMKgwuDDIMNgw6DD4MQgxGDEoMTgxSDFYMWgxeDGIMZgxqDG4Mcgx2DHoMfgyCDIYMigyODJEMlQyZDJ0MoQylDKkMrAywDLQMuAy8DMAMwwzHDMsMzwzSDNYM2gzeDOEM5QzpDO0M8Az0DPgM+wz/DAMNBg0KDQ4NEQ0VDRgNHA0gDSMNJw0qDS4NMg01DTkNPA1ADUMNRw1KDU4NUQ1VDVgNXA1fDWINZg1pDW0NcA10DXcNeg1+DYENhQ2IDYsNjw2SDZUNmQ2cDZ8Nog2mDakNrA2wDbMNtg25DbwNwA3DDcYNyQ3MDdAN0w3WDdkN3A3fDeMN5g3pDewN7w3yDfUN+A37Df4NAQ4EDgcOCg4NDhAOEw4WDhkOHA4fDiIOJQ4oDisOLg4xDjQONw46DjwOPw5CDkUOSA5LDk0OUA5TDlYOWQ5bDl4OYQ5kDmYOaQ5sDm8OcQ50DncOeQ58Dn8OgQ6EDocOiQ6MDo8OkQ6UDpYOmQ6bDp4OoQ6jDqYOqA6rDq0OsA6yDrUOtw66DrwOvw7BDsMOxg7IDssOzQ7PDtIO1A7WDtkO2w7dDuAO4g7kDucO6Q7rDu4O8A7yDvQO9w75DvsO/Q7/DgIPBA8GDwgPCg8MDw4PEQ8TDxUPFw8ZDxsPHQ8fDyEPIw8lDycPKQ8rDy0PLw8xDzMPNQ83DzkPOw89Dz8PQQ9DD0UPRg9ID0oPTA9OD1APUQ9TD1UPVw9ZD1oPXA9eD2APYQ9jD2UPZw9oD2oPbA9tD28PcQ9yD3QPdg93D3kPeg98D30Pfw+BD4IPhA+FD4cPiA+KD4sPjQ+OD5APkQ+TD5QPlQ+XD5gPmg+bD5wPng+fD6EPog+jD6UPpg+nD6gPqg+rD6wPrg+vD7APsQ+zD7QPtQ+2D7cPuA+6D7sPvA+9D74Pvw/AD8IPww/ED8UPxg/HD8gPyQ/KD8sPzA/ND84Pzw/QD9EP0g/TD9QP1Q/VD9YP1w/YD9kP2g/bD9wP3A/dD94P3w/gD+AP4Q/iD+MP4w/kD+UP5g/mD+cP6A/oD+kP6g/qD+sP7A/sD+0P7Q/uD+8P7w/wD/AP8Q/xD/IP8g/zD/MP9A/0D/UP9Q/2D/YP9w/3D/gP+A/4D/kP+Q/5D/oP+g/6D/sP+w/7D/wP/A/8D/wP/Q/9D/0P/Q/+D/4P/g/+D/4P/w//D/8P/w//D/8P/w8AEAAQABAAEAAQABAAEAAQABAAEA==';
+let _sh1xSine = null;
+function sh1xSineTable() {
+  if (_sh1xSine) return _sh1xSine;
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const b64 = SH1X_SINE_B64;
+  const n = b64.length - (b64.endsWith('=') ? 1 : 0);
+  const out = new Uint8Array((n * 3) >> 2);
+  let acc = 0, bits = 0, w = 0;
+  for (let i = 0; i < b64.length; i++) {
+    const v = L.indexOf(b64[i]);
+    if (v < 0) continue;               /* '=' padding */
+    acc = (acc << 6) | v; bits += 6;
+    if (bits >= 8) { bits -= 8; out[w++] = (acc >> bits) & 0xFF; }
   }
-  const on = state.sh1xAnimPreview !== false;
-  const D2R = Math.PI / 180;
-  for (const { a, list } of rec.sh1xBind) {
-    if (!list.length) continue;
-    const drv = a.driver;
-    if (!on || (drv !== 'spinRng' && drv !== 'spinConst' && drv !== 'fanArray')) {
-      for (const m of list) m.rotation.set(0, 0, 0);
-      continue;
+  _sh1xSine = new Int16Array(out.buffer, 0, 5120);
+  return _sh1xSine;
+}
+/* fog_poc.c:1376/1383 — sh_sin_q12 / sh_cos_q12 (verbatim LUT lookups) */
+function sh1xSinQ12(angle) { return sh1xSineTable()[angle & 0xFFF]; }
+function sh1xCosQ12(angle) { return sh1xSineTable()[(angle & 0xFFF) + 0x400]; }
+
+/* fog_poc.c:7020 fx_q12_mul & friends generalized: (int64)(a*b) >> sh.
+ * JS numbers hold integer products < 2^53 exactly, so Math.floor(a*b/2^sh)
+ * is bit-identical to the int64 arithmetic shift for every product this
+ * driver set can form (max |a*b| ~ 2^26). */
+function sh1xMulSh(a, b, sh) { return Math.floor(a * b / (1 << sh)); }
+/* C int division trunc-toward-zero (the engine's idiom at the /5, /30,
+ * /14745, /temp_a0 sites) */
+function sh1xDivT(a, b) { return Math.trunc(a / b); }
+
+/* fog_poc.c:7899 sh_rng_next — the GLOBAL engine RNG (Rand16):
+ * seed = seed*1664525 + 1013904223 (u32 wrap); return seed >>> 17.
+ * Math.imul keeps the u32 product exact; >>> 0 stores the u32 seed. */
+function sh1xRngNext(S) {
+  S.rngSeed = (Math.imul(S.rngSeed, 1664525) + 1013904223) >>> 0;
+  return S.rngSeed >>> 17;
+}
+
+/* ---- tiny JSON accessors mirroring the engine's jint/jnum/jbool/jstr ---- */
+function sh1xJn(e, k, d) { const v = e ? e[k] : undefined; const n = +v; return (v !== undefined && isFinite(n)) ? n : d; }
+function sh1xJi(e, k, d) { const v = e ? e[k] : undefined; const n = +v; return (v !== undefined && isFinite(n)) ? Math.trunc(n) | 0 : d; }
+function sh1xJb(e, k, d) { const v = e ? e[k] : undefined; return (typeof v === 'boolean') ? v : d; }
+function sh1xJs(e, k, d) { const v = e ? e[k] : undefined; return (typeof v === 'string') ? v : d; }
+
+const SH1X_DRIVER_IDS = {
+  spin: 0, spinRng: 0, spinConst: 0, fanArray: 1, tvNoise: 2, translate: 3,
+  doorRattle: 4, dampedSwing: 5, kickSwing: 8, gravityScatter: 9,
+  stoneChoreo: 10, lightFlicker: 11, sineBob: 12, carouselSpin: 13,
+  ferrisWheel: 14, lissajousOrbit: 15, slideDoor: 16, rngWalk: 17,
+  fallOnce: 18, binSpin: 19, scrollBelt: 20, waterRipple: 21,
+  particles: 22, cutscene: 7
+};
+
+/* fog_poc.c:1565-1823 — the propAnims parse + live-state init, VERBATIM
+ * (defaults, driver mapping, manifest-level detection, the demo seeds).
+ * Returns the driver state S { anims, rngSeed, beltScroll, lightFlicker,
+ * animsDemo, chunkX, chunkZ }. animsDemo=true reproduces the engine's
+ * --anims-demo default (v33+: the editor PREVIEWS the cutscene state). */
+function sh1xDriverInit(propAnims, header, opts) {
+  const S = {
+    anims: [], rngSeed: 1,
+    beltScroll: 0,          /* v32 scrollBelt D_800F48A4 (raw Q12) */
+    lightFlicker: 1.0,      /* v27 lightFlicker live multiplier */
+    animsDemo: !!(opts && opts.animsDemo !== false),
+    chunkX: (header && isFinite(+header.chunkX)) ? Math.trunc(+header.chunkX) : 0,
+    chunkZ: (header && isFinite(+header.chunkZ)) ? Math.trunc(+header.chunkZ) : 0
+  };
+  const list = Array.isArray(propAnims) ? propAnims : [];
+  for (let k = 0; k < list.length && k < 64; k++) {
+    const e = list[k];
+    if (!e || typeof e !== 'object') continue;
+    const a = {
+      object: sh1xJs(e, 'object', ''), driver: -1,
+      pos: [0, 0, 0], rot0: [0, 0, 0],
+      rate: 0, rngBase: -180, rngMask: 0x1FF, hasRng: false,
+      /* fanArray */
+      bladeCount: 16, alternate: 0, fanAng: new Array(16).fill(0),
+      fanSplit: 7, rotY180From: 7, posPerInstN: 0, posPerInst: [],
+      /* tvNoise (catalog constants; the engine's own literals) */
+      lcgA: 0x7169AC35, lcgXorA: 0xA547B39E, lcgB: 0x892D719C, lcgXorB: 0xC65A4B97,
+      lcgS1: 0, lcgS2: 0, durationShift: 5, durationBase: 0x555,
+      tvChannel: 0, tvTimer: 0, tvSub: 0, tvDur: 0, tvSlot: 0, tvU: 0, tvV: 0,
+      tvPat: 0, tvPatT: 0, tvDone: 0,
+      /* gates */
+      chunkGate: [-9999, -9999], chunkGateAlt: [0, 0], hasChunkGate: 0,
+      manifestLevel: 0, eventGate: 0, eventGateAlt: 0, eventGatePol: 0,
+      cutsceneOnly: false, gated: 0,
+      axis: 2, cur: [0, 0, 0],
+      /* raw swing family (Q12 angle ints) */
+      rawVy: 0, rawVel: 0, rawVyFloor: 0, rawAngAccel: -113, rawAngVelFloor: -56,
+      rawKickVel: -128, rawOpenLimit: -1920, rawBounceHi: -1791,
+      rawSettle: -1790, rawRebound: 32, kickPhase: 0,
+      rattleD: 0, kick: 0, restAngle: 0, angVelMax: 0,
+      sharedLeader: -1, count: 1,
+      /* lightFlicker */
+      flT0: 0, flT1: 0, flPer0: 64, flPer1: 64, flAmp: 48,
+      flBase: 1.35, flAmpA: 0.9, flAmpB: 0.6, flRampThresh: 262144,
+      /* movement drivers */
+      mvMaster: 0, mvMaster2: 0, mvWrap: 0, mvWrapCount: 0,
+      mvPend: [0, 0, 0, 0], mvPendVel: [0, 0, 0, 0],
+      mvVel: 0, mvState: 0, mvTimer: 0,
+      /* rngWalk */
+      rwVy: 0, rwVelVy: 0, rwVz: 0, rwVelVz: 0, rwRotBase: 0x800,
+      rwVzBaseQ12: Math.trunc(19.7 * 4096), rwMask: 0x1F, rwBias: 0x20,
+      /* slideDoor / fallOnce / stoneChoreo / binSpin */
+      slideIdx: 0, slideVelRaw: 0, fallArmed: 0, fallTorque: 0, fallVel: 0,
+      stoneStep: 0, stoneData: 0, stoneVel: 0, binAng: 0,
+      /* waterRipple / waterfall (FX-only state) */
+      wrT: new Array(16).fill(0), wrSel: new Array(16).fill(0),
+      wrX: new Array(16).fill(0), wrZ: new Array(16).fill(0),
+      wfAlive: new Array(16).fill(0), wfX: new Array(16).fill(0),
+      wfY: new Array(16).fill(0), wfZ: new Array(16).fill(0),
+      wfVy: new Array(16).fill(0), wfEm: new Array(16).fill(0),
+      scatterAng: new Array(16).fill(0), scatterAmp: new Array(16).fill(0),
+      liveVy: new Array(16).fill(0), liveVz: new Array(16).fill(0),
+      seeded: 0, isCabin: 0
+    };
+    a.object = sh1xJs(e, 'object', '');
+    const drv = sh1xJs(e, 'driver', '');
+    a.driver = (drv in SH1X_DRIVER_IDS) ? SH1X_DRIVER_IDS[drv] : -1;
+    if (a.driver < 0) continue;              /* unknown driver: not played */
+    const p = Array.isArray(e.pos) && e.pos.length >= 3 ? e.pos : null;
+    if (p) { a.pos = [+p[0], +p[1], +p[2]]; }
+    a.manifestLevel = p ? 0 : 1;             /* non-numeric pos = overlay manifest */
+    const r0 = Array.isArray(e.rot0) && e.rot0.length >= 3 ? e.rot0 : null;
+    if (r0) { a.rot0 = [+r0[0], +r0[1], +r0[2]]; }
+    a.rate = sh1xJn(e, 'rate', sh1xJn(e, 'rngBase', 0.0));
+    a.rngBase = sh1xJn(e, 'rngBase', -180.0);
+    a.rngMask = sh1xJi(e, 'rngMask', 0x1FF);
+    /* v27.2 (B-2): the RNG form only when rngBase/rngMask are AUTHORED */
+    a.hasRng = (e.rngBase !== undefined) || (e.rngMask !== undefined);
+    a.rattleD = 0;
+    a.kick = sh1xJn(e, 'kick', 0.0);
+    a.restAngle = sh1xJn(e, 'rest', sh1xJn(e, 'restAngle', 0.0));
+    a.angVelMax = sh1xJn(e, 'angVelMax', 0.0);
+    a.rawVyFloor = sh1xJi(e, 'vyFloorRaw', 0);
+    a.rawAngAccel = sh1xJi(e, 'angAccelRaw', -113);
+    a.rawAngVelFloor = sh1xJi(e, 'angVelFloorRaw', -56);
+    a.rawKickVel = sh1xJi(e, 'kickVelRaw', -128);
+    a.rawOpenLimit = sh1xJi(e, 'openLimitRaw', -1920);
+    a.rawBounceHi = sh1xJi(e, 'bounceHiRaw', -1791);
+    a.rawSettle = sh1xJi(e, 'settleRaw', -1790);
+    a.rawRebound = sh1xJi(e, 'reboundVelRaw', 32);
+    a.kickPhase = 0;
+    a.sharedLeader = -1;
+    a.count = sh1xJi(e, 'count', sh1xJi(e, 'arms', sh1xJi(e, 'bladeCount', 1)));
+    /* lightFlicker verbatim init */
+    a.flBase = sh1xJn(e, 'base', 1.35);
+    a.flAmpA = sh1xJn(e, 'ampA', 0.9);
+    a.flAmpB = sh1xJn(e, 'ampB', 0.6);
+    a.flRampThresh = sh1xJi(e, 'rampThreshRaw', 262144);
+    a.flPer0 = sh1xJi(e, 'per0', 64);
+    a.flPer1 = sh1xJi(e, 'per1', 64);
+    a.flAmp = sh1xJi(e, 'amp', 48);
+    a.rotY180From = sh1xJi(e, 'rotY180From', 7);
+    a.fanSplit = sh1xJi(e, 'spinSplit', 7);
+    if (a.driver === 16) {                   /* slideDoor catalog fields */
+      a.rate = sh1xJn(e, 'speed', 0.35);
+      a.kick = sh1xJn(e, 'accel', 0.8);
     }
-    /* v13.3 (A3): the engine's glTF-space matrix = S·Ry(vy)·Rx(vx)·Rz(vz)·S
-     * with S=diag(1,-1,-1) = Ry(-vy)·Rx(vx)·Rz(-vz) (fog_poc.c:8211-8219,
-     * the verbatim Math_RotMatrixZxyNeg port + the S-conjugation) — so
-     * three Euler order 'YXZ' with NEGATED y/z angles matches the engine
-     * exactly (x preserved). The v13.2 raw-angle write mirrored every
-     * y/z-axis spin (SU0203's z-axis fans span backwards).          */
-    if (drv === 'fanArray') {
-      /* v13.3 (A2): the ripper emits 'spinSplit' (ipd2gltf.py:894) —
-       * the v13.2 read of the nonexistent 'fanSplit' key was a dead
-       * override (always the fallback 7).                             */
-      const split = a.spinSplit != null ? a.spinSplit : 7;
-      const yFrom = a.rotY180From != null ? a.rotY180From : 7;
-      list.forEach((m, i) => {
-        const ang = (i < split ? -90 : 90) * t;
-        m.rotation.order = 'YXZ';
-        m.rotation.set(ang * D2R, (i >= yFrom) ? Math.PI : 0, 0);
-      });
+    a.slideIdx = sh1xJi(e, 'slideIdx', 0);
+    a.eventGateAlt = sh1xJi(e, 'eventGateAlt', 0);
+    a.cutsceneOnly = sh1xJb(e, 'cutsceneOnly', false);
+    {
+      const pol = sh1xJs(e, 'eventGatePolarity', 'set');
+      a.eventGatePol = (pol === 'clear') ? 1 : (pol === 'clear-or') ? 2 : 0;
+      /* v31: tvNoise defaults LIVE-WHILE-CLEAR when the polarity is absent */
+      if (a.driver === 2 && e.eventGatePolarity === undefined) a.eventGatePol = 1;
+    }
+    /* v31 rngWalk params (vzBase prefers the authored pose) */
+    a.rwRotBase = sh1xJi(e, 'rotBase', 0x800);
+    a.rwVzBaseQ12 = Math.trunc((a.pos[2] !== 0 ? a.pos[2] : sh1xJn(e, 'vzBase', 19.7)) * 4096);
+    a.rwMask = sh1xJi(e, 'dirMask', 0x1F);
+    a.rwBias = sh1xJi(e, 'dirBias', 0x20);
+    a.isCabin = sh1xJb(e, 'cabin', false) ? 1 : 0;
+    {
+      const ppi = Array.isArray(e.posPerInst) ? e.posPerInst : [];
+      for (let q = 0; q < ppi.length && q < 16; q++) {
+        const pp = ppi[q];
+        if (Array.isArray(pp) && pp.length >= 3) {
+          a.posPerInst[q] = [+pp[0], +pp[1], +pp[2]];
+          a.posPerInstN++;
+        }
+      }
+      if (a.driver === 1 && !a.posPerInstN && ppi.length > 0) a.driver = 7;
+    }
+    a.bladeCount = sh1xJi(e, 'bladeCount', 16);
+    a.alternate = sh1xJb(e, 'alternate', false) ? 1 : 0;
+    a.lcgA = sh1xJi(e, 'lcgA', 0x7169AC35) >>> 0;
+    a.lcgXorA = sh1xJi(e, 'lcgXorA', 0xA547B39E) >>> 0;
+    a.lcgB = sh1xJi(e, 'lcgB', 0x892D719C) >>> 0;
+    a.lcgXorB = sh1xJi(e, 'lcgXorB', 0xC65A4B97) >>> 0;
+    a.durationShift = sh1xJi(e, 'durationShift', 5);
+    a.durationBase = sh1xJi(e, 'durationBase', 0x555);
+    a.eventGate = sh1xJi(e, 'eventGate', 0);
+    {
+      const cg = Array.isArray(e.chunkGate) && e.chunkGate.length >= 2 ? e.chunkGate : null;
+      a.hasChunkGate = 0;
+      if (cg) {
+        for (let q = 0; q < 2; q++) {
+          const v = cg[q];
+          if (typeof v === 'string') {          /* 'N|M' alternatives */
+            const mm = v.match(/^(-?\d+)\|(-?\d+)?/);
+            if (mm) {
+              a.chunkGate[q] = +mm[1];
+              a.chunkGateAlt[q] = mm[2] !== undefined ? +mm[2] : 0;
+              a.hasChunkGate = 1;
+            }
+          } else if (isFinite(+v)) {
+            a.chunkGate[q] = Math.trunc(+v);
+            a.hasChunkGate = 1;
+          }
+        }
+        if (!a.hasChunkGate) { a.chunkGate[0] = -9999; a.chunkGate[1] = -9999; }
+      } else { a.chunkGate[0] = -9999; a.chunkGate[1] = -9999; }
+    }
+    {
+      const ax = sh1xJs(e, 'axis', 'z');
+      a.axis = (ax === 'x') ? 0 : (ax === 'y') ? 1 : 2;
+    }
+    /* live state init (verbatim drivers start at rot0/pos) */
+    a.cur = [a.rot0[0], a.rot0[1], a.rot0[2]];
+    if (a.driver === 3) a.cur[2] = a.pos[2];        /* B-4: MOVACHES */
+    if (a.driver === 16) a.cur[2] = a.pos[2];
+    if (a.driver === 18) a.cur[1] = a.pos[1];
+    if (a.driver === 10) { a.cur[0] = a.rot0[2]; a.cur[1] = a.pos[1]; a.cur[2] = a.pos[2]; }
+    if (a.driver === 19) a.cur[0] = a.rot0[0];
+    if (a.driver === 20) a.cur[2] = a.pos[2];
+    /* C: (int)(rot0[1] * 4096/360) — trunc toward zero */
+    a.rawVy = Math.trunc(a.rot0[1] * 4096 / 360);
+    a.rawVel = 0;
+    /* v27: dampedSwing demo start = the post-event pose */
+    if (a.driver === 5 && S.animsDemo) a.rawVy = sh1xJi(e, 'postEventVyRaw', 91);
+    a.lcgS1 = 0; a.lcgS2 = 0;
+    a.tvChannel = 0; a.tvTimer = 0;
+    /* v31.4: --anims-demo = master state 3 for the TVs */
+    if (S.animsDemo && a.driver === 2) a.tvChannel = 3;
+    a.rwVy = 0; a.rwVelVy = 0; a.rwVz = 0; a.rwVelVz = 0;
+    S.anims.push(a);
+  }
+  /* v27: sharedRot leader resolution (one-way; mutual pairs broken) */
+  for (let k = 0; k < S.anims.length; k++) {
+    const sh = sh1xJs(list[k], 'sharedRot', '');
+    if (sh) {
+      for (let m = 0; m < S.anims.length; m++) {
+        if (m !== k && S.anims[m].object === sh) { S.anims[k].sharedLeader = m; break; }
+      }
+    }
+  }
+  for (let k = 0; k < S.anims.length; k++) {        /* cycle break */
+    const m = S.anims[k].sharedLeader;
+    if (m >= 0 && m < S.anims.length && S.anims[m].sharedLeader === k) {
+      S.anims[k].sharedLeader = -1;
+      S.anims[m].sharedLeader = -1;
+    }
+  }
+  return S;
+}
+
+/* fog_poc.c:8449 anim_gate_on — VERBATIM. The chunk gate uses the room's own
+ * cell (single-room consumer); --anims-demo forces every event gate open. */
+function sh1xGateOn(S, a) {
+  if (a.hasChunkGate && !a.manifestLevel) {
+    const okx = (S.chunkX === a.chunkGate[0]) ||
+                (a.chunkGateAlt[0] !== 0 && S.chunkX === a.chunkGateAlt[0]);
+    const okz = (S.chunkZ === a.chunkGate[1]) ||
+                (a.chunkGateAlt[1] !== 0 && S.chunkZ === a.chunkGateAlt[1]);
+    if (!(okx && okz)) return false;
+  }
+  if (S.animsDemo) return true;         /* demo: every event gate is open */
+  if (a.eventGate) {
+    if (a.eventGatePol === 1) return true;
+    if (a.eventGatePol === 2) {
+      if (!a.eventGateAlt) return true;
+      return true;      /* engine-fresh: both clear -> live */
+    }
+    return false;      /* set: gated off until the event */
+  }
+  return true;
+}
+
+/* ---- v31 tvNoise — map4_s03.c VERBATIM (fog_poc.c:8516-8795) -----------
+ * The LCG (func_800D7394) and the master/channel state machine tick exactly;
+ * the SCREEN QUAD PAINT (func_800D88C8 over the extern-only corner/TIM-slot
+ * tables D_800DB7D4/D_800DB7E4[3][3]/D_800DB874) is DATA-BLOCKED in the
+ * decomp — the editor keeps the screens at their authored pose (the pose
+ * case falls to default) and surfaces the state machine via the debug
+ * counter (window.__camtrack.sh1xDebugState). */
+function shTvLcg(a, dtRaw) {
+  if (dtRaw !== 0) {
+    const p = Math.imul(a.lcgS2, a.lcgA) >>> 0;                 /* u32 mult */
+    a.lcgS1 = ((((p | 0) >> 3) ^ (a.lcgXorA | 0)) >>> 0);      /* s32 >> 3 ^ xor */
+    const q = Math.imul(a.lcgS1, a.lcgB) >>> 0;
+    a.lcgS2 = (((q >>> 3) ^ a.lcgXorB) >>> 0);                 /* u32 >> 3 ^ xor */
+  }
+  return (a.lcgS1 & 0xFFFF) & 0x7FFF;   /* (u16)s1 & SHRT_MAX */
+}
+/* func_800D81FC — the blank/off slot */
+function shTv81FC(a, arg1, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg1;
+  a.tvSlot = 0; a.tvU = 0; a.tvV = 0;
+  return a.tvTimer >= a.tvDur;
+}
+/* func_800D8230 — the picture-segment slot */
+function shTv8230(a, arg1, arg2, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg2;
+  a.tvSlot = arg1 + 6; a.tvV = 0; a.tvU = 0;
+  return a.tvTimer >= a.tvDur;
+}
+/* func_800D826C — the static-noise slot with the v-offset ramp.
+ * The int64 ((min<<12)/arg2) sites are C int64 DIVISION (trunc; operands
+ * positive -> floor) then an arithmetic >> 6/>> 12 — floor semantics. */
+function shTv826C(a, arg1, arg2, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg2;
+  a.tvSlot = 4; a.tvU = 0;
+  switch (arg1) {
+    case 1: a.tvV = 64; break;
+    case 2: a.tvV = 32; break;
+    case 4: {
+      const m = arg2 < a.tvTimer ? arg2 : a.tvTimer;
+      a.tvV = Math.floor(Math.floor(m * 4096 / arg2) / 64);
+      break;
+    }
+    case 3: {
+      const m = arg2 < a.tvTimer ? arg2 : a.tvTimer;
+      const q = Math.floor(m * 4096 / arg2);
+      a.tvV = 64 - Math.floor(q / 64);
+      break;
+    }
+    default: a.tvV = 0; break;
+  }
+  return a.tvTimer >= a.tvDur;
+}
+/* func_800D8354 — the signal-search segment */
+function shTv8354(a, arg1, arg2, dtRaw) {
+  let var_t0;
+  if (arg1 !== 0) var_t0 = 1;
+  else var_t0 = ((shTvLcg(a, dtRaw) & 0xFFF) < 0x199) ? 1 : 0;
+  if (a.tvTimer === 0) a.tvDur = arg2;
+  a.tvV = 0; a.tvU = 0;
+  const sp10 = [0, 0, 0, 0];
+  sp10[0] = arg2 - 0x555;
+  if (sp10[0] < 0) sp10[0] = 0;
+  if (sp10[0] > 0x111) sp10[0] = 0x111;         /* CLAMP(0, 0x111) */
+  let var_v1 = sh1xMulSh(arg2, 0x4CC, 12);      /* Q12_MULT(arg2, 0x4CC) */
+  if (var_v1 > 0x5DD) var_v1 = 0x5DD;
+  sp10[1] = var_v1 + sp10[0];
+  sp10[2] = sp10[1] + 0x3BB;
+  sp10[3] = sp10[1] + 0x45E;
+  var_v1 = a.tvTimer;
+  if (sp10[0] >= a.tvTimer) {
+    a.tvSlot = 2;
+    const temp_a0 = sp10[0];
+    /* (int64)(min<<12) / temp_a0 — C int64 division trunc */
+    const num = (var_v1 <= temp_a0 ? var_v1 : temp_a0) * 4096;
+    a.tvV = sh1xMulSh(sh1xDivT(num, temp_a0), 0x19, 12) - 0x20;
+  } else {
+    if (var_v1 < sp10[1]) a.tvSlot = 2;
+    else if (var_v1 < sp10[2] || var_t0 === 0 || var_v1 >= sp10[3]) a.tvSlot = 3;
+    else a.tvSlot = 2;
+  }
+  return a.tvTimer >= arg2;
+}
+/* func_800D84C0 — the rolling-brightness segment */
+function shTv84C0(a, arg1, arg2, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg2;
+  a.tvU = 0;
+  switch (arg1) {
+    default:
+    case 0:
+      a.tvSlot = 5;
+      /* (int64)((timer % 2730) << 12) / 2730 >> 6 — floor/floor */
+      a.tvV = Math.floor(Math.floor((a.tvTimer % 2730) * 4096 / 2730) / 64);
+      if (a.tvV > 24 && a.tvV < 29) a.tvV = 32;
+      break;
+    case 1:
+      a.tvSlot = 5;
+      a.tvU = shTvLcg(a, dtRaw) % 6;
+      a.tvV = 32;
+      break;
+  }
+  return !(a.tvTimer < a.tvDur);
+}
+/* func_800D85E4 — the blank hold slot 15 */
+function shTv85E4(a, arg1, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg1;
+  a.tvSlot = 15; a.tvV = 0; a.tvU = 0;
+  return a.tvTimer >= a.tvDur;
+}
+/* func_800D8874 — the pattern-change interval */
+function shTv8874(a, dtRaw) {
+  const temp2 = shTvLcg(a, dtRaw) & 0xFFF;      /* Q12_FRACT */
+  return sh1xMulSh(2048, temp2, 12) + 4096;
+}
+/* func_800D87AC — the picture-pattern random walk */
+function shTv87AC(a, dtRaw) {
+  let cond = 0;
+  if (a.tvTimer === 0) { cond = 1; a.tvPatT = shTv8874(a, dtRaw); }
+  else if (a.tvTimer >= a.tvPatT) { cond = 1; a.tvPatT += shTv8874(a, dtRaw); }
+  if (cond) {
+    const temp = shTvLcg(a, dtRaw) & 0xFFF;     /* Q12_FRACT */
+    if (temp < 1228) a.tvPat = 0;               /* Q12(0.3f)  */
+    else if (temp < 2048) a.tvPat = 1;          /* Q12(0.5f)  */
+    else if (temp < 3153) a.tvPat = 2;          /* Q12(0.77f) */
+    else if (temp < 3399) a.tvPat = 3;          /* Q12(0.83f) */
+    else a.tvPat = 4;
+  }
+  return a.tvPat;
+}
+/* func_800D8620 — the wobble/picture slots */
+function shTv8620(a, arg1, arg2, dtRaw) {
+  if (a.tvTimer === 0) a.tvDur = arg2;
+  if (arg1 === -1 /* NO_VALUE */) arg1 = shTv87AC(a, dtRaw);
+  switch (arg1 + 1) {
+    default:
+    case 0: a.tvSlot = 1; a.tvU = 0; a.tvV = 0; break;
+    case 2: a.tvSlot = 1; a.tvU = 50; a.tvV = 24; break;
+    case 3: a.tvSlot = 1; a.tvU = 128; a.tvV = 0; break;
+    case 4:
+      a.tvU = 0; a.tvSlot = 4;
+      {
+        /* FP_FROM(-(Q12_DIV(timer % Q12(1.5), Q12(1.5)) * 80), 12) - 108 */
+        const q = Math.floor((a.tvTimer % 6144) * 4096 / 6144) * 80;
+        a.tvV = Math.floor(-q / 4096) - 108;
+      }
+      break;
+    case 5:
+      a.tvSlot = 1; a.tvU = 0; a.tvV = 0;
+      a.tvV = shTvLcg(a, dtRaw) % 320;
+      break;
+  }
+  return !(a.tvTimer < a.tvDur);
+}
+/* D_800CACA8 — the state-1 attract durations (the tracked screen idx 9) */
+const shTvCACA8 = [0x0B33, 0x1E66, 0x1999, 0x1B33, 0x2333,
+                   0x0E66, 0x1E66, 0x1800, 0x1CCC, 0x04CC];
+/* func_800D78F4 — master state 1 (the power-on attract) */
+function shTvState1(a, screenIdx, dtRaw) {
+  let var_s0 = 0, var_s2 = 0;
+  switch (a.tvSub) {
+    default:
+    case 0:  var_s0 = shTv81FC(a, shTvCACA8[screenIdx] + 2048, dtRaw); break;
+    case 1:  var_s0 = shTv826C(a, 0, 409, dtRaw); break;
+    case 2:  var_s0 = shTv826C(a, 1, 409, dtRaw); break;
+    case 3:  var_s0 = shTv826C(a, 3, 955, dtRaw); break;
+    case 4:  var_s0 = shTv826C(a, 4, 546, dtRaw); break;
+    case 5:  var_s0 = shTv8620(a, 0, 6144, dtRaw); break;
+    case 6:  var_s0 = shTv826C(a, 2, 682, dtRaw); break;
+    case 7:  var_s0 = shTv8354(a, 1, 8192, dtRaw); break;
+    case 8:  var_s0 = shTv826C(a, 3, 1365, dtRaw); break;
+    case 9:  var_s0 = shTv84C0(a, 0, 9011, dtRaw); break;
+    case 10: var_s0 = shTv826C(a, 4, 1365, dtRaw); break;
+    case 11: var_s0 = shTv85E4(a, 409, dtRaw); break;
+    case 12: var_s0 = shTv826C(a, 3, 1365, dtRaw); break;
+    case 13: var_s2 = shTv84C0(a, 1, 2048, dtRaw); break;
+  }
+  a.tvTimer += dtRaw;
+  if (var_s0) { a.tvSub++; a.tvTimer = 0; }
+  return var_s2;
+}
+/* func_800D7AE0 — master state 2 (the channel-change noise walk) */
+function shTvState2(a, dtRaw) {
+  let var_s0 = 0, var_s2 = 0;
+  switch (a.tvSub) {
+    case 0:  var_s0 = shTv84C0(a, 0, (shTvLcg(a, dtRaw) >> 5) + 0x1199, dtRaw); break;
+    case 1:  var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 2:  var_s0 = shTv8620(a, 1, (shTvLcg(a, dtRaw) >> 5) + 0x1800, dtRaw); break;
+    case 3:  var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 4:  var_s0 = shTv8230(a, 0, (shTvLcg(a, dtRaw) >> 5) + 0x2AA, dtRaw); break;
+    case 5:  var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 6:  var_s0 = shTv8230(a, 1, (shTvLcg(a, dtRaw) >> 5) + 0xAAA, dtRaw); break;
+    case 7:  var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 8:  var_s0 = shTv8230(a, 2, (shTvLcg(a, dtRaw) >> 5) + 0x1000, dtRaw); break;
+    case 9:  var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 10: var_s0 = shTv8230(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0xAAA, dtRaw); break;
+    case 11: var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 12: var_s0 = shTv8230(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x2AA, dtRaw); break;
+    case 13: var_s0 = shTv8230(a, 5, (shTvLcg(a, dtRaw) >> 5) + 0xAAA, dtRaw); break;
+    case 14: var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 15: var_s0 = shTv8230(a, 6, (shTvLcg(a, dtRaw) >> 5) + 0x2AA, dtRaw); break;
+    case 16: var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 17: var_s0 = shTv8230(a, 7, (shTvLcg(a, dtRaw) >> 5) + 0xD55, dtRaw); break;
+    case 18: var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 19: var_s0 = shTv8230(a, 6, (shTvLcg(a, dtRaw) >> 5) + 0xAAA, dtRaw); break;
+    case 20: var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x555, dtRaw); break;
+    case 21: var_s0 = shTv8230(a, 8, (shTvLcg(a, dtRaw) >> 5) + 0x1555, dtRaw); break;
+    case 22: var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x444, dtRaw); break;
+    case 24: var_s0 = shTv8620(a, 2, (shTvLcg(a, dtRaw) >> 5) + 0x1800, dtRaw); break;
+    case 25: var_s0 = shTv85E4(a, (shTvLcg(a, dtRaw) >> 5) + 0x199, dtRaw); break;
+    case 26: var_s0 = shTv826C(a, 4, (shTvLcg(a, dtRaw) >> 5) + 0x444, dtRaw); break;
+    case 23:
+    case 27: var_s0 = shTv826C(a, 3, (shTvLcg(a, dtRaw) >> 5) + 0x2AA, dtRaw); break;
+    case 28: var_s2 = shTv8620(a, 0, (shTvLcg(a, dtRaw) >> 5) + 0x1800, dtRaw); break;
+  }
+  a.tvTimer += dtRaw;
+  if (var_s0) { a.tvTimer = 0; a.tvSub += 1; }
+  return var_s2;
+}
+/* func_800D7F1C — master state 3 (the ON program walk) */
+function shTvState3(a, dtRaw) {
+  let var_s0 = 0, var_s2 = 0;
+  switch (a.tvSub) {
+    default:
+    case 0x00: var_s0 = shTv8620(a, -1, 0xAAA, dtRaw); break;
+    case 0x0A: var_s0 = shTv8620(a, -1, 0xAAA, dtRaw); break;
+    case 0x14: var_s0 = shTv8620(a, -1, 0xD55, dtRaw); break;
+    case 0x1E: var_s0 = shTv8620(a, -1, 0x1000, dtRaw); break;
+    case 0x28: var_s0 = shTv8620(a, -1, 0x12AA, dtRaw); break;
+    case 0x32: var_s0 = shTv8620(a, -1, 0x1555, dtRaw); break;
+    case 0x3C: var_s0 = shTv8354(a, 0, 0x1AAA, dtRaw); break;
+    case 0x46: var_s0 = shTv8354(a, 0, 0x1AAA, dtRaw); break;
+    case 0x50: var_s2 = shTv826C(a, 4, 0x3BB, dtRaw); break;
+    case 0x51: var_s0 = shTv8230(a, 0, 0x2AA, dtRaw); break;
+    case 0x5A: var_s2 = shTv826C(a, 3, 0x444, dtRaw); break;
+    case 0x5B: var_s0 = shTv8230(a, 1, 0xAAA, dtRaw); break;
+    case 0x64: var_s2 = shTv826C(a, 4, 0x444, dtRaw); break;
+    case 0x65: var_s0 = shTv8230(a, 2, 0x1000, dtRaw); break;
+    case 0x6E: var_s2 = shTv826C(a, 3, 0x444, dtRaw); break;
+    case 0x6F: var_s0 = shTv8230(a, 3, 0xAAA, dtRaw); break;
+    case 0x78: var_s2 = shTv826C(a, 4, 0x444, dtRaw); break;
+    case 0x79: var_s2 = shTv8230(a, 4, 0x2AA, dtRaw); break;
+    case 0x7A: var_s0 = shTv8230(a, 5, 0xAAA, dtRaw); break;
+    case 0x82: var_s2 = shTv826C(a, 3, 0x555, dtRaw); break;
+    case 0x83: var_s0 = shTv8230(a, 6, 0x2AA, dtRaw); break;
+    case 0x8D: var_s0 = shTv8230(a, 7, 0xD55, dtRaw); break;
+    case 0x96: var_s2 = shTv826C(a, 3, 0x555, dtRaw); break;
+    case 0x97: var_s0 = shTv8230(a, 6, 0xAAA, dtRaw); break;
+    case 0x8C:
+    case 0xA0: var_s2 = shTv826C(a, 4, 0x555, dtRaw); break;
+    case 0xA1: var_s0 = shTv8230(a, 8, 0x1000, dtRaw); break;
+  }
+  a.tvTimer += dtRaw;
+  if (var_s2) { a.tvSub++; a.tvTimer = 0; }
+  if (var_s0) {
+    a.tvSub = (shTvLcg(a, dtRaw) % 17) * 10;
+    a.tvTimer = 0;
+  }
+}
+
+/* fog_poc.c:8797 sh1x_anims_tick — VERBATIM (all driver families).
+ * The shared S.rngSeed advances exactly like the engine's global g_propRngSeed:
+ * the per-anim draw order (gated anims skipped before any draw, followers
+ * skipped) is part of the deterministic contract. */
+function sh1xDriverTick(S, dt) {
+  const dtRaw = Math.trunc(dt * 4096);          /* C: (int)(dt * 4096.0) */
+  for (let i = 0; i < S.anims.length; i++) {
+    const a = S.anims[i];
+    a.gated = sh1xGateOn(S, a) ? 0 : 1;
+    if (a.gated) {
+      if (a.driver === 11) S.lightFlicker = 1.0; /* fresh: Q12(1.0) identity */
+      /* v32 (S18): the waterfall despawns when the gate closes */
+      if (a.driver === 22 && a.seeded) {
+        for (let q = 0; q < 16; q++) a.wfAlive[q] = 0;
+        a.seeded = 0;
+      }
+      continue;                                  /* engine: update gated off */
+    }
+    if (a.sharedLeader >= 0) continue;           /* follower: leader's state */
+    switch (a.driver) {
+    case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264 */
+      let d;
+      if (a.hasRng) {
+        d = a.rngBase;
+        if (a.rngMask)
+          d -= (sh1xRngNext(S) & a.rngMask) * (360 / 4096);
+      } else {
+        d = a.rate;
+      }
+      a.cur[a.axis] += dt * d;
+      break;
+    }
+    case 1: {  /* fanArray — map4_s02.c:131,140-149 */
+      const tmp0 = sh1xMulSh(dtRaw, 1024, 12);
+      for (let q = 0; q < a.count && q < 16; q++)
+        a.fanAng[q] += (q < a.fanSplit) ? -tmp0 : tmp0;
+      break;
+    }
+    case 3: {  /* translate/MOVACHES — cutscene/demo-only crawl */
+      if (S.animsDemo) {
+        let z = a.cur[2] + dt * 0.14;
+        const clampM = 0x3C720 / 4096;
+        if (z > clampM) z = clampM;
+        a.cur[2] = z;
+      }
+      break;
+    }
+    case 4: {  /* doorRattle — map1_s01.c:1229-1290, one step per 30Hz frame */
+      a.mvTimer += dt * 30.0;
+      let steps = 0;
+      while (a.mvTimer >= 1.0 && steps < 8) {
+        a.mvTimer -= 1.0; steps++;
+        if (a.rawVel === 0 && (sh1xRngNext(S) & 31) === 0)
+          a.rawVel = -(2 + (sh1xRngNext(S) & 7));         /* Rng(2,9) */
+        if (a.rawVel !== 0) {
+          if (a.rawVel === 1 || a.rawVel === -1)
+            a.rawVy += a.rawVel;              /* engine adds twice */
+          a.rawVy += a.rawVel;
+          if (a.rawVel > 0) {
+            if (a.rawVy > 0) {
+              a.rawVy = 0;
+              if (a.rawVel >= 8 && (sh1xRngNext(S) & 3) === 0)
+                a.rawVel = 0;
+              else
+                a.rawVel = (sh1xRngNext(S) & 3) - a.rawVel + 1;
+              if (a.rawVel > 0) a.rawVel = 0; /* MIN(D,0) */
+            }
+          } else if (a.rawVy < -20) {
+            a.rawVel = ~(sh1xRngNext(S) & 3) - a.rawVel;
+            if (a.rawVel < 1) a.rawVel = 1;   /* MAX(D,1) */
+          }
+        }
+      }
+      break;
+    }
+    case 5: {  /* dampedSwing — map2_s00.c:1937-1943 */
+      a.rawVel += sh1xMulSh(dtRaw, a.rawAngAccel, 12);
+      if (a.rawVel < a.rawAngVelFloor) a.rawVel = a.rawAngVelFloor;
+      a.rawVy += sh1xMulSh(dtRaw, a.rawVel, 12);
+      if (a.rawVy < a.rawVyFloor) a.rawVy = a.rawVyFloor;
+      break;
+    }
+    case 8: {  /* kickSwing — map1_s03.c:1956-1999, per-30Hz-frame steps */
+      if (a.kickPhase === 0) {
+        if (S.animsDemo) {           /* the cutscene state-6 kick fires */
+          a.rawVel = a.rawKickVel;
+          a.kickPhase = 1;
+        } else break;
+      }
+      a.mvTimer += dt * 30.0;
+      let steps = 0;
+      while (a.mvTimer >= 1.0 && steps < 8) {
+        a.mvTimer -= 1.0; steps++;
+        a.rawVy += a.rawVel;
+        if (a.rawVel === a.rawKickVel) {        /* initial kick */
+          if (a.rawVy < a.rawOpenLimit) {
+            a.rawVy = a.rawOpenLimit;
+            a.rawVel = a.rawRebound;
+          }
+        } else if ((a.rawVy < a.rawOpenLimit && a.rawVel < 0) ||
+                   (a.rawVy >= a.rawBounceHi && a.rawVel > 0)) {
+          const th = -a.rawVel >> 1;
+          a.rawVel = th;
+          if (th === 1 || th === -1) a.rawVel = 0;
+        }
+        if (a.rawVel === 0 && a.kickPhase === 1) {
+          a.rawVy = a.rawSettle;                /* rest: Q12_ANGLE(-157.4) */
+          a.kickPhase = 2;
+        }
+      }
+      break;
+    }
+    case 9: {  /* gravityScatter — map7_s02_2.c:1167-1188 */
+      if (a.kickPhase === 0) {
+        if (S.animsDemo) a.kickPhase = 1;       /* the bag cutscene fires */
+        else break;
+      }
+      a.mvTimer += dt * 30.0;
+      let steps = 0;
+      while (a.mvTimer >= 1.0 && steps < 8) {
+        a.mvTimer -= 1.0; steps++;
+        a.mvVel += sh1xMulSh(526, 10419, 12);   /* g_GravitySpeed raw */
+        if (a.mvVel > 20480) a.mvVel = 20480;
+        for (let q = 0; q < a.count && q < 16; q++) {
+          const rateY = a.mvVel + sh1xMulSh(a.scatterAmp[q], sh1xSinQ12(a.scatterAng[q]), 12);
+          const rateZ = sh1xMulSh(a.scatterAmp[q], sh1xCosQ12(a.scatterAng[q]), 12);
+          a.liveVy[q] += sh1xMulSh(dtRaw, rateY, 12);
+          a.liveVz[q] += sh1xMulSh(dtRaw, rateZ, 12);
+          if (a.liveVy[q] > 0) a.liveVy[q] = 0; /* floor 0 */
+        }
+      }
+      break;
+    }
+    case 11: { /* lightFlicker — map1_s05.c:371-396 */
+      a.flT0 += dtRaw;
+      if (a.flT0 * a.flPer0 >= a.flRampThresh) {
+        a.flT0 = 0;
+        a.flPer0 = 32 + (sh1xRngNext(S) % 64);  /* Rng(32,95) */
+        a.flAmp = 32 + (sh1xRngNext(S) % 32);   /* Rng(32,63) */
+      }
+      const sp0 = sh1xMulSh(a.flAmp, sh1xSinQ12(a.flT1), 12);
+      a.flT1 += dtRaw;
+      let sp1 = sh1xMulSh(a.flT1, a.flPer1, 6);
+      if (sp1 >= 4096) {
+        a.flT1 = 0;
+        a.flPer1 = 32 + (sh1xRngNext(S) % 64);
+        sp1 &= 0xFFF;
+      }
+      const inten = 5529                        /* Q12(1.35f) */
+        + sh1xMulSh(3686 + sh1xMulSh(sp0, 2457, 12), sh1xSinQ12(sp1), 15);
+      S.lightFlicker = inten / 4096;
+      break;
+    }
+    case 13:  /* carouselSpin master — map6_s04_2.c:3553-3554 */
+      a.mvMaster = (a.mvMaster +
+                    sh1xMulSh(dtRaw, S.animsDemo ? -122 : 0, 12)) & 0xFFF;
+      break;
+    case 14: { /* ferrisWheel — map6_s04_2.c:3746-3845 */
+      const add = sh1xMulSh(dtRaw, 186413, 12);
+      a.mvMaster += add;
+      if (a.mvMaster > 1258291) {
+        a.mvMaster -= 1258291;
+        a.mvWrapCount++;
+        for (let q = 3; q > 0; q--) {
+          a.mvPend[q] = a.mvPend[q - 1];
+          a.mvPendVel[q] = a.mvPendVel[q - 1];
+        }
+        a.mvPend[0] = 0; a.mvPendVel[0] = 0;
+      }
+      for (let q = 0; q < 4; q++) {
+        if (a.mvPendVel[q] === 0) {
+          a.mvPend[q] += add;
+          if (a.mvPend[q] > 186413 &&
+              ((sh1xRngNext(S) % 186413) + 186413) < a.mvPend[q])
+            a.mvPendVel[q]--;
+        } else if (a.mvPend[q] > 0) {
+          a.mvPendVel[q] += sh1xMulSh(dtRaw, -279620, 12);
+          if (a.mvPendVel[q] < -139810) a.mvPendVel[q] = -139810;
+          a.mvPend[q] += sh1xMulSh(dtRaw, a.mvPendVel[q], 12);
+          if (a.mvPend[q] < 0) {
+            if (a.mvPendVel[q] > -93206) {
+              a.mvPendVel[q] = 0; a.mvPend[q] = 0;
+            } else {
+              a.mvPendVel[q] >>= 1;
+            }
+          }
+        } else {  /* B-6: the engine's THIRD branch (the return swing) */
+          a.mvPendVel[q] += sh1xMulSh(dtRaw, 279620, 12);
+          if (a.mvPendVel[q] > 139810) a.mvPendVel[q] = 139810;
+          a.mvPend[q] += sh1xMulSh(dtRaw, a.mvPendVel[q], 12);
+          if (a.mvPend[q] > 0) {
+            if (a.mvPendVel[q] < 93206) {
+              a.mvPendVel[q] = 0; a.mvPend[q] = 0;
+            } else {
+              a.mvPendVel[q] >>= 1;
+            }
+          }
+        }
+      }
+      break;
+    }
+    case 15:  /* lissajousOrbit — map6_s04_2.c:3856-3860 */
+      a.mvMaster += sh1xMulSh(dtRaw, 807, 12);
+      a.mvMaster2 += sh1xMulSh(dtRaw, 1126, 12);
+      break;
+    case 2: { /* tvNoise — map4_s03.c VERBATIM LCG + master/channel machine.
+                 The SCREEN QUAD PAINT is the documented blocker — only the
+                 state machine ticks (the 3 paint-mirror LCG advances keep
+                 the single-screen sequence engine-shaped). */
+      if (dtRaw === 0) break;   /* func_800D7808: g_DeltaTime == 0 */
+      switch (a.tvChannel) {
+        case 0:  /* off: the screens run func_800D78D4 = 81FC(0) */
+          shTv81FC(a, 0, dtRaw);
+          break;
+        case 1:  /* attract: per-screen func_800D78F4(a, 9) */
+          if (shTvState1(a, 9, dtRaw))
+            a.tvDone = 1;       /* field_21 = master state */
+          break;
+        case 2:  /* channel-change: func_800D7AE0 */
+          if (shTvState2(a, dtRaw)) {
+            /* func_800D76BC(3): master -> 3 + the screens reset */
+            a.tvChannel = 3;
+            a.tvSub = 0; a.tvTimer = 0; a.tvDone = 0;
+            a.tvPat = 0; a.tvPatT = 0;
+          }
+          break;
+        case 3:  /* on: func_800D7F1C */
+          shTvState3(a, dtRaw);
+          break;
+      }
+      /* the paint-mirror LCG draws (func_800D88C8 draws 3 per screen) */
+      shTvLcg(a, dtRaw);
+      shTvLcg(a, dtRaw);
+      shTvLcg(a, dtRaw);
+      break;
+    }
+    case 17: { /* rngWalk — map6_s03.c:375-444 (SITAI_NE) */
+      let temp_a0 = (sh1xRngNext(S) & a.rwMask) + a.rwBias;
+      if (a.rwVelVy > 0 && a.rwVy > 0 && temp_a0 < a.rwVy)
+        a.rwVelVy = -((sh1xRngNext(S) & 0x1) + 1);
+      else if (a.rwVelVy < 0 && a.rwVy < 0 && temp_a0 < -a.rwVy)
+        a.rwVelVy = (sh1xRngNext(S) & 0x1) + 1;
+      else if (!a.rwVelVy || !(sh1xRngNext(S) % 32))  /* Rng(0,0x1F) */
+        a.rwVelVy = (sh1xRngNext(S) % 5) - 2;         /* Rng(-2,2) */
+      if ((sh1xRngNext(S) & 0xFF) < ((Math.abs(a.rwVelVy) << 6) + 0x40))
+        a.rwVy += (a.rwVelVy <= 0) ? -1 : 1;
+      temp_a0 = (sh1xRngNext(S) & 0x1F) + 0x10;
+      if (a.rwVelVz > 0 && temp_a0 < (a.rwVz + Math.abs(a.rwVy >> 1)))
+        a.rwVelVz = -((sh1xRngNext(S) & 0x1) + 1);
+      else if (a.rwVelVz === 0 || !(sh1xRngNext(S) & 0x3F))
+        a.rwVelVz = (sh1xRngNext(S) % 5) - 2;         /* (Rng%5)-2 */
+      if ((sh1xRngNext(S) & 0xFF) < ((Math.abs(a.rwVelVz) << 6) + 0x60))
+        a.rwVz += (a.rwVelVz <= 0) ? -1 : 1;
+      if (a.rwVz < 0) a.rwVz = 0;                    /* MAX(0, ...) */
+      break;
+    }
+    case 16: { /* slideDoor — sharedFunc_800D15F0_3_s01.h:341-353 */
+      if (S.animsDemo) {
+        const accelQ = Math.trunc(a.kick * 4096);   /* C: (int)(f*4096) */
+        const speedQ = Math.trunc(a.rate * 4096);
+        a.slideVelRaw += sh1xMulSh(dtRaw, accelQ, 12);
+        if (a.slideVelRaw > speedQ) a.slideVelRaw = speedQ;
+        const add = sh1xMulSh(dtRaw, a.slideVelRaw, 12);
+        a.cur[2] += ((a.slideIdx & 1) ? add : -add) / 4096;
+      }
+      break;
+    }
+    case 18: { /* fallOnce — map4_s03.c:1688-1735 */
+      if (!a.fallArmed) {
+        if (!S.animsDemo) break;   /* engine: fires on flag 320 */
+        a.fallArmed = 1;
+        a.fallVel += 4096;                        /* Q12(1.0f) */
+      }
+      /* ENGINE QUIRK (ported verbatim): mvTimer is an INT accumulator and
+       * the engine adds (float)dt < 1.0 — the truncating int store keeps it
+       * at 0 on the 30Hz grid, so the D_800E05A8 damping never decays. */
+      a.mvTimer = Math.trunc(a.mvTimer + dt);
+      {
+        let rotVx = Math.trunc(a.cur[0] * (4096 / 360));  /* C (int) cast */
+        const cosV = sh1xCosQ12(rotVx);
+        const gx = sh1xMulSh(1336, cosV, 12);
+        /* fx_q12_angle(atan2f(4096, gx)*180/PI) — the one float-libm site
+         * (f32 vs f64: a ±1-count wobble at the trunc boundary is possible) */
+        const degVar = Math.atan2(4096, gx) * (180 / Math.PI);
+        const varr = Math.trunc(degVar / 360 * 4096);
+        let varA0 = 4096 - Math.trunc(a.mvTimer * 2 * 4096);
+        if (varA0 < 0) varA0 = 0;
+        a.fallTorque = sh1xMulSh(varA0, a.fallTorque + varr, 12);
+        rotVx += sh1xMulSh(dtRaw, a.fallTorque, 12);
+        if (rotVx > 1024) rotVx = 1024;           /* Q12_ANGLE(90) */
+        a.cur[0] = rotVx * (360 / 4096);
+      }
+      a.fallVel += 1336 + (1336 >> 4);            /* MIN(Q12(15),..) */
+      if (a.fallVel > 61440) a.fallVel = 61440;
+      a.cur[1] += sh1xMulSh(dtRaw, a.fallVel, 12) / 4096;
+      break;
+    }
+    case 10: { /* stoneChoreo — map7_s01_2.c:1516-1596 (cutscene case 13) */
+      if (!S.animsDemo) break;
+      switch (a.stoneStep) {
+        case 0:
+          a.stoneStep = 1;                        /* sfx 1647 kick */
+          break;
+        case 1: {
+          a.stoneData += dtRaw;
+          if (a.stoneData > 8192) a.stoneData = 8192;  /* Q12(2.0) */
+          /* C int arithmetic: (stoneData*409)/8192 — trunc division */
+          a.cur[2] = (sh1xDivT(a.stoneData * 409, 8192) - 575897) / 4096;
+          if (a.stoneData >= 8192) a.stoneStep = 2;
+          break;
+        }
+        case 2: {
+          a.stoneVel += 1336 >> 1;                /* D_800E168E += g>>1 */
+          let vyQ = Math.trunc(a.cur[1] * 4096);
+          if (vyQ < -4300) {          /* vy < Q12(-1.05): the stone RISES */
+            vyQ += sh1xMulSh(dtRaw, a.stoneVel, 12);
+            if (vyQ > -4300) {
+              vyQ = -4300;             /* Q12(-1.05) clamp */
+              a.stoneStep = 3;         /* sfx 1648 */
+              a.stoneData = 0;
+              a.stoneVel = 0;
+            }
+            a.cur[1] = vyQ / 4096;
+          }
+          break;
+        }
+        case 3: {
+          let rz = Math.trunc(a.cur[0] * (4096 / 360));
+          rz += sh1xMulSh(dtRaw, -284, 12);       /* dt*Q12_ANGLE(-25) */
+          rz &= 0xFFF;
+          a.cur[0] = rz * (360 / 4096);
+          a.cur[1] = (sh1xMulSh(sh1xCosQ12(rz), 614, 12) - 4914) / 4096;
+          a.cur[2] = (sh1xMulSh(sh1xSinQ12(rz), -614, 12) - 575488) / 4096;
+          a.stoneData += dtRaw;
+          if (a.stoneData > 2048) {               /* Q12(0.5) */
+            a.stoneStep = 4;
+            a.stoneData = 0;
+          }
+          break;
+        }
+        case 4: {
+          a.stoneVel += 1336;
+          let rz = Math.trunc(a.cur[0] * (4096 / 360));
+          rz += sh1xMulSh(dtRaw, -1365, 12);      /* dt*Q12_ANGLE(-120) */
+          rz &= 0xFFF;
+          a.cur[0] = rz * (360 / 4096);
+          let vyQ = Math.trunc(a.cur[1] * 4096);
+          vyQ += sh1xMulSh(a.stoneVel, dtRaw, 12);
+          a.cur[1] = vyQ / 4096;
+          a.cur[2] += sh1xMulSh(dtRaw, 1228, 12) / 4096;
+          if (vyQ > 0) a.stoneStep = 5;           /* hit the floor */
+          break;
+        }
+        case 5:
+          a.cur[0] = -90.0;  /* Q12(-0.25) = -1024 raw = -90deg */
+          a.cur[1] = -0.05; a.cur[2] = -140.0;
+          a.stoneStep = 0;                         /* sfx 1649, loop */
+          break;
+      }
+      break;
+    }
+    case 19: { /* binSpin — map7_s03_3.c:8238-8245 */
+      if (!S.animsDemo) break;
+      if (!a.fallArmed) {
+        a.fallArmed = 1;           /* cutscene step 21 init: Q12_ANGLE(-167.6) */
+        a.binAng = -1906;
+      }
+      a.binAng -= sh1xDivT(dtRaw << 12, 14745);   /* int64 div trunc */
+      if (a.binAng < -32768) a.binAng += 65536;   /* SVECTOR vy s16 */
+      a.cur[0] = a.binAng * (360 / 4096);
+      break;
+    }
+    case 20: { /* scrollBelt — map7_s03_3.c:8296-8355 (the finale conveyor) */
+      if (!S.animsDemo) break;
+      S.beltScroll += sh1xMulSh(dtRaw, 10936, 12);
+      if (S.beltScroll > 81920) S.beltScroll -= 81920;
+      break;
+    }
+    case 21:  /* waterRipple: the spawn + t-walk + QUAD paint all live in the
+                 engine's DRAW pass (sh1x_water_fx_draw) — no mesh pose, no
+                 per-tick state (documented engine-only FX) */
+      break;
+    case 22: { /* particles/<waterfall> — water.c:20-107 logic (FX-only:
+                 the droplets are engine draws; the state ticks so the
+                 shared RNG stream stays engine-shaped) */
+      if (a.seeded) {
+        for (let q = 0; q < 10; q++) {
+          if (!a.wfAlive[q]) {
+            const em = sh1xRngNext(S) & 1;
+            const spread = sh1xRngNext(S) % 6553; /* Q12(1.6) */
+            a.wfEm[q] = em;
+            /* emitter 0 @90deg: x+spread; emitter 1 @270deg: x-spread */
+            a.wfX[q] = (em ? -60620 : -67174) + (em ? -spread : spread);
+            a.wfY[q] = 409;                      /* Q12(0.1) */
+            a.wfZ[q] = -209715;                  /* Q12(-51.2) */
+            a.wfVy[q] = 0;
+            a.wfAlive[q] = 1;
+          } else {
+            /* fall: vel capped Q12(6.0), vy += dt*vel; recycle at the end */
+            a.wfVy[q] += 1336;                   /* g raw */
+            if (a.wfVy[q] > 24576) a.wfVy[q] = 24576;
+            a.wfY[q] += sh1xMulSh(dtRaw, a.wfVy[q], 12);
+            if (a.wfY[q] > 409 + 8601)           /* band end */
+              a.wfAlive[q] = 0;
+          }
+        }
+      } else {
+        a.seeded = 1;             /* sharedFunc_800CBC98 spawn */
+      }
+      break;
+    }
+    case 7:   /* cutscene: idle (engine-true default) */
+    default:
+      break;
+    }
+  }
+}
+
+/* fog_poc.c:8121 sh1x_anim_pose — VERBATIM: driver state -> engine rot
+ * DEGREES + engine pos METERS + the per-axis pos replace mask. */
+function sh1xDriverPose(S, i, inst) {
+  const a = S.anims[i];
+  const R2D = 360 / 4096;
+  const out = {
+    rotDeg: [a.rot0[0], a.rot0[1], a.rot0[2]],
+    posEng: [a.pos[0], a.pos[1], a.pos[2]],
+    mask: 0
+  };
+  if (a.sharedLeader >= 0 && a.sharedLeader < S.anims.length) {
+    /* follower: the leader's live rotation vector, its own pos */
+    const lp = sh1xDriverPose(S, a.sharedLeader, 0);
+    out.rotDeg = lp.rotDeg;
+    out.posEng = [a.pos[0], a.pos[1], a.pos[2]];
+    out.mask = 0;
+    return out;
+  }
+  switch (a.driver) {
+  case 0:   /* spinRng / spinConst: live angle on the anim axis */
+    out.rotDeg[a.axis] = a.cur[a.axis];
+    break;
+  case 1: { /* fanArray — map4_s02.c:140-155 */
+    let ii = inst > 0 ? inst : 0;
+    if (ii > 15) ii = 15;
+    out.rotDeg[0] = a.fanAng[ii] * R2D;
+    if (ii >= a.rotY180From) out.rotDeg[1] = 180;
+    if (ii < a.posPerInstN) {
+      out.posEng = [a.posPerInst[ii][0], a.posPerInst[ii][1], a.posPerInst[ii][2]];
+      out.mask = 7;
+    }
+    break;
+  }
+  case 3:   /* translate (MOVACHES): vz slides toward the clamp */
+    out.posEng[2] = a.cur[2];
+    out.mask = 4;
+    break;
+  case 4:   /* doorRattle: vy in raw units */
+  case 5:   /* dampedSwing (drawbridge door) */
+  case 8:   /* kickSwing (TOBIRA2_) */
+    out.rotDeg[1] = a.rawVy * R2D;
+    break;
+  case 9: { /* gravityScatter — per-instance live pos (raw Q12 m) */
+    let ii = inst > 0 ? inst : 0;
+    if (ii > 15) ii = 15;
+    if (ii < 16) {
+      out.posEng[1] = a.liveVy[ii] / 4096;
+      out.posEng[2] = a.liveVz[ii] / 4096;
+    }
+    out.mask = 6;               /* y + z */
+    break;
+  }
+  case 12: { /* sineBob: horse y = (Q12(-1) - sin(master*4+phase))/5 — the
+                /5 is C int division: TRUNC toward zero (the numerator is
+                <= 0), i.e. Math.trunc, NOT floor */
+    let master = 0;
+    for (let m = 0; m < S.anims.length; m++)
+      if (S.anims[m].driver === 13) { master = S.anims[m].mvMaster; break; }
+    const ii = inst > 0 ? inst : 0;
+    /* C: (i < 6) ? (int)(i * 4096 / 3) : (i * 2048 + 2048) */
+    const phase = (ii < 6) ? sh1xDivT(ii * 4096, 3) : (ii * 2048 + 2048);
+    const arg = master * 4 + phase;
+    out.posEng[1] = sh1xDivT(-4096 - sh1xSinQ12(arg), 5) / 4096;
+    out.mask = 2;
+    break;
+  }
+  case 13:  /* carouselSpin: rot.vy = master + the per-object rot0 offset */
+    out.rotDeg[1] = a.rot0[1] + a.mvMaster * R2D;
+    break;
+  case 14: { /* ferrisWheel — map6_s04_2.c:3814-3845 */
+    let ii = inst > 0 ? inst : 0;
+    if (ii > 15) ii = 15;
+    const ang = (a.mvMaster >> 12) + (-739 + ii * 307);
+    if (a.isCabin) {
+      /* the pendulum POSITION is Q12-shifted counts: angle = >>12 */
+      const pendPos = (ii < 4) ? a.mvPend[ii] : a.mvPendVel[0];
+      out.rotDeg[0] = (pendPos >> 12) * R2D;
     } else {
-      const rate = drv === 'spinRng'
-        ? (a.rngBase != null ? a.rngBase : (a.rate || 0))
-        : (a.rate || 0);
-      const axis = a.axis === 'y' ? 'y' : a.axis === 'z' ? 'z' : 'x';
-      const base = (a.rot0 && isFinite(a.rot0[axis === 'x' ? 0 : axis === 'y' ? 1 : 2]))
-        ? a.rot0[axis === 'x' ? 0 : axis === 'y' ? 1 : 2] : 0;
-      const rot = base + rate * t;
-      const r = { x: 0, y: 0, z: 0 };
-      r[axis] = (axis === 'x' ? rot : -rot) * D2R;   /* S-conjugation */
-      for (const m of list) {
-        m.rotation.order = 'YXZ';
-        m.rotation.set(r.x, r.y, r.z);
+      out.rotDeg[0] = ang * R2D;
+    }
+    const rad = ang * R2D * Math.PI / 180;
+    const radius = a.isCabin ? 11.25 : 10.0;
+    out.posEng[0] = 8.7;
+    out.posEng[1] = radius * Math.cos(rad) - 13.8;
+    out.posEng[2] = radius * Math.sin(rad) - 28.0;
+    out.mask = 7;
+    break;
+  }
+  case 15: { /* lissajousOrbit: capsule i pos/rot (map6_s04_2.c:3856-3874) */
+    const ii = inst > 0 ? inst : 0;
+    /* C int division /30 — trunc toward zero (sin can be negative) */
+    const aq = sh1xDivT(sh1xSinQ12(a.mvMaster + (ii << 10)), 30);
+    const ryCnt = sh1xDivT(ii << 12, 12);
+    out.rotDeg[1] = (a.mvMaster2 + ryCnt) * R2D;
+    const ry = out.rotDeg[1] * Math.PI / 180;
+    const temp = sh1xSinQ12(aq + 1024) / 4096 * 4.0;   /* cos */
+    out.posEng[0] = temp * Math.sin(ry) - 16.0;
+    out.posEng[1] = sh1xSinQ12(aq) / 4096 * 4.0 - 1.5;
+    out.posEng[2] = temp * Math.cos(ry) - 64.0;
+    out.rotDeg[0] = -aq * R2D;
+    out.mask = 7;
+    break;
+  }
+  case 17:  /* rngWalk: rot.vy = D_800DFEF0 + 0x800; pos.vz = +Q12(19.7) */
+    out.rotDeg[1] = (a.rwVy + a.rwRotBase) * R2D;
+    out.posEng[2] = (a.rwVz + a.rwVzBaseQ12) / 4096;
+    out.mask = 4;
+    break;
+  case 16:  /* slideDoor: vz slides */
+    out.posEng[2] = a.cur[2];
+    out.mask = 4;
+    break;
+  case 18:  /* fallOnce: rot.vx tilts to 90deg + pos.vy falls */
+    out.rotDeg[0] = a.cur[0];
+    out.posEng[1] = a.cur[1];
+    out.mask = 2;
+    break;
+  case 10:  /* stoneChoreo: rotZ cur[0] + y cur[1] + z cur[2] */
+    out.rotDeg[2] = a.cur[0];
+    out.posEng[1] = a.cur[1];
+    out.posEng[2] = a.cur[2];
+    out.mask = 6;
+    break;
+  case 19:  /* binSpin: rot.vx = D_800F482C */
+    out.rotDeg[0] = a.cur[0];
+    break;
+  case 20: { /* scrollBelt: 3 segment copies vz = base - scroll, -20, +20 */
+    let ii = inst > 0 ? inst : 0;
+    if (ii > 2) ii = 2;
+    const off = (ii === 0) ? 0.0 : (ii === 1) ? -20.0 : 20.0;
+    out.posEng[2] = a.pos[2] - S.beltScroll / 4096 + off;
+    out.mask = 4;
+    break;
+  }
+  default:  /* 2 tvNoise (screens at the authored pose), 7 cutscene, ... */
+    break;
+  }
+  return out;
+}
+
+/* fog_poc.c:8357 sh1x_anim_apply — the numeric half (the rot/pos
+ * quantizers). The three.js half (the S-conjugated Euler + the world-space
+ * mutation) lives in the editor glue; the Node tick-match harness compares
+ * THESE numbers against the engine's APPLY debug output 1:1.
+ *   - rotQ12 = floor(deg * 4096/360 + 0.5) (round-half-up),
+ *     x/z snapped to the engine's Q10 grid ((q>>2)*4 — arithmetic shift),
+ *   - the masked position axes through the engine's Q8 grid:
+ *     (floor(m*4096)>>4)*16/4096, glTF y = -engine y, glTF z = -engine z. */
+function sh1xDriverApplyNum(S, i, inst, baseT) {
+  const p = sh1xDriverPose(S, i, inst);
+  const rotQ12 = [0, 0, 0];
+  for (let k = 0; k < 3; k++)
+    rotQ12[k] = Math.floor(p.rotDeg[k] * (4096 / 360) + 0.5);
+  rotQ12[0] = (rotQ12[0] >> 2) * 4;   /* WorldObjects_Add Q12_TO_Q10 */
+  rotQ12[2] = (rotQ12[2] >> 2) * 4;
+  let tx = baseT[0], ty = baseT[1], tz = baseT[2];
+  if (p.mask & 1) tx = (Math.floor(p.posEng[0] * 4096) >> 4) * 16 / 4096;
+  if (p.mask & 2) ty = -(Math.floor(p.posEng[1] * 4096) >> 4) * 16 / 4096;
+  if (p.mask & 4) tz = -(Math.floor(p.posEng[2] * 4096) >> 4) * 16 / 4096;
+  return { rotQ12: rotQ12, t: [tx, ty, tz], mask: p.mask };
+}
+
+/* fog_poc.c:7916 sh1x_anims_bind — VERBATIM (the v33 instance-GROUP bind
+ * + the gravityScatter seeding). items = the scene's draw items in
+ * node/primitive order: { name, posedInst, tx, ty, tz (the item's composed
+ * WORLD translation, glTF), cx, cy, cz (the item's WORLD vertex centroid) }.
+ * Sets item.animIdx / item.animInst. */
+function sh1xDriverBind(S, items) {
+  for (let i = 0; i < items.length; i++) {
+    items[i].animIdx = -1;
+    items[i].animInst = 0;
+  }
+  for (let k = 0; k < S.anims.length; k++) {
+    const a = S.anims[k];
+    if (!a.object || a.object[0] === '<' || !a.object[0]) continue; /* <light> */
+    const ol = a.object.length;
+    const grps = [];   /* {items:[], n, posed, cx, cy, cz} */
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.animIdx >= 0) continue;      /* already bound */
+      const nl = it.name.length;
+      if (ol > nl) continue;
+      if (it.name.slice(0, ol) !== a.object) continue;
+      const c = (nl > ol) ? it.name.charCodeAt(ol) : 0;
+      if (c !== 0 && c !== 35 /*'#'*/ &&
+          !(c === 95 /*'_'*/ && nl > ol + 1 && it.name.charCodeAt(ol + 1) === 109 /*'m'*/))
+        continue;                          /* not this object's inst */
+      /* find / make this item's group */
+      let g = -1;
+      if (it.posedInst >= 0) {
+        for (let q = 0; q < grps.length; q++)
+          if (grps[q].posed === it.posedInst) { g = q; break; }
+      } else {
+        for (let q = 0; q < grps.length; q++) {
+          if (grps[q].posed >= 0) continue;
+          const b = items[grps[q].items[0]];
+          const dx = b.tx - it.tx, dy = b.ty - it.ty, dz = b.tz - it.tz;
+          if (dx * dx + dy * dy + dz * dz > 1e-6) continue;
+          g = q; break;      /* same stem family + same translation */
+        }
+      }
+      if (g < 0) {
+        if (grps.length >= 64) break;
+        g = grps.length;
+        grps.push({ items: [], n: 0, posed: it.posedInst, cx: 0, cy: 0, cz: 0 });
+      }
+      if (grps[g].n < 64) {
+        grps[g].items[grps[g].n++] = i;
+        grps[g].cx += it.cx; grps[g].cy += it.cy; grps[g].cz += it.cz;
+      }
+    }
+    if (!grps.length) continue;
+    /* group centroids -> distance^2 (kept in the cx/cy/cz slot) */
+    for (let q = 0; q < grps.length; q++) {
+      if (grps[q].n) {
+        const fx = grps[q].cx / grps[q].n;
+        const fy = grps[q].cy / grps[q].n;
+        const fz = grps[q].cz / grps[q].n;
+        const dx = fx - a.pos[0];
+        const dy = fy - (-a.pos[1]);      /* glTF y = -eng y */
+        const dz = fz - (-a.pos[2]);      /* glTF z = -eng z */
+        grps[q].cx = dx * dx + dy * dy + dz * dz;
+      } else {
+        grps[q].cx = 1e30;
+      }
+    }
+    /* selection: count==1 -> the nearest group; count>1 -> fill slots.
+     * POSED groups bind first with their own posedInst index; unposed
+     * groups only fill the remaining slots (clamped to want-1). */
+    {
+      const want = (a.count > 1) ? a.count : 1;
+      let posedAvail = 0;
+      for (let q = 0; q < grps.length; q++)
+        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) posedAvail++;
+      /* pass 1: every valid posed group */
+      if (posedAvail > 0) {
+        for (let q = 0; q < grps.length && posedAvail > 0; q++) {
+          if (grps[q].n === 0 || grps[q].posed < 0) continue;
+          if (grps[q].posed >= a.count) continue;
+          for (let j = 0; j < grps[q].n; j++) {
+            const it = items[grps[q].items[j]];
+            it.animIdx = k;
+            it.animInst = grps[q].posed;
+          }
+          grps[q].n = 0;                  /* mark used */
+          posedAvail--;
+        }
+      }
+      /* pass 2: unposed groups fill the remaining slots by distance
+       * (verbatim: the took-loop guard leaves took at 0 — fill = want) */
+      let took = 0;
+      for (let q = 0; q < grps.length && posedAvail > 0; q++) {
+        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) took++;
+      }
+      const fill = want - took;
+      let nth = 0;
+      for (let taken = 0; taken < fill; ) {
+        let bg = -1, bd = 1e30;
+        for (let q = 0; q < grps.length; q++) {
+          if (grps[q].n === 0) continue;         /* already used */
+          if (grps[q].posed >= 0) continue;      /* posed: done */
+          if (grps[q].cx < bd) { bd = grps[q].cx; bg = q; }
+        }
+        if (bg < 0) break;
+        if (nth > want - 1) nth = want - 1;      /* clamp (M-4) */
+        const cnt = grps[bg].n;
+        for (let j = 0; j < cnt; j++) {
+          const it = items[grps[bg].items[j]];
+          it.animIdx = k;
+          it.animInst = nth;
+        }
+        nth++;
+        grps[bg].n = 0;                          /* mark used */
+        taken++;
+      }
+    }
+  }
+  /* v27.2: gravityScatter seeding — per-instance live pos from each bean's
+   * AUTHORED posed translation + the scatter rolls (in ITEM order — the
+   * RNG draw order is part of the deterministic contract) */
+  for (let k = 0; k < S.anims.length; k++) {
+    const a = S.anims[k];
+    if (a.driver === 9 && !a.seeded) {
+      a.seeded = 1;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.animIdx !== k) continue;
+        const q = it.animInst;
+        if (q < 0 || q > 15) continue;
+        a.liveVy[q] = Math.trunc(-it.ty * 4096);   /* glTF y = -eng y */
+        a.liveVz[q] = Math.trunc(-it.tz * 4096);    /* glTF z = -eng z */
+        a.scatterAng[q] = sh1xRngNext(S) & 0xFFF;
+        a.scatterAmp[q] = sh1xMulSh(
+          sh1xSinQ12((sh1xRngNext(S) & 0x1FF) | 0x200), 9011, 12);
       }
     }
   }
 }
+
+/* The debug counter (the TV state machine + the raw families surfaced —
+ * trivial observable for the data-blocked TV paint). */
+function sh1xDriverDebugState(S) {
+  const out = [];
+  for (const a of S.anims) {
+    const d = { object: a.object, driver: a.driver, gated: !!a.gated };
+    if (a.driver === 2) {
+      d.tv = { ch: a.tvChannel, sub: a.tvSub, t: a.tvTimer, dur: a.tvDur,
+               slot: a.tvSlot, u: a.tvU, v: a.tvV, pat: a.tvPat,
+               patT: a.tvPatT, done: a.tvDone,
+               lcg: [a.lcgS1 >>> 0, a.lcgS2 >>> 0] };
+    }
+    if (a.driver === 1) d.fanAng = a.fanAng.slice(0, 16);
+    if (a.driver === 14) {
+      d.master = a.mvMaster;
+      d.pend = a.mvPend.slice(0, 4); d.pendVel = a.mvPendVel.slice(0, 4);
+    }
+    if (a.driver === 4 || a.driver === 5 || a.driver === 8)
+      d.raw = { vy: a.rawVy, vel: a.rawVel };
+    if (a.driver === 11) d.flicker = S.lightFlicker;
+    if (a.driver === 13 || a.driver === 15) d.master = a.mvMaster;
+    out.push(d);
+  }
+  return out;
+}
+/* ==== SH1X-DRIVERS-END ==== */
+
+/* ==================================================================== */
+/* T2 (v13.4): the SH1X prop-anim PREVIEW — the FULL driver set. The    */
+/* UI-independent VERBATIM port above is driven by this glue:          */
+/*   - per-model ITEM records built once from the loaded three.js scene */
+/*     (the GLTFLoader node objects — a node with >1 primitives        */
+/*     becomes a Group NAMED after the node whose primitive Meshes      */
+/*     carry mesh-def names, so the ITEM name is the OWNING NODE's      */
+/*     name: userData.name === .name marks node objects; posedInst      */
+/*     comes from the node extras' animInst, the world centroid from    */
+/*     the vertex data through the item's world matrix — the engine's  */
+/*     own M*c, fog_poc.c:7974-7990);                                  */
+/*   - the per-rec driver STATE {st, steps, lastT} (fog_poc.c's Sh1x +  */
+/*     the shared RNG seed): the 30Hz tick grid — during normal        */
+/*     playback ONE step advances per 1/30 s of preview time (the      */
+/*     engine's game frame); a seek/scrub/loop-wrap/model switch that   */
+/*     moves t BACK resets the state (RNG seed 1) and re-runs from     */
+/*     t=0; forward jumps catch up step-by-step (equivalent — every    */
+/*     step is dt=1/30, so the state is a deterministic function of    */
+/*     the step count: scrub-safe, paused = no re-run); the step count */
+/*     is capped at 5400 (180 s);                                      */
+/*   - the BIND is the engine's own sh1x_anims_bind (posed-first +    */
+/*     nearest-unposed per group, the gravityScatter bean seeding) —   */
+/*     built at load (the engine's REALTIME semantics: its single-shot  */
+/*     path binds at the first render instead; both are engine         */
+/*     behaviors — the editor previews the live room);                 */
+/*   - the POSE apply is the engine's sh1x_anim_apply: the Q12/Q10-    */
+/*     quantized rotation through the S-conjugated Euler (order 'YXZ', */
+/*     x preserved, y/z negated — M_gl = S·Ry(vy)Rx(vx)Rz(vz)·S, the   */
+/*     v13.3-established equivalence), the masked position axes        */
+/*     through the engine's Q8 grid with glTF y/z negated, written as   */
+/*     the node's LOCAL transform composed with the parent's world     */
+/*     matrix inverse (the engine replaces the item's whole world      */
+/*     matrix; the posed parents are translation-only so the compose   */
+/*     is exact);                                                       */
+/*   - lightFlicker drives the preview sun's intensity (the engine's   */
+/*     g_sh1xLightFlicker multiplies the env light weight);           */
+/*   - the TV screens stay at their authored pose (the QUAD paint is   */
+/*     data-blocked in the decomp — the state machine ticks;          */
+/*     window.__camtrack.sh1xDebugState() surfaces it);                */
+/*   - waterRipple/waterfall tick their state but the droplet/ripple   */
+/*     paint is an engine-only FX draw (no mesh pose — documented).    */
+const SH1X_MAX_STEPS = 5400;         /* 180 s at 30 Hz */
+const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
+let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
+
+function sh1xOwnerNode(o) {
+  /* the GLTFLoader node object that OWNS a mesh: node objects carry
+   * userData.name === .name (the raw glTF name); the primitive Meshes
+   * under a multi-primitive node's Group do not — walk up to the node. */
+  if (o.userData && o.userData.name === o.name) return o;
+  let p = o.parent;
+  while (p && !(p.userData && p.userData.name === p.name)) p = p.parent;
+  return p || o;
+}
+
+function sh1xBuildMeshRecords(rec) {
+  /* one ITEM record per primitive Mesh (the engine's per-primitive
+   * DrawItems, glb_walk_node order = the scene DFS the traverse yields) */
+  const items = [];
+  rec.scene.updateMatrixWorld(true);
+  rec.scene.traverse(o => {
+    if (!o.isMesh) return;
+    const owner = sh1xOwnerNode(o);
+    const name = (owner.userData && owner.userData.name) || owner.name || '';
+    const posedInst = (owner.userData && owner.userData.animInst != null)
+      ? +owner.userData.animInst : -1;
+    const mw = o.matrixWorld, el = mw.elements;
+    let cx = el[12], cy = el[13], cz = el[14];
+    const pos = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
+    if (pos) {
+      const a = pos.array, n = pos.count;
+      let sx = 0, sy = 0, sz = 0;
+      for (let i = 0; i < n; i++) { sx += a[i * 3]; sy += a[i * 3 + 1]; sz += a[i * 3 + 2]; }
+      if (n) { sx /= n; sy /= n; sz /= n; }
+      cx = el[0] * sx + el[4] * sy + el[8] * sz + el[12];
+      cy = el[1] * sx + el[5] * sy + el[9] * sz + el[13];
+      cz = el[2] * sx + el[6] * sy + el[10] * sz + el[14];
+    }
+    items.push({
+      name, posedInst,
+      tx: el[12], ty: el[13], tz: el[14],     /* the authored WORLD translation */
+      cx, cy, cz,                             /* the world vertex centroid */
+      animIdx: -1, animInst: 0,
+      node: owner,
+      basePos: owner.position.clone(), baseQuat: owner.quaternion.clone()
+    });
+  });
+  return items;
+}
+
+function sh1xDriverReset(rec) {
+  rec.sh1xSt = sh1xDriverInit(rec.sh1xAnims, rec.sh1xHeader, { animsDemo: true });
+  sh1xDriverBind(rec.sh1xSt, rec.sh1xItems);
+  rec.sh1xSt.steps = 0;
+}
+
+function applySh1xPropAnims(t) {
+  const rec = three.loaded.get(state.activeFile);
+  if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) {
+    if (sh1xSunLight) sh1xSunLight.intensity = SH1X_SUN_BASE_INTENSITY;
+    return;
+  }
+  if (!rec.sh1xItems) rec.sh1xItems = sh1xBuildMeshRecords(rec);
+  if (!rec.sh1xSt) sh1xDriverReset(rec);
+  let want = Math.floor((t + 1e-9) * 30);
+  if (want < 0) want = 0;
+  if (want > SH1X_MAX_STEPS) want = SH1X_MAX_STEPS;
+  if (want < rec.sh1xSt.steps) sh1xDriverReset(rec);   /* seek back: re-run from t=0 */
+  const S = rec.sh1xSt;
+  while (S.steps < want) { sh1xDriverTick(S, 1 / 30); S.steps++; }  /* the 30Hz grid */
+  S.lastT = t;
+  /* apply the live pose per bound NODE (all its primitive items share the
+   * bind group's animIdx/animInst — one pose per node) */
+  const on = state.sh1xAnimPreview !== false;
+  const D2R = Math.PI / 180;
+  const eul = new THREE.Euler();
+  const M = new THREE.Matrix4(), localM = new THREE.Matrix4(), invP = new THREE.Matrix4();
+  const pv = new THREE.Vector3(), pq = new THREE.Quaternion(), ps = new THREE.Vector3();
+  const seen = new Set();
+  for (const it of rec.sh1xItems) {
+    if (it.animIdx < 0) continue;
+    if (seen.has(it.node)) continue;
+    seen.add(it.node);
+    if (!on) {
+      it.node.position.copy(it.basePos);
+      it.node.quaternion.copy(it.baseQuat);
+      continue;
+    }
+    const ap = sh1xDriverApplyNum(S, it.animIdx, it.animInst, [it.tx, it.ty, it.tz]);
+    /* S-conjugated Euler: x preserved, y/z negated (order 'YXZ' = Ry·Rx·Rz) */
+    eul.set(ap.rotQ12[0] * (360 / 4096) * D2R,
+            -ap.rotQ12[1] * (360 / 4096) * D2R,
+            -ap.rotQ12[2] * (360 / 4096) * D2R, 'YXZ');
+    M.makeRotationFromEuler(eul);
+    M.setPosition(ap.t[0], ap.t[1], ap.t[2]);
+    /* the engine replaces the item's whole WORLD matrix — compose the
+     * node's local as parentWorld⁻¹ · M (posed parents are translation-only) */
+    if (it.node.parent) invP.copy(it.node.parent.matrixWorld).invert();
+    else invP.identity();
+    localM.multiplyMatrices(invP, M);
+    localM.decompose(pv, pq, ps);
+    it.node.position.copy(pv);
+    it.node.quaternion.copy(pq);
+    it.node.scale.copy(ps);
+  }
+  /* lightFlicker: the live multiplier on the preview sun (ungated drivers) */
+  let flick = 1;
+  if (on) for (const a of S.anims) if (a.driver === 11 && !a.gated) { flick = S.lightFlicker; break; }
+  if (sh1xSunLight) sh1xSunLight.intensity = SH1X_SUN_BASE_INTENSITY * flick;
+}
+
 function startRenderLoop() {
   let uiAcc = 0;
   /* v12: the per-track weather watcher — whenever the EFFECTIVE track
@@ -7252,7 +8604,7 @@ function startRenderLoop() {
     tickFly(dt);
     controls.update();
     tickPlayback(dt);
-    applySh1xPropAnims(state.t);   /* v13.2: the SH1X spin-family preview */
+    applySh1xPropAnims(state.t);   /* v13.2/v13.4: the full SH1X driver-set preview */
     const tr = playTarget() || selTrack();
     if (tr && tr.id !== lastWeatherTrackId) {
       const fxOff = !!(window.SHUI && window.SHUI.effectsOff);
@@ -8267,6 +9619,14 @@ window.__camtrack = {
   setSh1xAnimPreview(on) {
     state.sh1xAnimPreview = !!on;
     applySh1xPropAnims(state.t);
+  },
+  /* v13.4 (T2): the live SH1X driver state of the ACTIVE model (the TV
+   * state machine — data-blocked paint — the raw swing/ferris/carousel
+   * accumulators; the observable for the verbatim port)               */
+  sh1xDebugState() {
+    const rec = three.loaded.get(state.activeFile);
+    if (!rec || !rec.sh1xSt) return null;
+    return sh1xDriverDebugState(rec.sh1xSt);
   },
   addTrack, selectTrack,
   get turnInfo() {
