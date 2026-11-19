@@ -8745,22 +8745,32 @@ const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
 let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
 
 function sh1xOwnerNode(o) {
-  /* the GLTFLoader node object: single-primitive nodes reuse the MESH as
-   * the node object (mesh.name = the NODE name — the fan case); a
-   * MULTI-primitive node creates a GROUP named after the node whose
-   * primitive Meshes carry the MESH-DEF names ('<stem>_<primIdx>'). The
-   * bind suffix filter accepts only '#'/'_m' — the mesh-def '_<primIdx>'
-   * names are REJECTED, so every multi-primitive posed node (the APU
-   * ferris wheel/carousel, the 5-prim FW nodes) went UNBOUND and never
-   * posed (the user-reported "APU00FF/APUFFFE do not work on camtrack"
-   * — single-prim nodes like the school fan worked).
-   * THE FIX: the ripper puts extras on NODE defs ONLY (mesh defs never
-   * carry extras — verified across the corpus), so the node object is
-   * the nearest SELF/ancestor with a NON-EMPTY userData (the node
-   * extras: ot_base/field_B_1/propAnimPosed/animInst). The legacy
-   * userData.name===.name convention matched nothing (the ripper emits
-   * no extras.name) — removed. */
+  /* Resolve the GLTFLoader object that corresponds to the owning glTF
+   * NODE. AUDIT-A correction (the af74b7b narrative was WRONG: r170
+   * GLTFLoader sets node.userData.name = nodeDef.name on every named
+   * node, so the legacy userData.name===.name check worked too — the
+   * user-visible APU fix was the T2 commit 54743db's driver set, not a
+   * bind failure). The robust discriminator for a NODE object: it
+   * carries the NODE extras — the ripper emits ot_base on EVERY node
+   * def (183/183 APU00FF, 94/94 SU0203) and NEVER on mesh defs
+   * (0/3812 mesh defs across the corpus carry extras). Single-prim
+   * nodes: GLTFLoader reuses the primitive Mesh AS the node object
+   * (mesh.name = node name, node extras in mesh.userData — the
+   * school-fan case). Multi-prim nodes: a Group carries the node name
+   * + extras; the primitive Meshes under it carry mesh-def names —
+   * walk up to the Group. Hardened: mesh-def extras (loader-supported)
+   * and unnamed nodes can never steal ownership (an unnamed node still
+   * carries ot_base, resolves to itself, and its empty name then fails
+   * the bind's prefix filter exactly like the C engine's empty
+   * item.name — fog_poc.c:2388). */
   let p = o;
+  while (p) {
+    if (p.userData && p.userData.ot_base !== undefined) return p;
+    p = p.parent;
+  }
+  /* no node-extras carrier found (a non-ripper GLB): fall back to the
+   * nearest ancestor with non-empty userData, else the mesh itself */
+  p = o;
   while (p) {
     if (p.userData && Object.keys(p.userData).length) return p;
     p = p.parent;
@@ -8797,7 +8807,8 @@ function sh1xBuildMeshRecords(rec) {
       cx, cy, cz,                             /* the world vertex centroid */
       animIdx: -1, animInst: 0,
       node: owner,
-      basePos: owner.position.clone(), baseQuat: owner.quaternion.clone()
+      basePos: owner.position.clone(), baseQuat: owner.quaternion.clone(),
+      baseScale: owner.scale.clone()          /* AUDIT-A 5: restore on preview-off */
     });
   });
   return items;
@@ -8896,6 +8907,7 @@ function applySh1xPropAnims(t) {
     if (!on) {
       it.node.position.copy(it.basePos);
       it.node.quaternion.copy(it.baseQuat);
+      it.node.scale.copy(it.baseScale);   /* AUDIT-A 5: scale restored too */
       continue;
     }
     const ap = sh1xDriverApplyNum(S, it.animIdx, it.animInst, [it.tx, it.ty, it.tz]);
