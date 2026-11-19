@@ -8745,13 +8745,27 @@ const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
 let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
 
 function sh1xOwnerNode(o) {
-  /* the GLTFLoader node object that OWNS a mesh: node objects carry
-   * userData.name === .name (the raw glTF name); the primitive Meshes
-   * under a multi-primitive node's Group do not — walk up to the node. */
-  if (o.userData && o.userData.name === o.name) return o;
-  let p = o.parent;
-  while (p && !(p.userData && p.userData.name === p.name)) p = p.parent;
-  return p || o;
+  /* the GLTFLoader node object: single-primitive nodes reuse the MESH as
+   * the node object (mesh.name = the NODE name — the fan case); a
+   * MULTI-primitive node creates a GROUP named after the node whose
+   * primitive Meshes carry the MESH-DEF names ('<stem>_<primIdx>'). The
+   * bind suffix filter accepts only '#'/'_m' — the mesh-def '_<primIdx>'
+   * names are REJECTED, so every multi-primitive posed node (the APU
+   * ferris wheel/carousel, the 5-prim FW nodes) went UNBOUND and never
+   * posed (the user-reported "APU00FF/APUFFFE do not work on camtrack"
+   * — single-prim nodes like the school fan worked).
+   * THE FIX: the ripper puts extras on NODE defs ONLY (mesh defs never
+   * carry extras — verified across the corpus), so the node object is
+   * the nearest SELF/ancestor with a NON-EMPTY userData (the node
+   * extras: ot_base/field_B_1/propAnimPosed/animInst). The legacy
+   * userData.name===.name convention matched nothing (the ripper emits
+   * no extras.name) — removed. */
+  let p = o;
+  while (p) {
+    if (p.userData && Object.keys(p.userData).length) return p;
+    p = p.parent;
+  }
+  return o;
 }
 
 function sh1xBuildMeshRecords(rec) {
