@@ -3620,6 +3620,19 @@ window.SHUI = (function () {
     effectsOff: false,
     fxOffPair: null,      /* the real session pair while the override runs */
     fxOffFlash: false,    /* the real flashlight state while it runs       */
+    /* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT (models[].light) —
+     * the authored 6-DOF flashlight emulating Harry's: follow "world" =
+     * the free pose (pos + the world-fixed aim); follow "camera" = the
+     * anchor (offset + rot in the camera frame) + ahead; on = the boot
+     * toggle (Game_TurnFlashlightOn); the aim = the ANGLE DISTINCTION
+     * (func_8003F4DC's rot math, the verbatim -15deg default). The light
+     * NEVER fires in day modes — the verbatim Spot/unavailable gates.  */
+    lightOn: true,       /* the authored on/off (light.on)                 */
+    lightFollow: 'camera',
+    lightPos: [0, 1, 0],       /* m, world (follow world)                */
+    lightRot: [-15, 0, 0],    /* deg (pitch, yaw, roll — the aim)        */
+    lightOffset: [-0.08, 0.28, -0.12],  /* m, camera-local (follow camera) */
+    lightAhead: 0,            /* m along the beam                        */
     cmdEl: null, stateEl: null, lockEl: null,
     refreshAcc: 0
   };
@@ -3821,6 +3834,50 @@ window.SHUI = (function () {
       app override &gt; track &gt; model &gt; app custom mapping &gt; authentic default.</div>
   </div>
 </div>
+<div class="wgroup open" id="wg-light">
+  <div class="wgroup-h">User light — task 3 · v13.5<span class="chev">&#9654;</span></div>
+  <div class="wgroup-body">
+    <label class="tgl-row"><input type="checkbox" id="tgl-lighton">
+      <span><b>Light on</b> — Game_TurnFlashlightOn/Off</span></label>
+    <div class="wrow"><label>Follow</label>
+      <select class="sel" id="light-follow" style="flex:1">
+        <option value="camera">camera — Harry's anchor (offset + rot in the camera frame)</option>
+        <option value="world">world — the FREE 6-DOF pose (pos + the world-fixed aim)</option>
+      </select></div>
+    <div class="wrow"><label>Pos (m)</label>
+      <div style="flex:1;display:flex;gap:4px">
+        <input type="number" step="0.1" id="light-px" style="width:100%" title="world x">
+        <input type="number" step="0.1" id="light-py" style="width:100%" title="world y">
+        <input type="number" step="0.1" id="light-pz" style="width:100%" title="world z">
+      </div></div>
+    <div class="wrow"><label>Aim (deg)</label>
+      <div style="flex:1;display:flex;gap:4px">
+        <input type="number" step="1" id="light-rp" style="width:100%" title="pitch (down = negative; the verbatim -15)">
+        <input type="number" step="1" id="light-ry" style="width:100%" title="yaw">
+        <input type="number" step="1" id="light-rr" style="width:100%" title="roll (no engine term — parsed for symmetry)">
+      </div></div>
+    <div class="wrow"><label>Offset (m)</label>
+      <div style="flex:1;display:flex;gap:4px">
+        <input type="number" step="0.01" id="light-ox" style="width:100%" title="camera-local x">
+        <input type="number" step="0.01" id="light-oy" style="width:100%" title="camera-local y">
+        <input type="number" step="0.01" id="light-oz" style="width:100%" title="camera-local z">
+      </div></div>
+    <div class="wrow"><label>Ahead (m)</label>
+      <input type="number" step="0.1" min="0" id="light-ahead" style="flex:1"
+        title="meters forward along the beam (the --userlight-ahead surface)"></div>
+    <div class="wlegend"><b>v13.5:</b> the USER PROGRAMMABLE LIGHT (task 3) — a light source that
+      emulates Harry's flashlight and <b>moves in all the ways the camera can</b>: a full 6-DOF pose
+      (position + the independent AIM — the angle distinction; func_8003F4DC's rot math with the
+      verbatim −15° tilt as the default). <b>on/off</b> = the engine's flashlight toggle; in DAY
+      modes the light stays INERT exactly like the engine (lightMode None + the identical-pair
+      auto-off rule — never a forced Spot). follow <b>camera</b> = the Harry anchor
+      (Game_FlashlightAttribsSet offset −0.08,−0.28,0.12 + the beam rot, camera-relative);
+      follow <b>world</b> = the free-world light (the NULL-bone path — lights the geometry from
+      its own position with a world-fixed aim). Saved as <code>models[].light</code>; the PoC
+      consumes it at boot (CLI &gt; camdat &gt; the GLB's unbiased userLight EXTRAs).</div>
+    <div class="lock-note" id="light-note"></div>
+  </div>
+</div>
 <div class="wgroup open" id="wg-weather">
   <div class="wgroup-h">Weather — per track<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
@@ -3948,6 +4005,40 @@ window.SHUI = (function () {
         const [a, c] = b.dataset.pair.split(',').map(Number);
         applyPair(a, c, 'chip');
       }));
+    /* v13.5 (T7 — task 3): the USER LIGHT panel listeners */
+    {
+      const onEl = host.querySelector('#tgl-lighton');
+      if (onEl) onEl.addEventListener('change', e => {
+        U.lightOn = e.target.checked === true;
+        SV.setFlashlight(U.lightOn);   /* the preview env follows the toggle */
+        syncLightModel(); syncEnvUI();
+      });
+      const fwEl = host.querySelector('#light-follow');
+      if (fwEl) fwEl.addEventListener('change', e => {
+        U.lightFollow = e.target.value === 'world' ? 'world' : 'camera';
+        syncLightModel(); syncLightUI();
+      });
+      const numIds = ['light-px', 'light-py', 'light-pz', 'light-rp', 'light-ry', 'light-rr',
+                      'light-ox', 'light-oy', 'light-oz', 'light-ahead'];
+      numIds.forEach(id => {
+        const el = host.querySelector('#' + id);
+        if (el) el.addEventListener('change', () => {
+          const v = +el.value;
+          if (!isFinite(v)) { syncLightUI(); return; }
+          if (id === 'light-px') U.lightPos[0] = v;
+          else if (id === 'light-py') U.lightPos[1] = v;
+          else if (id === 'light-pz') U.lightPos[2] = v;
+          else if (id === 'light-rp') U.lightRot[0] = v;
+          else if (id === 'light-ry') U.lightRot[1] = v;
+          else if (id === 'light-rr') U.lightRot[2] = v;
+          else if (id === 'light-ox') U.lightOffset[0] = v;
+          else if (id === 'light-oy') U.lightOffset[1] = v;
+          else if (id === 'light-oz') U.lightOffset[2] = v;
+          else if (id === 'light-ahead') U.lightAhead = Math.max(0, v);
+          syncLightModel(); syncLightUI();
+        });
+      });
+    }
     /* authentic pair select */
     host.querySelector('#env-pair-sel').addEventListener('change', e => {
       const v = +e.target.value;
@@ -4728,6 +4819,64 @@ window.SHUI = (function () {
     syncPhaseUI();
   }
 
+  /* ------------------------------------------------------------------
+   * v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT — apply/sync the
+   * models[].light block (the authored 6-DOF flashlight; the panel state
+   * mirrors the model; the authored on/off also drives the preview's
+   * flashlight env state — exactly what the players' boots resolve).   */
+  function applyModelLight(m) {
+    if (m && m.light) {
+      const l = m.light;
+      if (typeof l.on === 'boolean') U.lightOn = l.on;
+      if (l.follow === 'world' || l.follow === 'camera') U.lightFollow = l.follow;
+      if (Array.isArray(l.pos) && l.pos.length >= 3) U.lightPos = [+l.pos[0] || 0, +l.pos[1] || 0, +l.pos[2] || 0];
+      if (Array.isArray(l.rot) && l.rot.length >= 3) U.lightRot = [+l.rot[0] || 0, +l.rot[1] || 0, +l.rot[2] || 0];
+      if (Array.isArray(l.offset) && l.offset.length >= 3) U.lightOffset = [+l.offset[0] || 0, +l.offset[1] || 0, +l.offset[2] || 0];
+      if (l.ahead != null && isFinite(+l.ahead)) U.lightAhead = Math.max(0, +l.ahead);
+      /* the authored on/off drives the preview's flashlight env state too
+       * (the engine's boot toggle — the camdat light.on replaces the env
+       * flashlightOn at boot in the PoC/wallpaper precedence)             */
+      if (typeof l.on === 'boolean') SV.setFlashlight(l.on);
+    }
+    syncLightUI();
+  }
+  function syncLightUI() {
+    const on = document.querySelector('#tgl-lighton');
+    if (on) on.checked = U.lightOn;
+    const fw = document.querySelector('#light-follow');
+    if (fw) fw.value = U.lightFollow;
+    const vals = { 'light-px': U.lightPos[0], 'light-py': U.lightPos[1], 'light-pz': U.lightPos[2],
+                   'light-rp': U.lightRot[0], 'light-ry': U.lightRot[1], 'light-rr': U.lightRot[2],
+                   'light-ox': U.lightOffset[0], 'light-oy': U.lightOffset[1], 'light-oz': U.lightOffset[2],
+                   'light-ahead': U.lightAhead };
+    for (const k in vals) {
+      const el = document.getElementById(k);
+      if (el) el.value = String(Math.round(+vals[k] * 1000) / 1000);
+    }
+    const note = document.querySelector('#light-note');
+    if (note)
+      note.textContent = U.lightFollow === 'world'
+        ? 'follow WORLD — pos ' + U.lightPos.map(v => v.toFixed(1)).join(', ') +
+          ' m, aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (world-fixed)'
+        : 'follow CAMERA — offset ' + U.lightOffset.join(', ') + ' m, aim ' +
+          U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' +
+          (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '');
+  }
+  function syncLightModel() {
+    if (!bridge || !SV.V.env) return;
+    const m = bridge.getActiveModel();
+    if (!m) return;
+    const l = {};
+    l.on = U.lightOn === true;
+    l.follow = U.lightFollow === 'world' ? 'world' : 'camera';
+    if (l.follow === 'world') l.pos = U.lightPos.slice();
+    else l.offset = U.lightOffset.slice();
+    l.rot = U.lightRot.slice();
+    if (U.lightAhead > 0) l.ahead = U.lightAhead;
+    m.light = l;
+    if (bridge.markDirty) bridge.markDirty();
+  }
+
   /* ------------------------------------------------------------------ */
   function init(br) {
     SC = window.SHCore;
@@ -4744,6 +4893,7 @@ window.SHUI = (function () {
            setEffectsOff, applyRegistrationWhileFxOff, syncFxUI,
            cliCommand, urlParams, syncEnvUI, syncWeatherUI, cycleNight,
            setPhase, cyclePhase, syncPhaseUI,
+           applyModelLight, syncLightUI, syncLightModel,
            get phase() { return U.phase; },
            hadUrlParams: () => !!U.urlOverride,
            get effectsOff() { return U.effectsOff; },
@@ -4782,6 +4932,7 @@ const DOC_STRING =
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
+  'USER PROGRAMMABLE LIGHT (v13.5, task 3): models[].light { on (boolean, the Game_TurnFlashlightOn boot toggle), follow "camera"|"world", pos[3] meters (world), rot[3] degrees (pitch,yaw,roll — the AIM; the verbatim default -15,0,0 = Harry\u2019s lightRotation; roll has no engine term), offset[3] meters (camera-local; the verbatim Game_FlashlightAttribsSet anchor -0.08,-0.28,0.12), ahead meters (forward along the beam) } — the 6-DOF light source that emulates Harry\u2019s flashlight: it moves in all the ways the camera can (a free world pose OR the camera-follow anchor), is disable-able (on=false + the runtime F key), NEVER fires in day modes (the verbatim lightMode-None + identical-pair auto-off gates — never a forced Spot), and has angle distinction (the authored aim drives func_8003F4DC\u2019s rot math in every consumer: the per-vertex MESH light, the lens-flare/water FX, the screen angles). Resolution: CLI --userlight/--userlightrot > camdat light > the GLB\u2019s unbiased userLight EXTRAs > the verbatim constants. ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
 
 /* ------------------------------------------------------------------ utils */
@@ -5582,6 +5733,7 @@ function docToJSON() {
       nighton: m.nighton === true,
       flashlighton: m.flashlighton === true,
       env: m.env ? sanitizeEnv(m.env) : undefined,
+      light: m.light ? sanitizeLight(m.light) : undefined,
       tracks: m.tracks.map(trackToJSON)
     }))
   };
@@ -5610,6 +5762,23 @@ function sanitizeEnv(raw) {
   return Object.keys(e).length ? e : null;
 }
 function num(v, def) { const n = +v; return isFinite(n) ? n : def; }
+/* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT sanitizer — the export
+ * whitelist (mirrors the engine's models[].light parse exactly: strict
+ * types, per-field presence, clamps). */
+function sanitizeLight(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const l = {};
+  if (typeof raw.on === 'boolean') l.on = raw.on;
+  if (raw.follow === 'world' || raw.follow === 'camera') l.follow = raw.follow;
+  if (Array.isArray(raw.pos) && raw.pos.length >= 3 && raw.pos.slice(0, 3).every(x => isFinite(+x)))
+    l.pos = [+raw.pos[0], +raw.pos[1], +raw.pos[2]];
+  if (Array.isArray(raw.rot) && raw.rot.length >= 3 && raw.rot.slice(0, 3).every(x => isFinite(+x)))
+    l.rot = [+raw.rot[0], +raw.rot[1], +raw.rot[2]];
+  if (Array.isArray(raw.offset) && raw.offset.length >= 3 && raw.offset.slice(0, 3).every(x => isFinite(+x)))
+    l.offset = [+raw.offset[0], +raw.offset[1], +raw.offset[2]];
+  if (raw.ahead != null && isFinite(+raw.ahead)) l.ahead = Math.max(0, +raw.ahead);
+  return Object.keys(l).length ? l : null;
+}
 function vec3(v, def) {
   if (Array.isArray(v) && v.length >= 3 && v.slice(0, 3).every(x => isFinite(+x))) return [+v[0], +v[1], +v[2]];
   return def;
@@ -5783,7 +5952,7 @@ function sanitizeDoc(raw) {
   if (raw && typeof raw === 'object' && Array.isArray(raw.models)) {
     for (const m of raw.models) {
       if (!m || typeof m.file !== 'string' || !m.file) continue;
-      const entry = { file: m.file, addedAt: typeof m.addedAt === 'string' ? m.addedAt : new Date().toISOString(), bounds: null, tracks: [], fogon: m.fogon === true, nighton: m.nighton === true, flashlighton: m.flashlighton === true, env: sanitizeEnv(m.env) };
+      const entry = { file: m.file, addedAt: typeof m.addedAt === 'string' ? m.addedAt : new Date().toISOString(), bounds: null, tracks: [], fogon: m.fogon === true, nighton: m.nighton === true, flashlighton: m.flashlighton === true, env: sanitizeEnv(m.env), light: sanitizeLight(m.light) };
       if (m.bounds && Array.isArray(m.bounds.min) && Array.isArray(m.bounds.max)) {
         entry.bounds = { min: vec3(m.bounds.min, [0, 0, 0]), max: vec3(m.bounds.max, [0, 0, 0]) };
       }
@@ -6431,6 +6600,10 @@ function registerModel(name, gltf) {
         else if (!window.SHUI.hadUrlParams() && entry.env) window.SHUI.applyModelEnv(entry);
         else window.SHUI.reapplyBootSelection();
         window.SHUI.writeEnvToModel(entry);
+        /* v13.5 (T7 — task 3): the model's authored USER LIGHT rides the
+         * registration (the panel + the gizmo follow the active model)   */
+        if (entry.light && typeof entry.light.on === 'boolean')
+          window.SHUI.applyModelLight(entry);
       }
       toast('World engine ready — 21 presets / 24 pairs / 9 weather states' +
             (window.SHView.V.snow.gh ? ' · ground datum ' + window.SHView.V.snow.datumM.toFixed(2) + ' m' : ' · no track yet (ground pending)'));
@@ -8622,6 +8795,63 @@ function sh1xDriverReset(rec) {
   rec.sh1xSt.steps = 0;
 }
 
+/* T7 (v13.5): the USER LIGHT gizmo — the authored pose VISUALIZED (a
+ * wireframe marker + the beam arrow; follow camera rides the ACTIVE TRACK
+ * camera via the PiP pose, follow world stays at the authored world pose;
+ * hidden when the light is off). PREVIEW AID ONLY — the per-vertex light
+ * RENDER is the players' engine job (the PoC/wallpaper consume the same
+ * models[].light at boot); the editor shows where the authored light sits
+ * and where it aims — the angle distinction made visible.                */
+let lightGizmo = null;
+function lightGizmoEnsure() {
+  if (lightGizmo) return lightGizmo;
+  const g = new THREE.Group();
+  const marker = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.09),
+    new THREE.MeshBasicMaterial({ color: 0xffe28a, wireframe: true }));
+  const arrow = new THREE.ArrowHelper(
+    new THREE.Vector3(0, -0.2588, -0.9659), new THREE.Vector3(), 1.4, 0xffd24a, 0.3, 0.15);
+  g.add(marker, arrow);
+  g.userData.arrow = arrow;
+  g.visible = false;
+  lightGizmo = g;
+  scene.add(g);
+  return g;
+}
+function updateLightGizmo() {
+  const m = activeModel();
+  const g = lightGizmoEnsure();
+  if (!m || !m.light || m.light.on === false) { g.visible = false; return; }
+  const l = m.light;
+  const D2R = Math.PI / 180;
+  const pitch = (Array.isArray(l.rot) && isFinite(+l.rot[0]) ? +l.rot[0] : -15) * D2R;
+  const yaw = (Array.isArray(l.rot) && isFinite(+l.rot[1]) ? +l.rot[1] : 0) * D2R;
+  const t = Math.cos(pitch);
+  /* the engine's beam dir (sh_light_dir_from_rot's glTF frame):
+   * (t*sin(yaw), sin(pitch), -t*cos(yaw)) — pitch<0 aims DOWN           */
+  const dir = new THREE.Vector3(t * Math.sin(yaw), Math.sin(pitch), -t * Math.cos(yaw));
+  if (l.follow === 'world') {
+    g.visible = true;
+    g.position.set(+l.pos[0] || 0, +l.pos[1] || 0, +l.pos[2] || 0);
+    g.userData.arrow.setDirection(dir);
+  } else {
+    /* follow camera: the Harry anchor over the ACTIVE TRACK camera pose
+     * (the PiP camera IS the track camera, updated this frame)          */
+    if (!pipCam || pipCam.matrixAutoUpdate) pipCam.updateMatrix();
+    const camQ = pipCam.quaternion.clone();
+    const off = new THREE.Vector3(
+      Array.isArray(l.offset) && isFinite(+l.offset[0]) ? +l.offset[0] : -0.08,
+      Array.isArray(l.offset) && isFinite(+l.offset[1]) ? +l.offset[1] : 0.28,
+      Array.isArray(l.offset) && isFinite(+l.offset[2]) ? +l.offset[2] : -0.12);
+    const ahead = l.ahead != null && isFinite(+l.ahead) ? Math.max(0, +l.ahead) : 0;
+    const world = off.applyQuaternion(camQ).add(pipCam.position);
+    if (ahead > 0) world.add(dir.clone().multiplyScalar(ahead));
+    g.visible = true;
+    g.position.copy(world);
+    g.userData.arrow.setDirection(dir.clone().applyQuaternion(camQ));
+  }
+}
+
 function applySh1xPropAnims(t) {
   const rec = three.loaded.get(state.activeFile);
   if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) {
@@ -8703,6 +8933,7 @@ function startRenderLoop() {
     controls.update();
     tickPlayback(dt);
     applySh1xPropAnims(state.t);   /* v13.2/v13.4: the full SH1X driver-set preview */
+    updateLightGizmo();            /* v13.5 (T7): the user-light pose gizmo */
     const tr = playTarget() || selTrack();
     if (tr && tr.id !== lastWeatherTrackId) {
       const fxOff = !!(window.SHUI && window.SHUI.effectsOff);
@@ -9725,6 +9956,16 @@ window.__camtrack = {
     const rec = three.loaded.get(state.activeFile);
     if (!rec || !rec.sh1xSt) return null;
     return sh1xDriverDebugState(rec.sh1xSt);
+  },
+  /* v13.5 (T7): the user-light gizmo debug state (automation surface) */
+  lightGizmoInfo() {
+    const m = activeModel();
+    if (!lightGizmo) return { exists: false };
+    return {
+      exists: true, visible: lightGizmo.visible,
+      position: lightGizmo.position.toArray(),
+      modelLight: (m && m.light) ? JSON.parse(JSON.stringify(m.light)) : null
+    };
   },
   addTrack, selectTrack,
   get turnInfo() {
