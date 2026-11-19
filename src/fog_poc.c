@@ -14283,22 +14283,16 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    /* ---- locate inputs: explicit path > cwd > input/ ---- */
+    /* ---- locate inputs: explicit path > cwd > input/ ----
+     * v33.8: the CAMDAT resolves FIRST and its FIRST MODEL's GLB is the
+     * default scene. The old order always booted THRF9FD.glb (the town
+     * street — no propAnims), so the drop-in flow (a folder holding
+     * camdat.json + the user's GLBs, no --glb) either errored out ("cannot
+     * find THRF9FD.glb") or played an UNANIMATED street while the camdat
+     * pointed at an animated room — the user-reported "PoC not animated
+     * AT ALL" (v33.3). Order now: --glb > camdat models[0].file (cwd /
+     * input/) > THRF9FD.glb (the wallpaper street fallback). */
     char glbBuf[512], cdBuf[512];
-    if (!glbPath) {
-        const char *cands[4] = { "THRF9FD.glb", "input/THRF9FD.glb", "./THRF9FD.glb", "./input/THRF9FD.glb" };
-        if (inputDir) {
-            snprintf(glbBuf, sizeof(glbBuf), "%s/THRF9FD.glb", inputDir);
-            cands[0] = glbBuf;
-        }
-        for (int i = 0; i < 4; i++) {
-            if (file_exists(cands[i])) { glbPath = cands[i]; break; }
-        }
-        if (!glbPath) {
-            fprintf(stderr, "cannot find THRF9FD.glb (use --glb FILE or --input DIR)\n");
-            return 1;
-        }
-    }
     if (!camdatPath) {
         const char *cands[4] = { "camdat.json", "input/camdat.json", "./camdat.json", "./input/camdat.json" };
         if (inputDir) {
@@ -14314,6 +14308,84 @@ int main(int argc, char **argv) {
         }
         camdatAuto = 1;   /* auto-discovered: camera track only, not an
                            * authored env for this room (v33) */
+    }
+    if (!glbPath) {
+        /* v33.8: peek the camdat's models[0].file — the USER'S authored
+         * scene is the default (json_parse + the same accessors the camdat
+         * loader uses; a malformed file falls through to THRF9FD, the
+         * loader below reports the JSON error itself). */
+        char first[512] = {0};
+        int haveFirst = 0;
+        {
+            FILE *fj = fopen(camdatPath, "rb");
+            if (fj) {
+                fseek(fj, 0, SEEK_END);
+                long jsz = ftell(fj);
+                fseek(fj, 0, SEEK_SET);
+                if (jsz > 0 && jsz < 16L * 1024 * 1024) {
+                    char *jtext = (char *)malloc((size_t)jsz + 1);
+                    if (jtext && fread(jtext, 1, (size_t)jsz, fj) == (size_t)jsz) {
+                        jtext[jsz] = 0;
+                        JValue *root = json_parse(jtext, (size_t)jsz);
+                        if (root) {
+                            const JValue *models = jarr(root, "models");
+                            const JValue *m0 = models ? jat(models, 0) : NULL;
+                            const char *mf = m0 ? jstr(m0, "file", "") : "";
+                            if (mf && *mf) {
+                                snprintf(first, sizeof(first), "%s", mf);
+                                haveFirst = 1;
+                            }
+                            jfree(root);
+                        }
+                        free(jtext);
+                    } else if (jtext) free(jtext);
+                }
+                fclose(fj);
+            }
+        }
+        if (haveFirst) {
+            /* strip any directory part — candidates resolve against the
+             * cwd and the --input dir, mirroring the THR fallback below */
+            const char *base = strrchr(first, '/');
+            #ifdef _WIN32
+            { const char *bs = strrchr(first, '\\'); if (bs && (!base || bs > base)) base = bs; }
+            #endif
+            base = base ? base + 1 : first;
+            static const char *pfx[2] = { "", "input/" };
+            for (int k = 0; k < 2 && !glbPath; k++) {
+                char try[600];
+                snprintf(try, sizeof(try), "%s%s", pfx[k], base);
+                if (file_exists(try)) {
+                    char *dup = strdup(try);
+                    if (dup) glbPath = dup;
+                }
+            }
+            if (inputDir && !glbPath) {
+                char try[600];
+                snprintf(try, sizeof(try), "%s/%s", inputDir, base);
+                if (file_exists(try)) {
+                    char *dup = strdup(try);
+                    if (dup) glbPath = dup;
+                }
+            }
+            if (glbPath)
+                printf("[boot] camdat default scene: %s (models[0].file)\n",
+                       glbPath);
+        }
+        if (!glbPath) {
+            const char *cands[4] = { "THRF9FD.glb", "input/THRF9FD.glb", "./THRF9FD.glb", "./input/THRF9FD.glb" };
+            if (inputDir) {
+                snprintf(glbBuf, sizeof(glbBuf), "%s/THRF9FD.glb", inputDir);
+                cands[0] = glbBuf;
+            }
+            for (int i = 0; i < 4; i++) {
+                if (file_exists(cands[i])) { glbPath = cands[i]; break; }
+            }
+            if (!glbPath) {
+                fprintf(stderr, "cannot find THRF9FD.glb (use --glb FILE or --input DIR)\n");
+                return 1;
+            }
+        }
     }
 
     /* ---- optional standalone TIM viewer ---- */
@@ -14358,6 +14430,23 @@ int main(int argc, char **argv) {
     if (!camdat_load(&cd, camdatPath, glbPath)) {
         fprintf(stderr, "camdat %s: no usable track\n", camdatPath);
         return 1;
+    }
+    /* v33.8: an auto-discovered camdat whose MATCHED model is exactly the
+     * booted GLB is AUTHORED for this room (the v33 camdatAuto guard dates
+     * from the forced-THR-default boot, where the camdat's env could not
+     * match the street) — its env applies like a --camdat run. */
+    if (camdatAuto) {
+        const char *mb = strrchr(cd.modelFile, '/');
+        #ifdef _WIN32
+        { const char *bs = strrchr(cd.modelFile, '\\'); if (bs && (!mb || bs > mb)) mb = bs; }
+        #endif
+        mb = mb ? mb + 1 : cd.modelFile;
+        const char *gb = strrchr(glbPath, '/');
+        #ifdef _WIN32
+        { const char *bs2 = strrchr(glbPath, '\\'); if (bs2 && (!gb || bs2 > gb)) gb = bs2; }
+        #endif
+        gb = gb ? gb + 1 : glbPath;
+        if (mb && gb && !strcmp(mb, gb)) camdatAuto = 0;
     }
     if (trackSel >= 0) {                 /* --track N (like the editor's
                                           * track selection / play button) */
