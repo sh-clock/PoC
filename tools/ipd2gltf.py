@@ -476,6 +476,81 @@ _TV_PAINT_STYLES = [
 ]
 
 
+_WATER_FLOOR_SRC = (
+    "func_8008E4EC lens_flare.c:497-502 (img0 {tPage{0,13}} all-zero -> "
+    "Material_FsImageApply materials.c:130-160: field_E=45 = 4bpp page-13 "
+    "x832 ABR-1 ADDITIVE, field_10=0 -> CLUT (0,0)) + WorldMap_"
+    "TexturesInit map.c:137-190 (fullPage slot i: CLUT strip (16*i, 0), "
+    "pixels (512+64*i, 0)) + Texture_Get materials.c:178-222 (slots in PLM "
+    "material-table order) + LmFilter_IsHalfPage map.c:1226-1241 (name "
+    "ends 'H' = half page)"
+)
+
+
+def _room_water_floor(room, resolver, report):
+    """v37: SH1X.waterFloor — the room's slot-0 CLUT row 0 (16 raw u16).
+
+    The engine's DWAVE floor redirect makes the water-floor quads read the
+    live 32x32 tile (the func_8008E5B4 write window at VRAM (832,224)) as
+    4bpp NIBBLES through the ROOM's FIRST fullPage texture-slot palette
+    (CLUT (0,0) — the slot strips at (16*i, 0), the FIRST table material's
+    TIM in slot 0). The clut15 array is that palette's row 0, VERBATIM raw
+    15-bit values. Consumers rebuild the floor view as:
+      texel(u, row) = clut15[(liveTile15[row][u>>2] >> (4*(u&3))) & 0xF]
+    (u 0..127 = the 32-halfword patch's 128 texels, rows 0..31) — the
+    page-texel UV mapping documented in SH1X_EXTRAS_V3_FX.md.
+
+    Emitted ONLY for rooms whose material table carries "DWAVE" (the
+    waterLive floor material) AND whose slot-0 TIM resolves locally; a
+    miss emits nothing (the consumer's legacy floor path — graceful no-op).
+    """
+    if room.plm is None:
+        return None
+    names = []
+    for raw in room.plm.tex_raws:
+        names.append(raw[:8].decode("ascii", "replace").rstrip("\x00"))
+    if not any(n == "DWAVE" for n in names):
+        return None
+    slot0 = None
+    for n in names:
+        if n.endswith("H"):        # LmFilter_IsHalfPage map.c:1226-1241
+            continue
+        slot0 = n
+        break
+    if slot0 is None:
+        return None
+    entry = None
+    try:
+        entry, _rec = resolver.resolve(slot0, room.name)
+    except Exception:
+        entry = None
+    if entry is None:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room.name}: waterFloor: slot-0 TIM {slot0} not resolved — "
+                f"waterFloor extras omitted (legacy floor path)")
+        return None
+    try:
+        tim = TimFile(slot0, entry.read_bytes())
+        row, _py = tim.palette(0)
+    except Exception as e:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room.name}: waterFloor: slot-0 TIM {slot0}: {e}")
+        return None
+    return {
+        "clutSource": slot0,
+        "clut15": [int(c) & 0xFFFF for c in row],
+        "slot0": {"clutX": 0, "clutY": 0, "pixelX": 512, "pixelY": 0,
+                  "src": "WorldMap_TexturesInit map.c:153-166 fullPage slot 0"},
+        "floorUv": {"pageTexel": True, "patchU": [0, 127], "patchV": [224, 255],
+                     "note": "the MIZ quads' UVs are page-13 texel coords "
+                              "(normalized by the DR_WAVE image's 256x64); "
+                              "the live patch = u 0..127, v 224..255"},
+        "src": _WATER_FLOOR_SRC,
+    }
+
+
 def _tv_paint_extras(room, resolver=None, report=None):
     """The SH1X.tvPaint block for the tvNoise rooms (the MAP4_S03 overlay's
     area tag). The palette STRIP reconstructs the paint's 256-entry CLUT
@@ -5406,6 +5481,11 @@ def build_sh1x(room, resolver, report, known_rooms=None):
     tvp = _tv_paint_extras(room, resolver, report)
     if tvp is not None:
         sh1x["tvPaint"] = tvp
+    # v37: the WATER FLOOR palette (the slot-0 CLUT row 0 the DWAVE floor
+    # redirect reads the live tile's 4bpp nibbles through)
+    wfl = _room_water_floor(room, resolver, report)
+    if wfl is not None:
+        sh1x["waterFloor"] = wfl
     # userLight defaults: the engine's flashlight attribs (Game_Flashlight
     # AttribsSet effects.c:210-218) — consumers may override everything;
     # the PoC's standing directive (light rides the CAMERA) is the default

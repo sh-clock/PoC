@@ -66,6 +66,25 @@ SH1X = { ...,                    # v2 fields unchanged
 ## 1. Water (`WATER.md` evidence)
 
 What the engine ACTUALLY does (no geometry mirroring!):
+- **THE FLOOR CONSUMPTION (v37 — `SH1X.waterFloor`)**: the DWAVE material
+  redirect (func_8008E4EC, img0 `{tPage{0,13}}` ALL-ZERO ->
+  Material_FsImageApply materials.c:130-160) makes the water-floor prims
+  4bpp on page 13 (x 832) with **CLUT (0,0)** — the ROOM's slot-0
+  palette (WorldMap_TexturesInit map.c:137-190: fullPage slot i's CLUT
+  strip at (16*i,0), pixels (512+64*i,0); Texture_Get materials.c:178-222
+  assigns slots in PLM material-table order; LmFilter_IsHalfPage
+  map.c:1226-1241 = the 'H'-name split). The floor quads' PAGE-texel UVs
+  (u 0..62, v 224..255) read the func_8008E5B4 live 32x32 patch as 4bpp
+  NIBBLES: `texel(u,row) = clut15[(liveTile15[row][u>>2] >> (4*(u&3))) & 0xF]`
+  (u 0..127, rows 0..31) — the 15-bit composite's nibbles indexing the
+  ROOM palette. The ripper emits the palette VERBATIM as
+  `SH1X.waterFloor = {clut15:[16 x u16], clutSource:"DRG04", floorUv:{pageTexel:true, patchU:[0,127], patchV:[224,255]}, src:...}`
+  (only for rooms with a DWAVE material + a locally resolved slot-0 TIM;
+  absent = the consumer's legacy path, graceful no-op). Texel classes
+  (a semi-trans prim, DuckStation gpu_sw_rasterizer): STP-set (0x8xxx)
+  → ABR-1 ADDITIVE B+F; STP-clear → OPAQUE write; 0x0000 → the hole.
+  NOTE the v2/v33 pre-v37 consumers sampled a 32x32 RGB tile 1:1 with
+  mod-32 wrap — WRONG scale, WRONG palette (audit W1-6).
 - **Sewer shimmer (DR/DRU)** = (a) an offscreen VRAM 32x32 rect whose UV
   window scrolls: v0 = `(ctr>>1)&0x1F`, poly2 u0 = `((ctr+1)>>2)&0x1F`,
   counter ++ per non-zero dt (lens_flare.c:536-599; NTSC CLUT (224,0),
@@ -73,22 +92,42 @@ What the engine ACTUALLY does (no geometry mirroring!):
   quad: mirrored light position `vy = posY*2 - pos.vy`, brightness
   `sin(clamp(angle-40°, ≤90°))` → r=sin>>6, g=(sin*7)>>9, b=(sin*5)>>9,
   tpage 45 CLUT (224,1), UV 64..127 x 0..31, ±24 x ±48 px around the
-  projected point, OT bucket 641 (lens_flare.c:610-680); (c) 8-caustic ring
-  around the light: per 45° step, g4[0] (20,18,12 / 4,4,4) @641 + g3[0]
-  (24,22,12/20,18,12) @641 + semi-trans g4[1] (4,8,4/0,0,0) + g3[1]
-  (8,8,4/4,8,4) @639 (lens_flare.c:683-825). Ring quad corners: inner r=0.2
-  at +1.2m fwd, outer r=2.2 at +1.5m fwd, in the light's yaw frame.
-- Gate: `!water_inhibit_f` AND camera in a waterZone box (X/Z inclusive
+  projected point, OT bucket 641 (lens_flare.c:610-681). THE GLINT IS A
+  TEXTURED FT4 blended ADDITIVE (F5 = T5*C8>>7, dst5 = B5+F5 clamped) —
+  subtle by engine design (≤ +6/31); the v32 untextured AVERAGE-blend
+  quad was WRONG (audit W1-2/W1-3, fixed v37). It paints ON TOP of the
+  caustic ring (both ride bucket 641; the engine's AddPrim chain inserts
+  the glint FIRST = head = drawn LAST — audit W1-13, fixed v37); (c) the
+  8-caustic ring around the light: per 45° step, g4[0] (20,18,12 / 4,4,4)
+  @641 + g3[0] (24,22,12/20,18,12) @641 + semi-trans g4[1] (4,8,4/0,0,0)
+  + g3[1] (8,8,4/4,8,4) @639 (lens_flare.c:683-825). Ring quad corners:
+  inner r=0.2 at +1.2m fwd, outer r=2.2 at +1.5m fwd, in the light's yaw
+  frame. v37 (W1-5): glint/ring/ripple prims are OT-BUCKET OCCLUDED by
+  nearer opaque geometry (bucket 641 = zQ8 5000 → 19.53 m; 639 →
+  19.47 m; the ripples at their own (zQ8+128)>>3 bucket).
+- Gate: `!water_inhibit_f` AND the LIGHT in a waterZone box (X/Z inclusive
   bounds) AND zone.enabled (lens_flare.c:78-93, 504-523).
 - **Sewer ripples (map5_s00)**: 12 RNG ripples in box x[-92.75,-91.25]
   z[7.35,8.85], y=0.5, half-size = 1.5 * t, t random-walks ±32 clamped
   [0,4095], CLUT row = 160+(r<<5), 3 rows (map5_s00.c:20-48, 89-94,
-  154-157). Only when NOT (flashlightAllowed && darkness).
+  154-157). Only when NOT (flashlightAllowed && darkness) — the CURRENT
+  BLENDED preset flags (effects.h:41-58): with the sewer pair {6,3}
+  flashlight-ON → preset 3 (NO Dark) → the ripples DRAW; flashlight-OFF
+  → preset 6 (Dark) → skip. (The v32 gate on the Spot light mode was
+  INVERTED — audit W1-1, fixed v37.) The walk runs per GAME FRAME
+  (moved to the tick discipline — audit W1-4, fixed v37); the mesh's
+  brightness = !(func_80055D78(Q12(-92.0),Q12(0.5),Q12(8.1)) < 129) * 8
+  (the VERBATIM light probe, map5_s00.c:197 — the hardcoded 8 was audit
+  W1-7, fixed v37); the spawn base Q12(7.35)=30105 truncated (W1-8);
+  the sprite screen culls |x3|>200 |y3|>160 + the OT bucket bound
+  (map5_s00.c:135-143 — W1-11, added v37).
 - WATER.TIM/DR_WAVE.TIM VRAM: NTSC (0,13)+CLUT(224,0) (screen/data.c
-  descriptors). **We do NOT have these TIMs locally** → the ripper emits
-  `envEffects` metadata ONLY (no pixel payload); consumers with the TIM
-  resolve it by name through the standard resolver; without it the feature
-  no-ops (documented; same ladder as BG_ETC leaf textures).
+  descriptors). DR_WAVE.TIM is now embedded (dr_wave_data.h — verbatim).
+  WATER.TIM (map1_s02/s03's effect tile) is NOT yet embedded — no corpus
+  room pairs it with a DWAVE floor (checked v37: SU rooms have no
+  envEffects/DWAVE); add water_tim_data.h when such a room ships.
+  Consumers without the TIM resolve it by name through the standard
+  resolver; without it the feature no-ops (same ladder as BG_ETC).
 
 ## 2. Lens flare (`LENS.md` evidence) — the flashlight glow, Spot mode ONLY
 
@@ -193,6 +232,7 @@ distinction = normal row + SetLightSourceXYZ (already in the PoC paths).
 | Field | ripper | PoC | wallpaper | camtrack |
 |---|---|---|---|---|
 | envEffects+waterZones | emit (hardcoded decomp tables) | shimmer+glint+caustic playback | same as PoC | preview toggle |
+| waterFloor (slot-0 CLUT) | emit clut15 (v37) | nibble-CLUT floor playback | same as PoC | floor preview |
 | lens flare spec | emit (tables are consumer-side constants; ripper emits flag only) | full sprite draw (BG_ETC embedded like snow) | same | preview toggle |
 | propAnims | emit catalog + posed nodes | 14 live driver ticks + cutscene/idle scaffolds | same | preview + authoring notes |
 | mapLink | emit tag/grid/neighbors | ignored (single-room) | load neighbors ≤4.5m edge | ignored |
