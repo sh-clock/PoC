@@ -1,0 +1,188 @@
+{
+ "format": "camdat",
+ "version": 1,
+ "generatedBy": "CamTrack Editor 1.4.0",
+ "units": {
+  "length": "meters",
+  "angle": "degrees",
+  "time": "seconds",
+  "up": "+Y",
+  "handedness": "right-handed (glTF)"
+ },
+ "doc": "Parametric constant-speed camera tracks. line: pos(t)=start+s(t)*(end-start). circle: theta deg, pos(t)=center+[radiusX*cos(theta),0,radiusZ*sin(theta)], y=center[1]. fixed: pos=position, yaw/pitch advance by *SpeedDegS with optional *MinDeg/*MaxDeg boundaries. curve: uniform Catmull-Rom spline through points[] (end tangents duplicated by clamping); a fixed 64-samples-per-segment chord table plus a monotone cubic Hermite (Fritsch-Carlson) refinement maps traveled distance to the spline parameter, pos(t) is the exact spline point (C1-smooth) at constant speedMS; lookMode path uses the analytic spline derivative. polyline: a line with multiple turns \u2014 straight segments through points[] at constant speedMS; arc length is the exact segment-length sum, pos(t) lerps inside the segment reached by traveled distance, lookMode path uses the (piecewise-constant) segment direction. spiral: f=phase01(t,turns*360/speedDegS,loopMode), theta=startAngleDeg+dir*turns*360*f with dir=+1 for cw and -1 for ccw, r=radiusStart+(radiusEnd-radiusStart)*f, y=center[1]+yStart+(yEnd-yStart)*f, pos(t)=center+[r*cos(theta),y-center[1],r*sin(theta)] \u2014 radius and height interpolate over the sweep (a circle when radiusStart=radiusEnd and yStart=yEnd). zigzag: lawnmower sweep \u2014 lanes passes across a sizeX by sizeZ rectangle centered at center, waypoints at x=center[0]+/-sizeX/2 alternating direction while z advances sizeZ/(lanes-1) per pass, joined by straight segments at constant speedMS (same segment walk as polyline). figure8: theta deg advances like circle over one full 360 deg period (angleAt with bounds startAngleDeg..startAngleDeg+/-360), pos(t)=center+[semiX*sin(theta),0,semiZ*sin(2*theta)], y=center[1] (Gerono lemniscate; closes every 360 deg). loopMode: loop wraps, pingPong mirrors at ends, once stops at end. Orientation: lookAt point when lookMode is center|point|path; lookMode \"normal\" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection \"forward\"|\"backward\" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine, animsDemo (v13.2: the cutscene/event-gated SH1X drivers play \u2014 the PoC v32.2 engine parses it; the wallpaper demo scenes set it per camdat) }. durationSec is informational (one playback cycle). PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries \u2014 the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets \u2014 the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.",
+ "models": [
+  {
+   "file": "SU0203.glb",
+   "addedAt": "2026-11-18T22:54:55.757Z",
+   "bounds": {
+    "min": [
+     96.796875,
+     -4,
+     -145.90234375
+    ],
+    "max": [
+     103.203125,
+     3.40234375,
+     -136.609375
+    ]
+   },
+   "fogon": false,
+   "nighton": false,
+   "flashlighton": false,
+   "env": {
+    "pair": [
+     7,
+     4
+    ],
+    "dayEnv": 7,
+    "nightEnv": 7,
+    "weatherTarget": 0,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": true,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true
+   },
+   "tracks": [
+    {
+     "id": "tmwmq81wa20p8l",
+     "name": "Fixed 1",
+     "type": "fixed",
+     "enabled": true,
+     "fovDeg": 60,
+     "loopMode": "pingPong",
+     "position": [
+      100.5031,
+      2.4016,
+      -137.6182
+     ],
+     "yawDeg": 342,
+     "pitchDeg": -20,
+     "yawSpeedDegS": 2,
+     "pitchSpeedDegS": 0,
+     "yawMinDeg": -20,
+     "yawMaxDeg": 45,
+     "weatherTarget": 0,
+     "durationSec": 65
+    }
+   ],
+   "light": {
+    "on": false
+   }
+  },
+  {
+   "file": "APU00FF.glb",
+   "addedAt": "2026-11-18T23:20:20.344Z",
+   "bounds": {
+    "min": [
+     -0.01953125,
+     -6,
+     11.98046875
+    ],
+    "max": [
+     15.5078125,
+     19.57390775856204,
+     41.551660478072684
+    ]
+   },
+   "fogon": false,
+   "nighton": false,
+   "flashlighton": false,
+   "env": {
+    "pair": [
+     1,
+     1
+    ],
+    "dayEnv": 1,
+    "nightEnv": 3,
+    "weatherTarget": 2,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": false,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true,
+    "animsDemo": false
+   },
+   "tracks": [
+    {
+     "id": "tmwmqviu63jgfo",
+     "name": "Fixed 1",
+     "type": "fixed",
+     "enabled": true,
+     "fovDeg": 60,
+     "loopMode": "pingPong",
+     "position": [
+      3.7038,
+      2.9412,
+      30.7071
+     ],
+     "yawDeg": -75,
+     "pitchDeg": 0,
+     "yawSpeedDegS": 3,
+     "pitchSpeedDegS": 0,
+     "durationSec": 240
+    }
+   ]
+  },
+  {
+   "file": "APUFFFE.glb",
+   "addedAt": "2026-11-18T23:24:04.283Z",
+   "bounds": {
+    "min": [
+     -40.01953125,
+     -6,
+     39.98046875
+    ],
+    "max": [
+     0.01953125,
+     7.662937164306641,
+     72
+    ]
+   },
+   "fogon": false,
+   "nighton": false,
+   "flashlighton": false,
+   "env": {
+    "pair": [
+     1,
+     1
+    ],
+    "dayEnv": 1,
+    "nightEnv": 3,
+    "weatherTarget": 2,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": false,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true,
+    "animsDemo": false
+   },
+   "tracks": [
+    {
+     "id": "tmwmr06rd4h1ja",
+     "name": "Fixed 1",
+     "type": "fixed",
+     "enabled": true,
+     "fovDeg": 60,
+     "loopMode": "pingPong",
+     "position": [
+      -26.0114,
+      3.543,
+      64.8745
+     ],
+     "yawDeg": -78.5707,
+     "pitchDeg": -11,
+     "yawSpeedDegS": 0,
+     "pitchSpeedDegS": 0,
+     "durationSec": 0
+    }
+   ]
+  }
+ ]
+}
