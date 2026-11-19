@@ -3787,7 +3787,8 @@ window.SHUI = (function () {
     <div class="wlegend">Slot A = base env · slot B = flashlight-on env. Identical pairs make the
       flashlight engine-unavailable (the authentic auto-off rule).</div>
     <div class="wrow" id="glb-env-row" style="display:none"><label>Room env (GLB)</label>
-      <div class="wlegend" id="glb-env-info" style="flex:1"></div></div>
+      <div class="wlegend" id="glb-env-info" style="flex:1"></div>
+      <button class="chip2" id="glb-env-orig" type="button" style="flex:none">use original</button></div>
   </div>
 </div>
 <div class="wgroup open" id="wg-daynight">
@@ -4761,7 +4762,7 @@ window.SHUI = (function () {
    ovals, fixed + rotating) for glTF rooms and writes them as camdat.json.
    Standalone authoring tool for the es-fca glTF room-viewer project.
    ========================================================================== */
-const APP_VERSION = '1.4.0';   /* v13 = v12 + DAY/NIGHT ENVIRONMENTS: models[].env.dayEnv/nightEnv (the Auto-Mode presets) + per-track envDay/envNight overrides (resolved track > model), previewed INSTANTLY through the session-only Day/Night lens while the ENGINE transitions day/night through its own environment paths; + the EMBED bridge (the in-app editor: the Android WebView loads/saves the wallpaper camdat via window.AndroidBridge) + the self-contained offline three.js (data-URL importmap). v12 = v10 + PER-TRACK WEATHER (models[].tracks[].weatherTarget, resolved track > model env) with the editor-side INSTANT application (shParticleWeatherApplyInstant — the verbatim D0B18 repack + the transition completed at t=0 + SnowInitialize; the ENGINE keeps the authentic 512-tick sine cross-fade) + the u16 boot-sync fidelity fix (E0CB6/E0CB4 := (u16)E0CB0). v10 = v9 + the lazyRateDegS default fix. v9: fog-mode render fix (SC.shR), engine-exact 30Hz tick grid, lookMode 'lazy', playbar/HUD overlap fix */
+const APP_VERSION = '1.4.1';   /* v13.5 = v13.4 + THE ROOM-ORIGINAL ENV DERIVATION (T7 — the rain-indoors fix): a newly added GLB (or a legacy un-authored entry) gets its World & Weather defaults DERIVED from the GLB's UNBIASED SH1X.env (the verbatim map-overlay pair + the field_17 weather recipe) instead of the generic app day defaults — the nightmare school no longer boots in broad daylight with snow, indoor sequences no longer rain; the day/night Auto-Mode fields follow the room's own map family (town: day 1 / night 6; day-lit interiors: 2 / 7; night-only locations — amusement park, alt sewers, resort: 6 / 6; dark nightmare-only interiors — school/hospital/Nowhere: 7 / 7; Nowhere fog: 9 / 9), the weather = field_17 VERBATIM, the flashlight = the preset-0 Dark+FlashlightAllowed signature; a "use original" button re-authors the ACTIVE model from the same derivation. v13.4 (T2) = all SH1X driver families in the preview + animsDemo retired; v13.3 = the S20 env surfacing; v13 = DAY/NIGHT ENVIRONMENTS + the EMBED bridge + offline three.js; v12 = PER-TRACK WEATHER; v10 = lazyRateDegS default; v9 = fog-mode render fix, 30Hz tick grid, lookMode lazy */
 const LS_KEY = 'camtrack.autosave.v1';
 const PALETTE = ['#4fc3f7', '#ffb74d', '#81c784', '#f06292', '#9575cd', '#4db6ac', '#ffd54f', '#e57373', '#7986cb', '#a1887f'];
 
@@ -4780,6 +4781,7 @@ const DOC_STRING =
   'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
+  'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
 
 /* ------------------------------------------------------------------ utils */
@@ -6262,6 +6264,85 @@ async function loadModelBase64(name, b64) {
   registerModel(name, gltf);
 }
 
+/* T7 (v13.5) — THE ROOM-ORIGINAL ENV DERIVATION (the rain-indoors fix).
+ * The GLB's SH1X.env is UNBIASED (the verbatim rip: the map overlay
+ * header's WorldEnv pair + presets + the boot weather recipe) — it stays
+ * untouched. THIS function derives the AUTHORED model env defaults from
+ * it, so a freshly added GLB no longer boots the app's generic {1,1} day
+ * defaults (the v13.4-and-earlier editor bug: the nightmare school in
+ * BROAD DAYLIGHT with SNOW, rain in indoor sequences).
+ *
+ * GROUNDING (silent-hill-decomp src/bodyprog/world/effects.c):
+ *  - WorldEnv_MapPresetSet (:220-267): the map header's field_16 selects
+ *    the STATIC pair (the map's day baseline): D_800A9F80 {1,1} (field_16=1
+ *    exterior — the day streets), D_800A9F84 {2,2} (field_16=1 interior
+ *    with active chunks — the day-lit interiors), D_800A9F88 {6,3}
+ *    (field_16=2 exterior — the night streets), D_800A9F8C {7,4} (field_16=2
+ *    interior — the dark school/hospital interiors), D_800A9F98 {9,9}
+ *    (field_16=3 — Nowhere fog).
+ *  - The pair is {flashlight-OFF preset, flashlight-ON preset}: WorldEnv_
+ *    Update blends current = transition[0]->transition[1] by flash-
+ *    lightIntensity with transition[WorldEnv_IsFlashlightOn()] (:417-456);
+ *    preset0 == preset1 => isFlashlightUnavailable (:346-352) — the
+ *    authentic auto-off rule for day/identical pairs.
+ *  - MapType semantics (map.h e_MapType): THR/SPR = the day town, SPU =
+ *    the night central town, DR = the flooded streets, DRU = the alt
+ *    sewers, RSR/RSU = the resort, APU = the amusement park, SC/SU = the
+ *    real/alt school, HP/HU = the real/alt hospital, ER = Nowhere.
+ *
+ * THE DERIVATION (the user's day/night population rules):
+ *  - the TOWN family ({1,1} day streets; {6,3} SPU/DR night streets — the
+ *    same streets by day and by night): dayEnv = 1, nightEnv = 6.
+ *  - DAY-LIT interiors ({2,2}): dayEnv = 2, nightEnv = 7 (the interior's
+ *    night look — no invented daylight beyond the authentic presets).
+ *  - NIGHT-ONLY locations (APU amusement park, DRU/RSU/RSR): dayEnv =
+ *    nightEnv = 6 — NEVER broad daylight (the Amusement-Park rule).
+ *  - DARK interiors ({7,4} — the school/hospital/Nowhere, nightmare-only):
+ *    dayEnv = nightEnv = 7 (preset 4 remains the flashlight-ON blend the
+ *    players toggle; no invented day look for a night-only scene).
+ *  - Nowhere fog {9,9}: both 9. Any other pair: unbiased p0/p1.
+ *  - weatherTarget = field17 VERBATIM (Particle_EnvironmentSet(field_17,
+ *    field_16) at map load, load_screen.c:34-36) — the ORIGINAL weather
+ *    recipe: rain ONLY where the original map data says so (no invented
+ *    indoor rain; the DR/SPU streets keep their real rain).
+ *  - flashlightOn boots ON only for the Dark+FlashlightAllowed preset-0
+ *    signature (the school/sewer/night interiors where Harry uses it);
+ *    identical pairs stay OFF + engine-unavailable.
+ * Returns null for GLBs without SH1X.env (the legacy path — env stays
+ * un-authored and the app defaults apply, as before).                    */
+function sh1xEnvDefaults(env) {
+  if (!env || typeof env.presetIdx0 !== 'number' ||
+      typeof env.presetIdx1 !== 'number') return null;
+  const p0 = Math.max(0, Math.min(20, env.presetIdx0 | 0));
+  const p1 = Math.max(0, Math.min(20, env.presetIdx1 | 0));
+  const tag = String(env.mapType || '').toUpperCase();
+  let dayEnv, nightEnv;
+  if (p0 === 1 && p1 === 1) { dayEnv = 1; nightEnv = 6; }
+  else if (p0 === 2 && p1 === 2) { dayEnv = 2; nightEnv = 7; }
+  else if (p0 === 6 && p1 === 3) {
+    if (tag === 'APU' || tag === 'DRU' || tag === 'RSU' || tag === 'RSR') {
+      dayEnv = 6; nightEnv = 6;               /* night-only locations       */
+    } else { dayEnv = 1; nightEnv = 6; }      /* the town: day + night      */
+  }
+  else if (p0 === 7 && p1 === 4) { dayEnv = 7; nightEnv = 7; }
+  else if (p0 === 9 && p1 === 9) { dayEnv = 9; nightEnv = 9; }
+  else { dayEnv = p0; nightEnv = p1; }        /* unbiased for other pairs   */
+  /* weather: field17 VERBATIM (0..8, the D0B18 argument identity)          */
+  let weather = 2;
+  if (typeof env.field17 === 'number') weather = Math.max(0, Math.min(8, env.field17 | 0));
+  /* flashlight: the preset-0 Dark + FlashlightAllowed signature           */
+  let flash = false;
+  const f0 = env.preset0 && Array.isArray(env.preset0.flags)
+    ? env.preset0.flags : null;
+  if (f0) flash = f0.includes('Dark') && f0.includes('FlashlightAllowed');
+  else if (p0 !== p1) flash = (p0 === 6 || p0 === 7);   /* legacy heuristic */
+  return {
+    pair: [p0, p1], dayEnv, nightEnv, weatherTarget: weather,
+    bootWeather: -1, lensFlare: 0, flashlightOn: flash,
+    psxWobble: true, dither: true, particles: true, engine: true
+  };
+}
+
 function registerModel(name, gltf) {
   const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
   if (!root) { toast('That file has no scene', 'err'); return; }
@@ -6276,7 +6357,8 @@ function registerModel(name, gltf) {
   if (bb.isEmpty()) bb.set(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
   const box = { min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] };
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
-  three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims, sh1xHeader: (sh1x && sh1x.header) || null });
+  three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims, sh1xHeader: (sh1x && sh1x.header) || null,
+    sh1xEnv: (sh1x && sh1x.env) || null });
   /* v33 (S20): surface the room's ORIGINAL environment (SH1X.env — the
    * v33 GLBs carry it; the PoC/wallpaper boot it by default when the
    * exported camdat leaves the World & Weather pair unselected). */
@@ -6287,11 +6369,12 @@ function registerModel(name, gltf) {
     if (row && info) {
       if (env && typeof env.presetIdx0 === 'number') {
         row.style.display = '';
-        info.textContent = '{' + env.presetIdx0 + ',' + env.presetIdx1 +
-          '} · ' + (env.weather || 'none') + ' weather · ' +
-          (env.overlay || '?') + ' field_16=' + env.field16 +
-          ' — the room\u2019s original pair; leave the World & Weather ' +
-          'selection empty to let the players boot it.';
+        info.innerHTML = '{' + env.presetIdx0 + ',' + env.presetIdx1 +
+          '} · ' + esc(env.weather || 'none') + ' weather · ' +
+          esc(env.overlay || '?') + ' field_16=' + env.field16 +
+          (typeof env.mapType === 'string' ? ' · ' + esc(env.mapType) : '') +
+          ' — the room\u2019s ORIGINAL pair (unbiased, effects.c:220-267);' +
+          ' the World &amp; Weather defaults are authored from it.';
       } else {
         row.style.display = 'none';
       }
@@ -6308,6 +6391,21 @@ function registerModel(name, gltf) {
     if (!same) toast('Loaded model bounds differ from the camdat record — coordinates may be offset', 'warn');
   }
   entry.bounds = { min: box.min.slice(), max: box.max.slice() };
+  /* v13.5 (T7): the room-original env derivation — a newly added GLB (or a
+   * legacy entry whose env was never authored) gets its World & Weather
+   * defaults from the GLB's UNBIASED SH1X.env instead of the generic app
+   * day defaults (the rain-indoors / broad-daylight fix). Authored envs
+   * are NEVER overwritten here — the "use original" button does that on
+   * explicit request.                                                            */
+  if (!entry.env) {
+    const derived = sh1xEnvDefaults(sh1x && sh1x.env);
+    if (derived) {
+      entry.env = derived;
+      toast(name + ' — World & Weather authored from the room\u2019s original env: pair {' +
+            derived.pair[0] + ',' + derived.pair[1] + '}, day ' + derived.dayEnv +
+            ' / night ' + derived.nightEnv + ', weather ' + derived.weatherTarget);
+    }
+  }
   setActiveModel(name);
   frameModel();
   /* v1: register the room with the SH1 engine view — the ground probe grid
@@ -9953,6 +10051,11 @@ const EMBED = {
     });
     window.SHUI.init({
       getActiveModel: () => activeModel(),
+      /* v13.5 (T7): the room-original env derivation for the ACTIVE model
+       * (the "use original" button — re-authors models[].env from the
+       * GLB's unbiased SH1X.env). */
+      getRoomOriginalEnv: () => sh1xEnvDefaults(
+        (three.loaded.get(state.activeFile) || {}).sh1xEnv),
       /* v12: the per-track weather panel needs the selected track */
       getSelTrack: () => selTrack(),
       getSelTrackIdx: () => {
@@ -9970,6 +10073,28 @@ const EMBED = {
   } catch (e) {
     console.error('[camtrack] world engine init failed', e);
     window.__bootErrors.push('world engine: ' + String(e && e.message || e));
+  }
+  /* v13.5 (T7): the "use original" button — re-author the ACTIVE model's
+   * World & Weather from the room's ORIGINAL env (the same derivation a
+   * fresh GLB add gets). Fixes existing camdats authored with the old
+   * generic day defaults (the user's 3-map camdat: one click per model). */
+  {
+    const btn = document.getElementById('glb-env-orig');
+    if (btn) btn.addEventListener('click', () => {
+      const m = activeModel();
+      const derived = sh1xEnvDefaults((three.loaded.get(state.activeFile) || {}).sh1xEnv);
+      if (!m) { toast('No active model', 'warn'); return; }
+      if (!derived) {
+        toast('This GLB carries no SH1X.env — nothing to author from', 'warn');
+        return;
+      }
+      m.env = derived;
+      if (window.SHUI && window.SHUI.ready) window.SHUI.applyModelEnv(m);
+      markDirty();
+      toast('World & Weather re-authored from the room\u2019s original env: pair {' +
+            derived.pair[0] + ',' + derived.pair[1] + '}, day ' + derived.dayEnv +
+            ' / night ' + derived.nightEnv + ', weather ' + derived.weatherTarget);
+    });
   }
   state.doc = blankDoc();
   const restored = restoreAutosave();
