@@ -14218,9 +14218,19 @@ static void live_render(LiveApp *A) {
         snow_sync_live(&A->snow, A->play.t, cp.pos, cp.forward,
                        A->track, A->ovr.useFixed ? &A->ovr : NULL);
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
-    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT); /* v38: session clock */
-    fx_water_scroll_sync(&A->R.sc->sh1x, &A->env, &cp); /* v34: scroll per tick */
-    sh1x_water_ripple_tick((Sh1x *)&A->R.sc->sh1x, &A->env, &cp); /* v37: the ripple walk per tick */
+    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT); /* v38: session clock —
+     * dt=0 at the held sessionT: a no-op state hold (same discipline as the
+     * live_advance boot prime) */
+    /* v40 audit (C-F3): the WATER pair is NOT called here. live_render's
+     * only caller is live_save_final, which runs AFTER the loop's last
+     * fired tick already ran fx_water_scroll_sync + sh1x_water_ripple_tick
+     * at this exact session time — the v38-audit-A2 rule (fog_poc.c
+     * live_advance, the boot-prime comment): calling them again here
+     * double-advanced the D_800AFDAC scroll counter and the ripple RNG
+     * walk, so `--benchmark --save-final` was NOT bit-identical to
+     * `--shot t=DURATION` on water-zone rooms (the documented contract;
+     * V-c repro: a crafted waterLive GLB differed on 33.35% of pixels).
+     * The waterfall tick stays: it is sessionT-gated (dt=0 = no-op). */
     sh1x_waterfall_tick((Sh1x *)&A->R.sc->sh1x, &cp,
                         A->play.sessionT); /* v39: the school water per tick */
     render_frame(&A->fb, &A->R, &cp);
