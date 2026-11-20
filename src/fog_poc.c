@@ -11810,7 +11810,16 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
                 f180 = (int)(((int64_t)tv * f180) >> 12);
             }
         }
-        if (idx0 > 0 && a->wfSeg[idx0 - 1].horiz) {
+        /* v40 audit (A-F6): the backward-neighbor taper lives INSIDE the
+         * engine's horizontal branch (water.c:156 gates the whole path on
+         * field_30[idx0]==0; the taper :280-302 sits within it, and the
+         * vertical else :326-393 has NO tapers). The old condition gated
+         * only on the BACKWARD neighbor's horiz — a vertical current
+         * segment after a horizontal one leaked the taper into the
+         * droplet's brightness. Latent on shipped streams (map1_s02 is
+         * all-horizontal; map1_s03's vertical sits at idx 0) but live
+         * for authored mixed streams. */
+        if (idx0 > 0 && sg->horiz && a->wfSeg[idx0 - 1].horiz) {
             /* water.c:284-295 VERBATIM (audit v39-A2): the product < 0
              * branch SUBTRACTS the (negative) product and the else ADDS
              * — var_s1 = rampHalf + |product| in BOTH branches (the old

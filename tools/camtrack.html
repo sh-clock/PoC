@@ -9469,7 +9469,11 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
         f180 = sh1xMulSh(tv, f180, 12);
       }
     }
-    if (idx0 > 0 && a.wfSeg[idx0 - 1].horiz) {
+    /* v40 audit (A-F6 JS twin): the engine gates the backward-neighbor
+     * taper on the CURRENT segment's horizontal branch too (water.c:156
+     * wraps the whole path; the vertical else :326-393 has no tapers) —
+     * mirrors the C fix (fog_poc.c, sg->horiz && added). */
+    if (idx0 > 0 && sg.horiz && a.wfSeg[idx0 - 1].horiz) {
       /* water.c:284-295 VERBATIM (audit v39-A2): the product < 0
        * branch SUBTRACTS the (negative) product and the else ADDS
        * — var_s1 = rampHalf + |product| in BOTH branches (the old
