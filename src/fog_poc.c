@@ -13165,13 +13165,24 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             int bucket = -1;
             if (!bad) {
                 if (ams == 1) {
-                    /* MASK: engine Gfx_BillboardDraw — CENTER-depth bucket */
+                    /* MASK: engine Gfx_BillboardDraw — CENTER-depth bucket.
+                     * V41 C-4: the engine far cull is STRICT '<' on the
+                     * Q8 depth with the low 2 bits CLEARED — billboard.c:
+                     *   263:  temp_v0_2 = RotTransPers(...);   // OTZ = SZ>>2
+                     *   264:  temp_a0   = temp_v0_2 << 2;     // = SZ & ~3
+                     *   266:  if (temp_v0_2 > 32 && temp_a0 < sp494)
+                     * sp494 = farCullQ8 (MIN(0x79C<<3, fog far)). The old
+                     * `cq8 <= farCullQ8` kept a quad whose center sits
+                     * EXACTLY on the far-cull plane (equality passes) and,
+                     * because farCullQ8 is always a multiple of 4 in
+                     * practice (0x79C<<3; fog far = Q12>>4), the & ~3 is
+                     * exact: (cq8 & ~3) < farCullQ8 is verbatim.          */
                     float cz = 0.0f;
                     for (int q = 0; q < nv; q++) cz += xv[it->vbase + vi[q]].z;
                     cz /= (float)nv;
                     int cq8 = (int)floorf(cz * 256.0f + 0.5f);
                     int cq6 = cq8 >> 2;                 /* Q8 -> Q6 (Q6>>1 == Q8>>3) */
-                    if (cq6 > 32 && cq8 <= farCullQ8)   /* engine gates: >32, far cull */
+                    if (cq6 > 32 && (cq8 & ~3) < farCullQ8) /* engine: >32, STRICT far cull */
                         bucket = cq6 >> 1;
                 } else {
                     /* OPAQUE + BLEND: engine Gfx_MeshDraw — OTZ = MAX vertex
