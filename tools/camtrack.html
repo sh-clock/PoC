@@ -2213,7 +2213,7 @@ const SHCore = (function () {
     shMeshLightVertex, shGteLlBuggy, shEnvBlend, shEnvEntryFromPreset,
     shBillboardColors, shVec3Mag,
     /* particles */
-    makeSnow, snowTick, snowReset, snowRng, snowRand16, snowIsqrt,
+    makeSnow, snowTick, snowReset, snowBoxOrigin, snowRng, snowRand16, snowIsqrt,
     particleEnvironmentSet, shParticleWeatherTargetSet, shParticleWeatherTick,
     snowGroundEngine, bootWeatherMap0,
     shParticleWeatherApplyInstant,
@@ -3325,12 +3325,41 @@ window.SHView = (function () {
       snow = V.snow;
       const target = Math.floor(t * 30 + 1e-9);
       if (target < snow.ticksDone || t < snow.lastTickT - 1e-9) {
-        /* backward jump: seek semantics — re-simulate from the seed     */
+        /* backward jump: seek semantics — re-simulate from the seed.
+         * v41 audit (B-7): fog_poc.c:7221-7232's backward branch defers to
+         * snow_sync_exact — EVERY re-simulated tick uses its OWN exact
+         * track camera (camtrack_eval((ticksDone+1)/30), pos + the
+         * lookAt-direction forward, :7259-7272) plus the ticksDone==0 box
+         * origin from camtrack_eval(t) (:7243-7257). The old loop replayed
+         * every tick with the END-FRAME camera (V.camPos/V.camFwd) — after
+         * any scrub the flake field + RNG stream fully diverged from the
+         * engine (the fixed B-B2 waterfall class, snow seek twin). The
+         * live camera stays on the forward catch-up branch below. */
         SC.snowReset(snow);
         snow.ticksDone = 0;
         snow.lastTickT = 0;
+        const trk = rec && rec.hooks ? rec.hooks.getTrack() : null;
+        const poseAt = tt => {            /* the C's snow_sync_exact camera */
+          if (!trk) return null;
+          const ev = rec.hooks.evalTrack(trk, tt);
+          if (!ev) return null;
+          let fwd = [0, 0, -1];           /* no lookAt: the C's {0,0,-1}   */
+          if (ev.lookAt != null) {
+            const dx = ev.lookAt[0] - ev.pos[0], dy = ev.lookAt[1] - ev.pos[1], dz = ev.lookAt[2] - ev.pos[2];
+            const l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (l > 1e-9) fwd = [dx / l, dy / l, dz / l];  /* v3_norm (default kept) */
+          }
+          return { pos: ev.pos, fwd };
+        };
+        const p0 = poseAt(t);             /* box origin at the seek target (C :7243-7257) */
+        if (p0) SC.snowBoxOrigin(snow, p0.pos, p0.fwd);
         let done = 0;
-        while (done < target) { SC.snowTick(snow, V.camPos, V.camFwd); done++; }
+        while (done < target) {
+          const pk = poseAt((done + 1) / 30);   /* tick k's own camtrack_eval(k/30) */
+          if (pk) SC.snowTick(snow, pk.pos, pk.fwd);
+          else SC.snowTick(snow, V.camPos, V.camFwd);   /* no track: live cam */
+          done++;
+        }
       } else {
         while (snow.ticksDone < target) SC.snowTick(snow, V.camPos, V.camFwd);
       }
