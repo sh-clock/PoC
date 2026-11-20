@@ -6074,6 +6074,19 @@ async function importCamdatText(text, opts) {
 async function importCamdat(file) {
   return importCamdatText(await file.text());
 }
+/* v40 audit (B-B5): the editor auto-adds every opened GLB as a model
+ * (often with tracks: []) and exports unconditionally — but BOTH C
+ * consumers (fog_poc.c:16194-16198, the wallpaper's identical parse)
+ * hard-fail the WHOLE camdat with "no usable track" for a trackless
+ * model. Warn at the moment of writing instead of dropping the model
+ * (dropping would trade the loud failure for a silent wrong camera:
+ * camdat_load's basename match falls back to the FIRST model). */
+function warnTracklessModels() {
+  const tl = state.doc.models.filter(m => !m.tracks.length);
+  if (tl.length)
+    toast('No tracks: ' + tl.map(m => m.file).join(', ') +
+          ' — the engine exits with "no usable track" when booted with that GLB', 'warn');
+}
 function exportCamdat() {
   const json = JSON.stringify(docToJSON(), null, 2);
   const blob = new Blob([json + '\n'], { type: 'application/json' });
@@ -6087,6 +6100,7 @@ function exportCamdat() {
   doAutosave();
   const n = state.doc.models.reduce((a, m) => a + m.tracks.length, 0);
   toast('Exported camdat.json (' + state.doc.models.length + ' model(s), ' + n + ' track(s))');
+  warnTracklessModels();   /* v40 audit (B-B5) */
 }
 async function newDoc() {
   if (state.dirty && !state.exported) {
@@ -11554,6 +11568,7 @@ const EMBED = {
       doAutosave();
       toast('Saved — the wallpaper camdat.json was updated');
       try { this.bridge.toast('camdat.json saved — the wallpaper will reload'); } catch (e) {}
+      warnTracklessModels();   /* v40 audit (B-B5) */
     } else {
       toast('Save failed — the app reported an error', 'err');
     }
