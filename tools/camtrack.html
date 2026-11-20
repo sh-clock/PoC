@@ -5768,15 +5768,21 @@ function sanitizeEnv(raw) {
      fogon/nighton/flashlighton booleans, which the World panel derives)   */
   if (!raw || typeof raw !== 'object') return null;
   const e = {};
-  if (Array.isArray(raw.pair) && raw.pair.length === 2) {
+  /* v40 audit (B-B4): the pair is JV_NUM-gated in the C (fog_poc.c:3377-
+   * 3379 — BOTH elements must be numbers or the pair is IGNORED); the
+   * old `|0` coerced strings/booleans and silently kept a pair the
+   * engine drops. For real numbers `x|0` = the C's (int)x truncation. */
+  if (Array.isArray(raw.pair) && raw.pair.length === 2 &&
+      typeof raw.pair[0] === 'number' && typeof raw.pair[1] === 'number') {
     e.pair = [Math.max(0, Math.min(20, raw.pair[0] | 0)), Math.max(0, Math.min(20, raw.pair[1] | 0))];
   }
-  /* v13: the Auto-Mode day/night presets */
-  if (raw.dayEnv != null) e.dayEnv = Math.max(0, Math.min(20, raw.dayEnv | 0));
-  if (raw.nightEnv != null) e.nightEnv = Math.max(0, Math.min(20, raw.nightEnv | 0));
-  if (raw.weatherTarget != null) e.weatherTarget = Math.max(0, Math.min(8, raw.weatherTarget | 0));
-  if (raw.bootWeather != null) e.bootWeather = Math.max(-1, Math.min(6, raw.bootWeather | 0));
-  if (raw.lensFlare != null) e.lensFlare = Math.max(0, Math.min(5, raw.lensFlare | 0));
+  /* v13: the Auto-Mode day/night presets (v40 B-B4: JV_NUM strict — the
+   * C requires type==JV_NUM, fog_poc.c:3163-3169/3390-3407) */
+  if (typeof raw.dayEnv === 'number') e.dayEnv = Math.max(0, Math.min(20, raw.dayEnv | 0));
+  if (typeof raw.nightEnv === 'number') e.nightEnv = Math.max(0, Math.min(20, raw.nightEnv | 0));
+  if (typeof raw.weatherTarget === 'number') e.weatherTarget = Math.max(0, Math.min(8, raw.weatherTarget | 0));
+  if (typeof raw.bootWeather === 'number') e.bootWeather = Math.max(-1, Math.min(6, raw.bootWeather | 0));
+  if (typeof raw.lensFlare === 'number') e.lensFlare = Math.max(0, Math.min(5, raw.lensFlare | 0));
   if (typeof raw.flashlightOn === 'boolean') e.flashlightOn = raw.flashlightOn;
   if (typeof raw.psxWobble === 'boolean') e.psxWobble = raw.psxWobble;
   if (typeof raw.dither === 'boolean') e.dither = raw.dither;
@@ -5785,7 +5791,13 @@ function sanitizeEnv(raw) {
   if (typeof raw.animsDemo === 'boolean') e.animsDemo = raw.animsDemo;
   return Object.keys(e).length ? e : null;
 }
-function num(v, def) { const n = +v; return isFinite(n) ? n : def; }
+/* v40 audit (B-B4): jnum parity (fog_poc.c:549-552) — ONLY a JSON
+ * number counts: strings/booleans/null take the default (the C's
+ * JV_NUM strictness; the old `+v` coerced '2.5'→2.5, null→0, true→1).
+ * ±Infinity (JSON.parse of 1e999 = the C's strtod→inf JV_NUM) flows to
+ * the caller's clamp exactly like the C. NaN cannot occur in
+ * JSON.parse output. */
+function num(v, def) { return (typeof v === 'number') ? v : def; }
 /* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT sanitizer — the export
  * whitelist (mirrors the engine's models[].light parse exactly: strict
  * types, per-field presence, clamps). */
@@ -5803,8 +5815,18 @@ function sanitizeLight(raw) {
   if (raw.ahead != null && isFinite(+raw.ahead)) l.ahead = Math.max(0, +raw.ahead);
   return Object.keys(l).length ? l : null;
 }
+/* v40 audit (B-B4): jvec3 parity (fog_poc.c:587-594) — ANY array with
+ * >=3 elements is accepted and read element-wise: number → itself,
+ * true → 1, anything else (string/false/null) → 0, exactly the C's
+ * calloc'd JValue.num (fog_poc.c:358-361, 492-494). The old
+ * all-or-nothing defaulting diverged from the C's element rule.
+ * (Self-contained: no external helper, so function-extracting
+ * consumers — camtrack_audit.js — keep working unchanged.) */
 function vec3(v, def) {
-  if (Array.isArray(v) && v.length >= 3 && v.slice(0, 3).every(x => isFinite(+x))) return [+v[0], +v[1], +v[2]];
+  if (Array.isArray(v) && v.length >= 3) {
+    const el = (x) => (typeof x === 'number') ? x : (x === true ? 1 : 0);
+    return [el(v[0]), el(v[1]), el(v[2])];
+  }
   return def;
 }
 function pick(v, list, def) { return list.includes(v) ? v : def; }
