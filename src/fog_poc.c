@@ -15868,7 +15868,16 @@ int main(int argc, char **argv) {
             }
             camDumpPath = cdBuf;
         }
-        else if (!strcmp(a, "--track") && i + 1 < argc) trackSel = atoi(argv[++i]);
+        else if (!strcmp(a, "--track") && i + 1 < argc) {
+            trackSel = atoi(argv[++i]);
+            /* v40 audit (E-F3): -1 is the internal "absent" sentinel,
+            * so `--track -1` silently fell back to track 0 (identical
+            * render, no warning) while 999999 errors out. Reject
+            * negatives like the out-of-range case does. */
+            if (trackSel < 0) {
+                fprintf(stderr, "bad --track (must be >= 0)\n"); return 1;
+            }
+        }
         else if (!strcmp(a, "--dbg-item") && i + 1 < argc) dbgItem = atoi(argv[++i]);
         else if (!strcmp(a, "--help") || !strcmp(a, "-h")) {
             printf("fog_poc — Silent Hill fog+snow PoC (GLTF-native software renderer)\n\n"
