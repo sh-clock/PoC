@@ -22,6 +22,10 @@ shots/probe_cam.png
 shots/probe_nofl.png
 shots/probe_x.png
 shots/probe_day.png
-fog_poc binary
+# built engine binaries (V41 E-6: the old "fog_poc binary" line was a
+# filename-with-space pattern that matched nothing, so stale builds stayed
+# tracked; root-anchored so dist/ staging copies stay ignored via dist/ above)
+/fog_poc
+/fog_poc.exe
 __pycache__/
 *.pdb

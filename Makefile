@@ -12,7 +12,11 @@ BIN = fog_poc
 
 all: $(BIN)
 
-$(BIN): $(SRC) src/snow_tim_data.h src/sh_font8.h
+# all 8 local headers fog_poc.c includes (V41 E-7: was 2-of-8, so editing
+# e.g. rain_tim_data.h never triggered a rebuild)
+$(BIN): $(SRC) src/snow_tim_data.h src/rain_tim_data.h src/flare_tim_data.h \
+    src/dr_wave_data.h src/water_tim_data.h src/tv_tim_data.h \
+    src/sh_sine_table.h src/sh_font8.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 
 clean:

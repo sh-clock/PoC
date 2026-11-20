@@ -87,7 +87,14 @@ jobs:
           fi
 
       - name: Build (make)
-        run: make -C . all V=1
+        run: |
+          # V41 E-6: the repo used to track built binaries; with one checked
+          # out, make could see it "up to date" against the freshly checked-
+          # out sources (mtime race) and CI would silently test the STALE
+          # committed build. rm -f guarantees a fresh build even if a binary
+          # is ever re-tracked or restored by a cache.
+          rm -f fog_poc fog_poc.exe
+          make -C . all V=1
 
       - name: Convert sample scenes (GLBs are not committed)
         run: |
