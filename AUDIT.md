@@ -701,3 +701,98 @@ opt-in GPU path — default software backend unaffected); the committed
 wallpaper engine twin still needs the other V40 engine fixes at the next sync
 (glint nibble, waterFloor STP, scroll Gate-2, ripple selector/depth,
 once-mode, lightFlicker — the PoC PRs #2-#13 are the canonical hunks).
+
+## V41 audit round (2026-11-21) — the QA fleet's verified findings + PR index
+
+"Rinse and repeat": a fresh 6-agent audit fleet (A: water re-audit incl. the
+maintainer's 333f1b1 reimplementations, B: camtrack editor, C: render
+pipeline + lighting, D: TIM/texture/VRAM data, E: CLI/runtime stress, F: the
+7 aims' wiring across all four programs) + a 5-agent targeted verification
+wave (a..e, one per report) + coordinator re-verification of every headline
+finding (personal diff review + build + render A/Bs; the flare and parser
+fixer agents died on deadlines after pushing — the coordinator completed
+their verification and implemented C-2 personally).
+**42 confirmed findings: 3 CRITICAL, 10 MAJOR, 22 MINOR, 7 INFO — 0
+refuted, 0 shipped false positives.** The maintainer's V40 reimplementations
+(333f1b1's gate chain, mesh selector, light.ahead mode-2) were re-audited
+and verified CORRECT (AUDIT_V41_A Part 1).
+
+| ID | Sev | Bug (one line) | PR |
+|----|-----|----------------|----|
+| E-1 | CRITICAL | `--weather` (no value) read argv[argc] — SIGSEGV exit 139; the ONLY unguarded value-flag of 33 | #24 |
+| D-1 | CRITICAL | TV-noise paint sampled 8bpp (`u>>1`, byte idx) but the engine draws 4bpp (tpage mode bits 7-8=0; TV TIMs are 4bpp 0x08) — LIVE on the shipped wallpaper SPU0401.glb (style-1 ~99.5% texels wrong, style-4 100% unmodeled) | #38 + wallpaper#5 |
+| E-4 | MAJOR | `--r2shot t=inf` hangs (timeout-kill), `t=nan` silent t=0 — the E-F1 gap | #25 |
+| E-3 | MAJOR | K_R restart misses ALL five v40-A4 water globals (restart != fresh; RNG stream, scroll phase, tile gate, belt, TV pad carried) | #26 |
+| E-2 | MAJOR | g_flaresys.nowEffRate in no reset list (multi-shot != solo: nowRate 1015 vs 1523, 100/146 px diffs, runtime-proven on shipped sewer/TV) | #27 |
+| E-5 | MAJOR | tim_load had no bounds checks (crafted 40-byte TIM = SIGSEGV + 8.6GB alloc attempt, ASAN-proven) | #28 |
+| A-3 | MAJOR | ripple spawn (the 49 RNG draws) ran under the flashlight-darkness draw gate; the engine spawns at Map_WorldObjectsInit unconditionally (map5_s00.c:1247-1250) | #29 |
+| C-1 | MAJOR | flare angle math fed the WORLD-space L->dir into view-space math (engine ApplyRotMatrix's it first, lighting.c:228) — engine-true 82.01° constant vs 77.7..89.1° wobble; LIVE on sewer/TV + 7 authored-light camdats | #33 |
+| D-2 | MAJOR | TV1 VRAM model clipped x<864 but the upload spans 832..895 (fs_queue.c:657) — style-4 windows read garbage | #39 |
+| F-2 | MAJOR | wallpaper ASSETS array copied only 4 files — 43/44 bundled scenes unreachable; the v11.2 dynamic copy lost in the base reset | wallpaper#4 |
+| F-1 | MAJOR | the twin missed ALL the V40 fixes (18 hunk groups; quantified: 37 hunks/~199 lines) — split into the fleet-canonical sync + the maintainer-parity port | wallpaper#2 + wallpaper#3 |
+| F-3 | MAJOR | the wallpaper's shipped GLB corpus is a pre-v39/v40 rip (D-F1 baked in live: 1,559 alpha-0 holes on SU1FTE2_pal3; 0/44 rooms carry stream/waterTex/statics) | workflow re-rip (maintainer) — see follow-ups |
+| A-4 | MINOR | mesh depth cull used the 4-corner average; engine culls on corner [i][j] (map5_s00.c:204) | #30 |
+| A-5 | MINOR | ripple sel==2 read g_waterTileRGB without the lazy first-composite gate (black tile on the mode-0 anchor, stale on multi-shot) | #31 |
+| A-6 | MINOR | fx_blit_water_quad UV solve axis-aligned (u from screen-x); engine POLY_FT4 interpolates along quad edges — oblique shear (2,983 px removed in the A/B) | #32 |
+| C-2 | MINOR | occluded-branch core quads 1-2 painted over everything; engine routes them depth_ot / depth_ot+7 (7 buckets FARTHER = +0.21875 m) | #34 |
+| C-3 | MINOR | ring/glint occlusion gates 19.53/19.47 m inverted the RIPPLE rule; the mesh rule (SZ>>3, bucket far edges) gives 20.0625/20.0 m — a 0.5 m band missed | #35 |
+| C-4 | MINOR | MASK far cull `cq8 <= farCull` vs engine strict `(cq8 & ~3) < farCullQ8` (billboard.c:263-266) | #36 |
+| C-5 | MINOR | flare probe lacked the ang_z >= 75° tile bound (lens_flare.c:103) + MASK leaves never occluded — with C-1, sewer/TV engine-true show NO flare (ang_z 27.07°) | #37 |
+| D-3 | MINOR | the "8bpp" gate `((flags>>3)&3)==1` is a no-op (passes 4bpp/8bpp/16bpp); correct = `(flags & 3)` per the project's own TimFile | #40 |
+| D-4 | MINOR | extract_rain/snow mislabel PMODE bits (1=8bpp, 2=16bpp) + wrong width multiplier (64x256 -> 128x256) | #40 |
+| D-5 | MINOR | stale extractor paths + the extract_water_tim.py that ea07754 claimed but never committed (provenance gap; the new script round-trips water_tim_data.h byte-identically) | #40 |
+| B-1 | MINOR | circle speedDegS parse lacked the >=0.001 clamp (editor parity; spiral/figure8 had it) | #41 |
+| B-2 | MINOR | editor DROPPED malformed points[] entries; the C coerces to [0,1,0] and counts RAW (path shape, >64 truncation, --track N indexing all diverge) | #42 |
+| B-3 | MINOR | 7 remaining isFinite(+v) gates accept strings/bools (weatherTarget, envDay/Night, sanitizeLight pos/rot/offset/ahead) vs the C's strict JV_NUM | #43 |
+| B-5 | MINOR | duplicate track ids leak one undisposed THREE.Group per visuals-Map rebuild | #44 |
+| B-6 | MINOR | snow ground datum for circle/curve/fixed was a NaN probe (t=0/0 -> lrintf(NaN)=0 garbage grid ALWAYS; THRF9FD: 21,714 cells vs the editor's true datum) | #45 |
+| B-7 | MINOR | editor snow backward-seek re-simulated with the END-frame camera (C: per-tick eval — 300/300 flakes differ, the B-B2 class in the snow twin) | #46 |
+| B-9 | MINOR | Shift+F fired BOTH the flashlight toggle and the frame-model handler | #47 |
+| E-6 | MINOR | stale tracked binaries + dead .gitignore pattern + the poc.yml:90 make race | #48 |
+| E-7 | MINOR | Makefiles list 2 of 8 headers as deps (touch dr_wave_data.h -> "Nothing to be done") | #48 |
+| E-8 | MINOR | ~12 numeric flags accepted trailing garbage (2abc = 2) — strict end-pointer parses now | #49 |
+| E-9 | MINOR | >64 --shot args silently dropped (66 -> 64 files) — hard error now | #49 |
+| E-10 | MINOR | explicit `--lensflare 0` lost to the camdat (0 conflated with CLI-silent) — -1 sentinel | #49 |
+| E-12 | MINOR | negative --t/--shot/--r2shot silently rendered t=0; huge t = hours of CPU — reject + 3600s cap | #49 |
+| E-11 | doc | --help said 1280x720; the code default is 960x672 | #49 |
+| E-13 | INFO | benchmark duration int-overflow cast UB ("0 frames") — clamped before the cast | #49 |
+| F-4 | MINOR | light.ahead dead in the twin (subsumed by the maintainer-parity port) | wallpaper#3 |
+| F-6 | MINOR | twin lacked the `static` driver + v40 statics parse — a v40 re-rip would SILENTLY drop all static scenery on Android (subsumed by the parity port) | wallpaper#3 |
+| F-10 | MINOR | CUSTOM.md describes a WebView editor that is actually native (doc fix, follow-up PR) | (docs) |
+| C-6 | INFO | DPCL negative-MAC saturates 255; THIS swanstation returns 0 — 17,639/16.7M triples differ, unreachable on shipped rooms via the wLI floor (proof needs rewrite before any fix) | follow-up |
+| F-5 | MINOR | camtrack renders no flare sprites/shimmer (the conformance table's "preview toggle" unimplemented — a feature decision) | follow-up |
+| F-8 | INFO | mapLink boot-merge vs the engine's 4.5 m Q8 streaming (deliberate simplification; WORKLOG:850/902 still promise the edge probe — doc drift) | follow-up |
+| F-11 | INFO | effectTexFlag parsed but never used (dead parse, both engines) | follow-up |
+| A-7/8 | INFO | the engine's g_DeltaTime!=0 counter guard is unreachable in PoC discipline; inhibit flags never settable (structural fidelity notes) | follow-up |
+| D-6 | INFO | DR_WAVE docstring "blank at v 32..63" inaccurate (2/2048 non-zero texels) | follow-up |
+| D-7 | INFO | kFlareGhost3 duplicates kFlareCore (correct per lens_flare.c:484; ~4KB redundancy) + ghost3's additive blend is ~2x hardware ABR-2 strength | follow-up |
+| B-4 | MINOR | r4(±Infinity) exports JSON null — round-trip mutates hand-edited 1e999 fields (needs a DESIGN decision: visible normalization vs documented garbage-in) | follow-up |
+| B-8 | INFO | SMOOTH filter integrates per-rAF + snaps when paused vs the C's per-30Hz-tick + hold (documented editor semantic; the C banner's "snap on pause" overstates — the branch is unreachable while paused) | follow-up |
+| E-14..18 | INFO | SDL-only test facilities; unchecked fwrite/malloc + unclosed g_lightDump + hardcoded shots/ in K_S; silent flag precedence; glb_accessor negative byteOffset wrap (harden all five sites or none); --weather 2 boot no-op quirk | follow-ups |
+
+**Refuted/verified-correct (no PR):** the maintainer's 333f1b1 gate chain +
+mesh selector + mode-2 selection (AUDIT_V41_A Part 1 — verbatim-verified);
+the sine table (5120/5120 == decomp == round(sin(i/4096*2pi)*4096)); all BG_ETC/
+DR_WAVE/WATER tables byte-identical to sources; the V40 glint A-F1 unpacked-sheet
+indexing; F-9 (the wallpaper CI version scheme already matches the user's
+directive — 1.0.0 renumbering + asset->PATCH bump); 40+ further refuted
+candidates documented per report in download/v41_evidence/.
+
+**Battery re-baselines to expect when these merge:** C-1+C-5 remove the sewer/TV
+flare entirely (engine-true ang_z 27.07° < 75°); D-1+D-2 recolor the TV static
+(7.95% px on the shipped SPU0401) + wake style-4 windows (TV A/B 6.55% ->
+10.15%); A-3 changes dark+flashlight rooms' RNG-affected output; A-6 changes
+oblique water views (no shipped golden); B-6 removes the garbage resting-snow
+grid on fixed-track snow scenes.
+
+**Wallpaper follow-ups (workflow, not code):** (1) the corpus re-rip (F-3)
+needs the CDN /sh1 corpus + WATER.TIM — do it AFTER wallpaper#2/#3 merge
+(the statics driver must land first or the re-rip silently drops static
+scenery); (2) the wallpaper twin still needs the V41 engine fixes (C-1..C-5,
+A-3..A-6, E-2/E-3, D-1/D-2 landed as wallpaper#5 for the TV pair) at the
+next sync after their PoC merges.
+
+Full evidence: the six AUDIT_V41_* reports + five VERIFY_V41_* reports +
+per-fix FIX_V41_* reports (branch, diff, verification transcripts) at
+/home/z/my-project/download/v41_evidence/ (mirrored in the audit fleet's
+sandbox; the PR bodies carry the per-bug essentials).
