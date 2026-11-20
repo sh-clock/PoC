@@ -50,8 +50,8 @@ GLB_DIR="$OUT/glbs"
 rm -rf "$GLB_DIR"
 mkdir -p "$GLB_DIR"
 python3 "$ROOT/tools/ipd2gltf.py" --input "$ROOT/input" \
-    --output "$GLB_DIR" --rooms THRF9FD,HP0003,SU0203 >/dev/null
-for r in THRF9FD HP0003 SU0203; do
+    --output "$GLB_DIR" --rooms THRF9FD,HP0003,SU0203,DRU0100,SPU0401 >/dev/null
+for r in THRF9FD HP0003 SU0203 DRU0100 SPU0401; do
     [ -f "$GLB_DIR/$r.glb" ] || {
         echo "package_release.sh: converter produced no $r.glb" >&2; exit 1; }
 done
@@ -64,6 +64,13 @@ install -m 644 "$GLB_DIR/HP0003.glb" "$TMP/input/"
 install -m 644 "$ROOT/input/hp_camdat.json" "$TMP/input/"
 install -m 644 "$GLB_DIR/SU0203.glb" "$TMP/input/"
 install -m 644 "$ROOT/input/fan_camdat.json" "$TMP/input/"
+# v40: the SEWER water room (DR_WAVE floor + waterZones + the flashlight —
+# the environment that reacts to the user light: glints + caustic ring on
+# the water) and the TOWN-CENTER TV room (tvNoise paint, all 10 screens).
+install -m 644 "$GLB_DIR/DRU0100.glb" "$TMP/input/"
+install -m 644 "$ROOT/input/sewer_camdat.json" "$TMP/input/"
+install -m 644 "$GLB_DIR/SPU0401.glb" "$TMP/input/"
+install -m 644 "$ROOT/input/tv_camdat.json" "$TMP/input/"
 
 # --- the engine ---
 if [ "$LINUX_BIN" = "NONE" ] || [ ! -f "$LINUX_BIN" ]; then
@@ -116,6 +123,37 @@ exec ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json --input inp
 EOF
 chmod 755 "$TMP/RUN_SU0203.sh"
 }
+write_run_dr_sh() {
+cat > "$TMP/RUN_DRU0100.sh" <<'EOF'
+#!/bin/sh
+# One-click: the SEWER water pier (DRU0100 — DR_WAVE floor + waterZones;
+# the flashlight follows the camera: the glints + the caustic ring react
+# to the light as it moves — THE user-light water demo).
+# Deterministic self-test:  ./RUN_DRU0100.sh --test (writes shots/SELFTEST_DRU0100.png)
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json \
+        --input input --shot t=6,file=SELFTEST_DRU0100.png
+fi
+exec ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json --input input
+EOF
+chmod 755 "$TMP/RUN_DRU0100.sh"
+}
+write_run_tv_sh() {
+cat > "$TMP/RUN_SPU0401.sh" <<'EOF'
+#!/bin/sh
+# One-click: the TOWN-CENTER TV wall (SPU0401 — the tvNoise paint, all
+# 10 screens: the LCG static + the channel switching + the flicker).
+# Deterministic self-test:  ./RUN_SPU0401.sh --test (writes shots/SELFTEST_SPU0401.png)
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc --glb input/SPU0401.glb --camdat input/tv_camdat.json \
+        --input input --shot t=6,file=SELFTEST_SPU0401.png
+fi
+exec ./fog_poc --glb input/SPU0401.glb --camdat input/tv_camdat.json --input input
+EOF
+chmod 755 "$TMP/RUN_SPU0401.sh"
+}
 write_run_bats() {
 cat > "$TMP/RUN_THR.bat" <<'EOF'
 @echo off
@@ -150,16 +188,41 @@ goto :eof
 :test
 fog_poc.exe --glb input\SU0203.glb --camdat input\fan_camdat.json --input input --shot t=2.0,file=SELFTEST_SU0203.png
 EOF
+cat > "$TMP/RUN_DRU0100.bat" <<'EOF'
+@echo off
+rem One-click: the SEWER water pier (DRU0100 — the flashlight water demo).
+rem Deterministic self-test:  RUN_DRU0100.bat --test  (writes shots\SELFTEST_DRU0100.png)
+cd /d "%~dp0"
+if "%1"=="--test" goto test
+fog_poc.exe --glb input\DRU0100.glb --camdat input\sewer_camdat.json --input input
+goto :eof
+:test
+fog_poc.exe --glb input\DRU0100.glb --camdat input\sewer_camdat.json --input input --shot t=6,file=SELFTEST_DRU0100.png
+EOF
+cat > "$TMP/RUN_SPU0401.bat" <<'EOF'
+@echo off
+rem One-click: the TOWN-CENTER TV wall (SPU0401 — the tvNoise paint).
+rem Deterministic self-test:  RUN_SPU0401.bat --test  (writes shots\SELFTEST_SPU0401.png)
+cd /d "%~dp0"
+if "%1"=="--test" goto test
+fog_poc.exe --glb input\SPU0401.glb --camdat input\tv_camdat.json --input input
+goto :eof
+:test
+fog_poc.exe --glb input\SPU0401.glb --camdat input\tv_camdat.json --input input --shot t=6,file=SELFTEST_SPU0401.png
+EOF
 }
 
 cat > "$TMP/README.txt" <<'EOF'
 Silent Hill 1 PoC — one-click test build (see TESTING.md).
   Linux/macOS :  ./RUN_THR.sh        (street demo)   ./RUN_HP0003.sh
                  ./RUN_SU0203.sh    (nightmare-school FAN demo)
+                 ./RUN_DRU0100.sh   (SEWER water + the flashlight demo)
+                 ./RUN_SPU0401.sh   (town-center TV wall demo)
   Windows     :  RUN_THR.bat                          RUN_HP0003.bat
-                 RUN_SU0203.bat
+                 RUN_SU0203.bat    RUN_DRU0100.bat    RUN_SPU0401.bat
 Deterministic self-test (renders a PNG, no window):
   ./RUN_THR.sh --test ; ./RUN_HP0003.sh --test ; ./RUN_SU0203.sh --test
+  ./RUN_DRU0100.sh --test ; ./RUN_SPU0401.sh --test
 This project is 100% AI Slop / Vibe Coded and is non-commercial.
 CODE is GPL; included assets are NOT — they are copyrighted by Konami,
 non-commercial use only. See ACKNOWLEDGEMENTS.md.
@@ -172,6 +235,8 @@ done
 write_run_thr_sh
 write_run_hp_sh
 write_run_fan_sh
+write_run_dr_sh
+write_run_tv_sh
 write_run_bats
 
 # --- the Linux zip (sh runners + binary + docs; .bat dropped) ---
@@ -179,9 +244,11 @@ if [ "$LINUX_BIN" != "NONE" ] && [ -f "$LINUX_BIN" ]; then
     rm -f "$OUT/sh1x-poc-$TAG-linux.zip"
     ( cd "$TMP" && zip -q -r "$OUT/sh1x-poc-$TAG-linux.zip" \
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
-        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh fog_poc input )
+        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh RUN_DRU0100.sh RUN_SPU0401.sh \
+        fog_poc input )
 fi
-rm -f "$TMP/RUN_THR.sh" "$TMP/RUN_HP0003.sh" "$TMP/RUN_SU0203.sh"
+rm -f "$TMP/RUN_THR.sh" "$TMP/RUN_HP0003.sh" "$TMP/RUN_SU0203.sh" \
+      "$TMP/RUN_DRU0100.sh" "$TMP/RUN_SPU0401.sh"
 
 if [ -n "$WIN_BIN" ] && [ -f "$WIN_BIN" ]; then
     install -m 755 "$WIN_BIN" "$TMP/fog_poc.exe"
@@ -218,10 +285,30 @@ fi
 exec ./fog_poc.exe --glb input/SU0203.glb --camdat input/fan_camdat.json --input input
 EOF
     chmod 755 "$TMP/RUN_SU0203.sh"
+    cat > "$TMP/RUN_DRU0100.sh" <<'EOF'
+#!/bin/sh
+# Git-Bash/WSL runner for the Windows build (SEWER water pier).
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc.exe --glb input/DRU0100.glb --camdat input/sewer_camdat.json --input input --shot t=6,file=SELFTEST_DRU0100.png
+fi
+exec ./fog_poc.exe --glb input/DRU0100.glb --camdat input/sewer_camdat.json --input input
+EOF
+    chmod 755 "$TMP/RUN_DRU0100.sh"
+    cat > "$TMP/RUN_SPU0401.sh" <<'EOF'
+#!/bin/sh
+# Git-Bash/WSL runner for the Windows build (town-center TV wall).
+cd "$(dirname "$0")"
+if [ "${1:-}" = "--test" ]; then
+    exec ./fog_poc.exe --glb input/SPU0401.glb --camdat input/tv_camdat.json --input input --shot t=6,file=SELFTEST_SPU0401.png
+fi
+exec ./fog_poc.exe --glb input/SPU0401.glb --camdat input/tv_camdat.json --input input
+EOF
+    chmod 755 "$TMP/RUN_SPU0401.sh"
     ( cd "$TMP" && zip -q -r "$OUT/sh1x-poc-$TAG-win.zip" \
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
-        RUN_THR.bat RUN_HP0003.bat RUN_SU0203.bat \
-        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh \
+        RUN_THR.bat RUN_HP0003.bat RUN_SU0203.bat RUN_DRU0100.bat RUN_SPU0401.bat \
+        RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh RUN_DRU0100.sh RUN_SPU0401.sh \
         fog_poc.exe input )
 fi
 

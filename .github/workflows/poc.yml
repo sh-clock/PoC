@@ -177,10 +177,32 @@ jobs:
           ./RUN_THR.sh --test
           ./RUN_HP0003.sh --test
           ./RUN_SU0203.sh --test
+          ./RUN_DRU0100.sh --test
+          ./RUN_SPU0401.sh --test
           test -s shots/SELFTEST_THR.png
           test -s shots/SELFTEST_HP0003.png
           test -s shots/SELFTEST_SU0203.png
-          echo "one-click zip verified: all three self-tests rendered"
+          test -s shots/SELFTEST_DRU0100.png
+          test -s shots/SELFTEST_SPU0401.png
+          echo "one-click zip verified: all five self-tests rendered"
+          # v40: the SEWER water-animation regression (the DR_WAVE scroll +
+          # glints MOVE: fixed camera, t=3 vs t=6 must differ — the water
+          # tile advances + the glint pattern shimmers)
+          ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json \
+              --input input --cam 56 1.8 -20 66 -1 -22 \
+              --shot t=3.0,file=SEW_A.png
+          ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json \
+              --input input --cam 56 1.8 -20 66 -1 -22 \
+              --shot t=6.0,file=SEW_B.png
+          python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/SEW_A.png shots/SEW_B.png 500
+          # v40: the TV-animation regression (tvNoise paint: t=3 vs t=6)
+          ./fog_poc --glb input/SPU0401.glb --camdat input/tv_camdat.json \
+              --input input --cam 160 1.4 -56 164 0.6 -52 \
+              --shot t=3.0,file=TV_A.png
+          ./fog_poc --glb input/SPU0401.glb --camdat input/tv_camdat.json \
+              --input input --cam 160 1.4 -56 164 0.6 -52 \
+              --shot t=6.0,file=TV_B.png
+          python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/TV_A.png shots/TV_B.png 500
           # v28: the fan-animation regression proof runs from the UNZIPPED
           # one-click zip too (same fixed-camera one-tick pixel diff)
           ./fog_poc --glb input/SU0203.glb --camdat input/fan_camdat.json \

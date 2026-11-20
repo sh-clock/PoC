@@ -2247,7 +2247,7 @@ if (typeof module !== 'undefined' && module.exports) {
       into shVcol/shOcol vertex attributes.
    2. SHADER COMPOSITE (exact formula): fragment = (texel*vcol)>>7 + ocol,
       STP per-texel binary alpha, near 0.05 discard, far-cull discard.
-   3. PSX WOBBLE (exact): gl_Position snapped to the 320x240 engine grid
+   3. PSX WOBBLE (exact): gl_Position snapped to the 320x224 engine grid
       with FLOOR semantics (DuckStation PushSXY s32(Sx>>16) truncation).
    3b. v5 OT BUCKET DEPTH + AFFINE VARYINGS (engine semantics — the JS
       flicker fix): the vertex depth quantizes onto the engine Ordering
@@ -2511,7 +2511,7 @@ window.SHView = (function () {
     varying float vDepth;
     varying float vW;      /* v5: the noperspective (affine) unwrap weight */
     uniform float uPsx;
-    uniform vec2 uPixScale;     /* (RT_W/320, RT_H/240) — the GTE grid    */
+    uniform vec2 uPixScale;     /* (RT_W/320, RT_H/224) — the GTE grid (v40: NTSC gsScreenHeight=224; the old 240 was the PAL/SCREEN_HEIGHT reading — see the PoC v21/v40 engine-truth grid) */
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       float depth = -mvPosition.z;
@@ -2520,10 +2520,10 @@ window.SHView = (function () {
         /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
            (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor)          */
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
-                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 240.0 * uPixScale.y);
+                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
         screen = floor(screen / uPixScale) * uPixScale;
         vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                        1.0 - screen.y / (240.0 * uPixScale.y) * 2.0);
+                        1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
         /* v5 — THE JS FLICKER FIX (1): the engine's per-quad OT bucket
            depth. The PSX GPU has NO depth buffer (DuckStation
            gpu_sw_rasterizer.inl rasterizes in pure GP0 command order); the
@@ -2667,10 +2667,10 @@ window.SHView = (function () {
       vec4 clip = projectionMatrix * mv;
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
-                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 240.0 * uPixScale.y);
+                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
         screen = floor(screen / uPixScale) * uPixScale;
         clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                       1.0 - screen.y / (240.0 * uPixScale.y) * 2.0) * clip.w;
+                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
       }
       /* atlas uv: the engine samples texels [u0t .. u0t+size) x [0..size) */
       vUvA = vec2((sU0 + sFrac.x * sSize) / 8.0, (sClutY + sFrac.y * sSize) / 40.0);
@@ -2783,7 +2783,7 @@ window.SHView = (function () {
         uniforms: {
           map: { value: buildSnowAtlas(three) },
           uPsx: { value: 1 },
-          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 240) },
+          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) },   /* v40: NTSC 224 */
           uHalfFovTan: { value: Math.tan(30 * Math.PI / 180) },
           uRT_H: { value: V.RT_H }
         },
@@ -2912,7 +2912,7 @@ window.SHView = (function () {
           uAlphaTest: { value: alphaMode },
           uFarCullM: { value: 30.47 },
           uPsx: { value: V.psxWobble ? 1 : 0 },
-          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 240) }
+          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) }    /* v40: NTSC 224 */
         },
         side: three.DoubleSide,     /* engine accepts both windings      */
         /* v5: LESS — an exact bucket tie keeps the FIRST-submitted quad
@@ -7494,8 +7494,8 @@ const SH1X_DRIVER_IDS = {
   stoneChoreo: 10, lightFlicker: 11, sineBob: 12, carouselSpin: 13,
   ferrisWheel: 14, lissajousOrbit: 15, slideDoor: 16, rngWalk: 17,
   fallOnce: 18, binSpin: 19, scrollBelt: 20, waterRipple: 21,
-  particles: 22, cutscene: 7
-};
+  particles: 22, cutscene: 7, static: 23
+};   /* v40: static = the positioned scenery WorldObjects (pose at rot0/pos, no tick) */
 
 /* fog_poc.c:1565-1823 — the propAnims parse + live-state init, VERBATIM
  * (defaults, driver mapping, manifest-level detection, the demo seeds).
@@ -7684,6 +7684,21 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.slideIdx = sh1xJi(e, 'slideIdx', 0);
     a.eventGateAlt = sh1xJi(e, 'eventGateAlt', 0);
     a.cutsceneOnly = sh1xJb(e, 'cutsceneOnly', false);
+    /* v40 (statics): the eventGate OR-string + the AND second flag */
+    a.eventGateOr = [0, 0, 0, 0];
+    a.eventGateOrN = 0;
+    a.eventGate2 = sh1xJi(e, 'eventGate2', 0);
+    a.eventGate2Pol = 0;
+    if (typeof e.eventGate === 'string' && e.eventGate.indexOf('|') >= 0) {
+      const parts = e.eventGate.split('|').map(Number).filter(n => n > 0);
+      for (let q = 0; q < Math.min(4, parts.length); q++) a.eventGateOr[q] = parts[q];
+      a.eventGateOrN = Math.min(4, parts.length);
+      if (a.eventGateOrN) a.eventGate = a.eventGateOr[0];   /* v40 audit B-F6: mirror the C parse (fog_poc.c) so OR-list statics stay gated when animsDemo is off */
+    }
+    if (a.eventGate2) {
+      const p2 = sh1xJs(e, 'eventGate2Polarity', 'set');
+      a.eventGate2Pol = (p2 === 'clear') ? 1 : 0;
+    }
     {
       const pol = sh1xJs(e, 'eventGatePolarity', 'set');
       a.eventGatePol = (pol === 'clear') ? 1 : (pol === 'clear-or') ? 2 : 0;
@@ -7792,7 +7807,14 @@ function sh1xGateOn(S, a) {
   }
   if (S.animsDemo) return true;         /* demo: every event gate is open */
   if (a.eventGate) {
-    if (a.eventGatePol === 1) return true;
+    /* v40: the OR-list (map3_s03's "265|266|267|268") — engine-fresh a
+     * SET-polarity list is hidden, a CLEAR-polarity list live. */
+    if (a.eventGateOrN) return (a.eventGatePol === 1);
+    if (a.eventGatePol === 1) {
+      /* v40: the AND second flag (KEY_HIDE 114-clear AND 113-set) */
+      if (a.eventGate2 && a.eventGate2Pol === 0) return false;
+      return true;
+    }
     if (a.eventGatePol === 2) {
       if (!a.eventGateAlt) return true;
       return true;      /* engine-fresh: both clear -> live */
@@ -9746,10 +9768,10 @@ const WATER_VERT = `
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
          (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
-                         (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 240.0 * uPixScale.y);
+                         (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
       screen = floor(screen / uPixScale) * uPixScale;
       vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (240.0 * uPixScale.y) * 2.0);
+                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
       /* the water prim's own PLAIN avg depth (shWb) — the C's painter gate
          input (fog_poc.c:11218-11219: skip only when opaque geometry is
          strictly NEARER; ties draw). The GL depth TEST is OFF (the room's
@@ -9923,7 +9945,7 @@ function sh1xWaterEnsureMesh() {
       uPsx: { value: 1 },
       uPixScale: { value: new THREE.Vector2(
         (window.SHView ? window.SHView.V.RT_W : 640) / 320,
-        (window.SHView ? window.SHView.V.RT_H : 360) / 240) }
+        (window.SHView ? window.SHView.V.RT_H : 360) / 224) }   /* v40: NTSC 224-row GTE grid */
     },
     /* TPAGE-45 ABR-1: additive, occluded only by opaque geometry
      * strictly NEARER (the C's fb->z depthM gate — implemented as the
@@ -10157,6 +10179,14 @@ function applySh1xPropAnims(t) {
     if (it.animIdx < 0) continue;
     if (seen.has(it.node)) continue;
     seen.add(it.node);
+    /* v40: STATIC WorldObjects — gated = the game's WorldObjects_Add
+     * never fired at this state -> the node is NOT drawn (the PoC
+     * engine's sh1xItemMask rule; --anims-demo opens every gate). */
+    {
+      const ca = S.anims[it.animIdx];
+      it.node.visible = !(ca && ca.driver === 23 && ca.gated);
+      if (!it.node.visible) continue;
+    }
     if (!on) {
       it.node.position.copy(it.basePos);
       it.node.quaternion.copy(it.baseQuat);

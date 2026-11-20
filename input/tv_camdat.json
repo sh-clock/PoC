@@ -1,0 +1,61 @@
+{
+ "format": "camdat",
+ "version": 1,
+ "generatedBy": "sh1 scene set",
+ "models": [
+  {
+   "file": "SPU0401.glb",
+   "fogon": false,
+   "nighton": true,
+   "flashlighton": true,
+   "env": {
+    "pair": [6, 3],
+    "weatherTarget": 6,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": true,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true,
+    "animsDemo": true
+   },
+   "light": {
+    "on": true,
+    "follow": "camera",
+    "ahead": 1.2
+   },
+   "tracks": [
+    {
+     "id": "tvwallpan",
+     "name": "Town-center TV wall pan (tvNoise screens)",
+     "type": "line",
+     "enabled": true,
+     "fovDeg": 55,
+     "loopMode": "pingPong",
+     "start": [156.0, 1.4, -58.0],
+     "end": [163.0, 1.4, -55.0],
+     "speedMS": 0.3,
+     "lookMode": "point",
+     "lookAt": [164.0, 0.6, -52.0],
+     "durationSec": 60.0
+    },
+    {
+     "id": "tvclose",
+     "name": "TV wall closeup (channel switching)",
+     "type": "fixed",
+     "enabled": false,
+     "fovDeg": 55,
+     "position": [161.0, 1.2, -53.0],
+     "yawSpeedDegS": 4,
+     "pitchSpeedDegS": 0,
+     "yawMinDeg": 20,
+     "yawMaxDeg": 60,
+     "lookMode": "point",
+     "lookAt": [164.0, 0.6, -52.0],
+     "durationSec": 45.0
+    }
+   ]
+  }
+ ]
+}

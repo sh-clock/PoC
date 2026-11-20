@@ -1,0 +1,61 @@
+{
+ "format": "camdat",
+ "version": 1,
+ "generatedBy": "sh1 scene set",
+ "models": [
+  {
+   "file": "DRU0100.glb",
+   "fogon": false,
+   "nighton": true,
+   "flashlighton": true,
+   "env": {
+    "pair": [6, 3],
+    "weatherTarget": 5,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": true,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true,
+    "animsDemo": true
+   },
+   "light": {
+    "on": true,
+    "follow": "camera",
+    "ahead": 1.2
+   },
+   "tracks": [
+    {
+     "id": "pierwalk",
+     "name": "Sewer pier walk (water + flashlight)",
+     "type": "line",
+     "enabled": true,
+     "fovDeg": 55,
+     "loopMode": "pingPong",
+     "start": [54.0, 1.8, -20.0],
+     "end": [70.0, 1.6, -20.0],
+     "speedMS": 0.4,
+     "lookMode": "point",
+     "lookAt": [66.0, -1.0, -22.0],
+     "durationSec": 80.0
+    },
+    {
+     "id": "poolorbit",
+     "name": "Sewer water pool orbit",
+     "type": "circle",
+     "enabled": false,
+     "fovDeg": 55,
+     "center": [62.0, 2.2, -20.0],
+     "radiusX": 6.0,
+     "radiusZ": 6.0,
+     "startAngleDeg": 20,
+     "speedDegS": 6,
+     "loopMode": "loop",
+     "lookMode": "center",
+     "durationSec": 60.0
+    }
+   ]
+  }
+ ]
+}
