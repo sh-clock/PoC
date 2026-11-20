@@ -6249,10 +6249,23 @@ static void snow_ground_build(Snow *S, const CamTrack *trk) {
     int nH = 0;
     int *smp = NULL;
     if (trk->type == TRK_POLYLINE || trk->type == TRK_SPIRAL ||
-        trk->type == TRK_ZIGZAG || trk->type == TRK_FIGURE8) {
+        trk->type == TRK_ZIGZAG || trk->type == TRK_FIGURE8 ||
+        trk->type == TRK_CIRCLE || trk->type == TRK_CURVE ||
+        trk->type == TRK_FIXED) {
         /* camtrack.html new types have no start/end — sample the ACTUAL
          * track path (the same "walkable level" concept, generalized;
-         * median over evalTrack positions across one cycle)            */
+         * median over evalTrack positions across one cycle).
+         * v41 audit (B-6): CIRCLE/CURVE/FIXED as well — their parse blocks
+         * never write start/end (memset {0,0,0}, fog_poc.c:3199), so the
+         * old else-branch walked a degenerate (0,0)->(0,0) segment:
+         * len=0 -> nSmp=1 -> t=0/0=NaN -> px=pz=NaN, and the NaN probe
+         * passes every snow_gnd_tri_at rejection test (NaN compares
+         * false) -> nH=1 always, smp[0] = lrintf(NaN) (0 on this
+         * x86-64/glibc build; formally UB elsewhere) -> a garbage grid
+         * ALWAYS built for those types. camtrack.html's buildGround
+         * samples evalTrack for EVERY type (:2436-2444, :2974-2984) —
+         * the C now does the same for every type without a usable
+         * start/end segment (LINE keeps its 0.25 m start->end walk). */
         double T = camtrack_cycle_duration(trk);
         if (!isfinite(T) || T <= 0) T = 8.0;
         int nSmp = 512;
@@ -6272,7 +6285,11 @@ static void snow_ground_build(Snow *S, const CamTrack *trk) {
         if (nSmp > 4096) nSmp = 4096;
         smp = (int *)malloc(sizeof(int) * (size_t)nSmp);
         for (int i = 0; i < nSmp; i++) {
-            float t = (float)i / (float)(nSmp - 1);
+            /* v41 audit (B-6): nSmp==1 (an XZ start->end length < 0.5 m)
+             * divided 0/0 -> t=NaN -> px=pz=NaN — the same NaN probe the
+             * branch extension above removes for circle/curve/fixed;
+             * probe the start point instead. */
+            float t = nSmp > 1 ? (float)i / (float)(nSmp - 1) : 0.0f;
             float px = ax + (bx-ax)*t, pz = az + (bz-az)*t;
             float y = snow_gnd_at(sc, px, pz, -2.0f, 1.5f);
             if (y != SNOW_GND_NOHIT) smp[nH++] = (int)lrintf(y * 256.0f);
