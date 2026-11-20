@@ -9,10 +9,16 @@ Layout (from the decomp):
    v 8..39)) -- verified periodic rows 0/32, 8/40 identical.
  - right half (u 64..127): content tiles at v 0..31, blank at v 32..63.
  - clut row 0 = grayscale ramp (0,29,42,5A,63,73); row 1 = purple-tint.
+
+Source: input/DR_WAVE.TIM (repo-relative default; md5-identical to
+ /home/z/my-project/test_assets/dr_rip/TIM/DR_WAVE.TIM).
+Run:  python3 tools/extract_dr_wave_tim.py [DR_WAVE.TIM] [src/dr_wave_data.h]
 """
 import struct
+import sys
 
-TIM = '/home/z/my-project/gamefiles/TIM/DR_WAVE.TIM'
+TIM = sys.argv[1] if len(sys.argv) > 1 else 'input/DR_WAVE.TIM'
+OUT = sys.argv[2] if len(sys.argv) > 2 else 'src/dr_wave_data.h'
 data = open(TIM, 'rb').read()
 
 off = 8
@@ -32,7 +38,8 @@ for y in range(H):
     px.append(row)
 
 out = []
-out.append('/* v32: DR_WAVE.TIM (gamefiles/TIM) — the sewer water tile, VERBATIM')
+out.append('/* v32: DR_WAVE.TIM (input/, md5-identical to test_assets/dr_rip)')
+out.append(' * — the sewer water tile, VERBATIM')
 out.append(' * pixel data. Upload (engine): s_FsImageDesc D_800A908C')
 out.append(' * {tPage 13, u 0, v 0, clut (224,0)} (screen/data.c:118 NTSC);')
 out.append(' * left 64x64 = the func_8008E5B4 scroll source; clut row 0 = the')
@@ -50,8 +57,8 @@ for r in range(2):
     out.append('    {' + ','.join(vals) + '},')
 out.append('};')
 
-open('/home/z/my-project/repos/PoC/src/dr_wave_data.h', 'w').write('\n'.join(out) + '\n')
-print('wrote src/dr_wave_data.h —', len(out), 'lines')
+open(OUT, 'w').write('\n'.join(out) + '\n')
+print('wrote', OUT, '—', len(out), 'lines')
 # sanity: periodicity check of the left scroll source
 same = all(px[y] == px[y + 32] for y in range(32))
 print('left-half 32-row periodicity:', same)

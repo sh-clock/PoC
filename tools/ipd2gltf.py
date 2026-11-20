@@ -553,8 +553,12 @@ def _room_water_floor(room, resolver, report):
 
 def _tv_paint_extras(room, resolver=None, report=None):
     """The SH1X.tvPaint block for the tvNoise rooms (the MAP4_S03 overlay's
-    area tag). The palette STRIP reconstructs the paint's 256-entry CLUT
-    bank rows 0..11 (VRAM x 448..703, the SwanStation Palette8Bit readout):
+    area tag). The palette STRIP reconstructs the paint's CLUT bank rows
+    0..11 (VRAM x 448..703, 256 entries wide). The paint samples it with
+    swanstation's Palette4Bit path (the quads are drawn 4bpp — tpage
+    (field_0 & 0x1F) | 0x20, mode bits 7-8 = 0), so ONLY columns 0..15
+    (VRAM x 448..463) are ever consumed; the rest is GLB-compat dead
+    data:
       x 448..463  = the TV TIMs' own CLUT rows (TV1 0..2, TV2 5..6,
                     TV3 10..11; rows 3,4,7,8,9 = fresh-boot stale = 0)
       x 464..511  = the tpage-7 region (the paper-map marking atlas only
@@ -571,15 +575,18 @@ def _tv_paint_extras(room, resolver=None, report=None):
     pa = _room_prop_anims(room.name)
     if not any(e.get("driver") == "tvNoise" for e in pa):
         return None
-    # ---- the strip: TV clut rows + the room TIM rows (RAW 8bpp parse —
-    # TimFile is 4bpp-only, so the TV/SPU effect TIMs are read directly) --
-    def _tim8_parts(raw):
+    # ---- the strip: TV clut rows + the room TIM rows (a direct raw-
+    # halfword parse — the TV/SPU effect TIMs are 4bpp CLUT files like
+    # every room sheet; the copies below are bpp-agnostic raw VRAM) --
+    def _tim4_parts(raw):
         """(clut_rows [[u16]], pixel_rows [[u16 x img_w]], img_w, img_h) for
-        an 8bpp CLUT TIM, or None on any structural mismatch."""
+        a 4bpp CLUT TIM (PMODE bits 0-1 == 0, CLT bit 3 — the same gate as
+        TimFile), or None on any structural mismatch. The returned rows are
+        RAW VRAM halfwords (bpp-agnostic byte copies)."""
         if len(raw) < 20 or raw[0] != 0x10:
             return None
         flags = u32(raw, 4)
-        if not (flags & 8) or ((flags >> 3) & 3) != 1:   # need 8bpp CLUT TIM
+        if not (flags & 8) or (flags & 3) != 0:   # need 4bpp CLUT TIM
             return None
         clen = u32(raw, 8)
         cw, ch = u16(raw, 16), u16(raw, 18)
@@ -614,27 +621,27 @@ def _tv_paint_extras(room, resolver=None, report=None):
                5: ("TV2.TIM", 0), 6: ("TV2.TIM", 1),
                10: ("TV3.TIM", 0), 11: ("TV3.TIM", 1)}
     for r, (name, row) in tv_rows.items():
-        parts = _tim8_parts(_resolve_bytes(name))
+        parts = _tim4_parts(_resolve_bytes(name))
         if parts is None:
             if report is not None:
                 report.setdefault("problems", []).append(
                     f"{room.name}: tvPaint palette strip: {name} not "
-                    f"resolved/8bpp (its CLUT row emitted as 0)")
+                    f"resolved/4bpp (its CLUT row emitted as 0)")
             continue
         clut_rows, _prows, _w, _h = parts
         for c in range(16):
             strip[r][c] = clut_rows[row][c] & 0xFFFF
     # the room's first three TIMs (the PLM texture-table order = the
-    # engine's material binding order): pixel rows 0..11 (the 8bpp sheets'
+    # engine's material binding order): pixel rows 0..11 (the sheets'
     # rows are img_w halfwords each)
     if room.plm is not None:
         for si, tname in enumerate(room.plm.tex_names[:3]):
-            parts = _tim8_parts(_resolve_bytes(tname))
+            parts = _tim4_parts(_resolve_bytes(tname))
             if parts is None:
                 if report is not None:
                     report.setdefault("problems", []).append(
                         f"{room.name}: tvPaint palette strip: room TIM "
-                        f"{tname} not resolved/8bpp (its slot emitted as 0)")
+                        f"{tname} not resolved/4bpp (its slot emitted as 0)")
                 continue
             _cl, prows, iw, ih = parts
             # v40 audit (D-F6): the strip column = VRAM x - 448 (the
@@ -664,7 +671,7 @@ def _tv_paint_extras(room, resolver=None, report=None):
                "MAP4_S03.BIN tables (D_800DB7D4/D_800DB7E4/D_800DB874, "
                "overlay base 0x800C9578) + Fs_QueuePostLoadTim "
                "(fs_queue.c:643-682, clutX=448 static D_800DB91C) + "
-               "swanstation gpu_sw_backend.cpp ShadePixel (Palette8Bit)",
+               "swanstation gpu_sw_backend.cpp ShadePixel (Palette4Bit)",
     }
 
 

@@ -32,7 +32,9 @@ def parse_tim(data):
     magic, flag = struct.unpack_from("<II", data, 0)
     if magic != 0x10:
         raise ValueError("not a TIM (magic %08x)" % magic)
-    bpp = 4 if (flag & 0x03) in (0x00, 0x01) else 8 if (flag & 0x03) in (0x02, 0x03) else None
+    # TIM PMODE bits 0-1: 0 = 4bpp, 1 = 8bpp, 2 = 16bpp, 3 = mixed
+    bpp = 4 if (flag & 0x03) == 0x00 else 8 if (flag & 0x03) == 0x01 \
+        else 16 if (flag & 0x03) == 0x02 else None
     off = 8
     clut = None
     if flag & 0x08:
@@ -57,7 +59,8 @@ def parse_tim(data):
             row.append((w >> 12) & 0xF)
         pixels.append(row)
     return {"bpp": bpp, "clut": clut, "vram": (px, py),
-            "size": (pw * (2 if bpp == 4 else 1), ph), "pixels": pixels}
+            "size": (pw * (4 if bpp == 4 else 2 if bpp == 8 else 1), ph),
+            "pixels": pixels}
 
 
 def halfword_from_pixels(pixels, row, hwcol):

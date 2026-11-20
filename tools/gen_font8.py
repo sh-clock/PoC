@@ -8,9 +8,10 @@ Output: one C array, 95 glyphs (ASCII 32..126), 8 bytes per glyph,
 MSB-first (bit 7 = leftmost pixel). Threshold at >= 96.
 """
 from PIL import Image, ImageDraw, ImageFont
+import sys
 
 TTF = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-OUT = "/home/z/my-project/upload/poc_v8/src/sh_font8.h"
+OUT = sys.argv[1] if len(sys.argv) > 1 else "src/sh_font8.h"
 
 # Render at a larger size and downsample with a threshold for crisper
 # glyphs than a naive 8px render (PIL's own hinting at tiny sizes is poor).
