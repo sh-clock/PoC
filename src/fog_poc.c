@@ -13298,7 +13298,20 @@ static CamPose playback_step(Playback *P, const CamTrack *tr, double dt,
         P->t += dt * P->speed;
         P->sessionT += dt * P->speed;   /* v10: monotonic — never wraps */
         if (isfinite(T) && T > 0) {
-            if (P->t >= T) P->t = fmod(P->t, T);   /* tickPlayback wrap */
+            /* v40 audit (B-B1): camtrack.html tickPlayback (:7315-7317)
+             * — `once` tracks STOP at the end pose and the player holds
+             * (setPlaying(false)); only loop/pingPong wrap. The old code
+             * wrapped `once` unconditionally, so every finite once-track
+             * replayed in an endless loop in the engine/wallpaper while
+             * the editor previewed a single pass — the format doc:
+             * "loopMode: loop wraps, pingPong mirrors at ends, once
+             * stops at end". Held at T, cam_phase01(once, u>=1) = 1 —
+             * the end pose, exactly the editor's hold. */
+            if (tr && tr->loopMode == LOOP_ONCE) {
+                if (P->t >= T) P->t = T;      /* once: stop at the end */
+            } else if (P->t >= T) {
+                P->t = fmod(P->t, T);          /* tickPlayback wrap     */
+            }
         }
         if (P->t < 0) P->t = 0;
     }
