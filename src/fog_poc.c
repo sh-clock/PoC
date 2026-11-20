@@ -11244,9 +11244,25 @@ static void fx_blit_water_quad(Frame *fb, const int sx[4], const int sy[4],
     if (mny < 0) mny = 0;
     if (mxx >= (int)fb->w) mxx = (int)fb->w - 1;
     if (mxy >= (int)fb->h) mxy = (int)fb->h - 1;
-    /* affine UV: (u0,v0)->corner0, (u1,v0)->corner1, (u0,v1)->corner2  */
-    double du = (double)(u1 - u0) / (double)(sx[1] - sx[0] + 0.0001);
-    double dv = (double)(v1 - v0) / (double)(sy[2] - sy[0] + 0.0001);
+    /* v41 (A-6): the affine UV solve for OBLIQUE quads — the v39
+     * school-water blits' (fx_blit_wsheet_ft4/gt4) parallelogram solve:
+     * the parametric (a, b) in P = P0 + a*(P1-P0) + b*(P2-P0), the
+     * PS1's own screen-space linear interpolation along the quad EDGES
+     * (a POLY_FT4 interpolates u along corner0->corner1 and v along
+     * corner0->corner2 whatever their screen orientation — the ripple
+     * setters, map5_s00.c:165-168/226-231, give the four corners
+     * independent UVs). The old solve took u from screen-x and v from
+     * screen-y (axis-aligned) — correct only when edge 0->1 is
+     * horizontal and 0->2 vertical; under the oblique sewer camera the
+     * +x edge (u) and the -z edge (v) project to arbitrary headings
+     * and the tile sheared. Same contract as before:
+     * (u0,v0)->corner0, (u1,v0)->corner1, (u0,v1)->corner2.          */
+    double ax1 = (double)sx[1] - sx[0], ay1 = (double)sy[1] - sy[0];
+    double ax2 = (double)sx[2] - sx[0], ay2 = (double)sy[2] - sy[0];
+    double det = ax1 * ay2 - ax2 * ay1;
+    if (fabs(det) < 1e-9) return;            /* degenerate quad          */
+    double ia =  ay2 / det, ib = -ax2 / det; /* inv [[ax1 ax2][ay1 ay2]] */
+    double ic = -ay1 / det, id2 =  ax1 / det;
     for (int py = mny; py <= mxy; py++) {
         for (int px = mnx; px <= mxx; px++) {
             double ax = px + 0.5, ay = py + 0.5;
@@ -11262,8 +11278,11 @@ static void fx_blit_water_quad(Frame *fb, const int sx[4], const int sy[4],
                 if (!(neg && pos)) inside = 1;
             }
             if (!inside) continue;
-            int u = u0 + (int)((ax - sx[0]) * du);
-            int v = v0 + (int)((ay - sy[0]) * dv);
+            double rx = ax - sx[0], ry = ay - sy[0];
+            double ua = ia * rx + ib * ry;   /* along edge 0->1 (u axis)  */
+            double vb = ic * rx + id2 * ry;  /* along edge 0->2 (v axis)  */
+            int u = u0 + (int)((u1 - u0) * ua);
+            int v = v0 + (int)((v1 - v0) * vb);
             if (u < 0 || u > 31 || v < 0 || v > 31) continue;
             size_t pi = (size_t)py * fb->w + px;
             if (depthM > 0.0f && fb->z && fb->z[pi] < depthM)
