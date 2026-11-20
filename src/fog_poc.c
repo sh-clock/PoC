@@ -10253,8 +10253,17 @@ static void fx_water_glint_blit(Frame *fb, int px0, int py0,
             int tu = 64 + (int)(fu * 63.0);
             int tv = 31 - (int)(fv * 31.0);
             if (tu < 64 || tu > 127 || tv < 0 || tv > 31) continue;
-            unsigned idx = (unsigned)((g_drWaveIdx[tv][tu >> 1] >>
-                                       ((tu & 1) * 4)) & 0xF);
+            /* v40 audit (A-F1): g_drWaveIdx is the UNPACKED byte-per-texel
+             * sheet (dr_wave_data.h: [64][128], one palette index per
+             * texel — every other consumer indexes [y][x] directly, e.g.
+             * fx_water_tile_update / fx_water_static_tile). The old
+             * packed-nibble fetch [tv][tu>>1] >> ((tu&1)*4) read the WRONG
+             * half of the sheet (columns pair-packed) and forced index 0
+             * on odd columns — the glint sampled garbage. Verbatim
+             * reference: the FT4's u0..u3 = 64..127 window (lens_flare.c
+             * shLensFlareExec, the glint quad) reads the sheet's right
+             * half — one index per texel. */
+            unsigned idx = (unsigned)(g_drWaveIdx[tv][tu] & 0xFu);
             unsigned short tc = g_drWaveClut[1][idx];
             uint8_t *p = fb->rgb + pi * 3;
             int Fr = ((int)(tc & 31u) * r0) >> 7;
