@@ -661,7 +661,7 @@ full test battery green (3 self-test goldens byte-identical, camera parity
 
 | ID | Sev | Bug (one line) | PR |
 |----|-----|----------------|----|
-| A-F1 | MAJOR | glint blit: packed-nibble fetch on the UNPACKED DR_WAVE sheet = wrong half + forced index 0 on odd columns | #22 `audit-v40/fix-glint-texel-nibble` |
+| A-F1 | MAJOR | glint blit: packed-nibble fetch on the UNPACKED DR_WAVE sheet = wrong half + forced index 0 on odd columns | #1 `audit-v40/fix-glint-texel-nibble` |
 | A-F3 | MINOR | scroll tick omits shLensFlareExec Gate-2 (scroll advanced in an engine-impossible state; NOTE: verbatim gate freezes camera-mounted-light floors — maintainer decision) | #3 |
 | A-F4 | MINOR | ripple mesh reads sprite 0's selector; the mesh's own RNG draw missing (stream off by one) | #4 |
 | A-F5 | MINOR | ripple sprite cull `((z+128)>>3)>=1024` vs engine `(z>>3)>=2048` (drops 31.5-64m sprites) | #5 |
@@ -682,7 +682,7 @@ full test battery green (3 self-test goldens byte-identical, camera parity
 | D-F6 | MINOR | tvPaint strip column base 48 vs 64 (VRAM 512+64*si - clut base 448) | #16 |
 | E-F1 | MAJOR | `--cam nan inf...` exited 0 with a flat frame + 8 UBSAN reports; `--t nan` hangs the realtime window | #12 |
 | E-F3 | MINOR | `--track -1` silently fell back to track 0 | #13 |
-| — | FIX | camera_audit_run.sh pointed at input/THRF9FD.glb (removed in v25) — the parity harness was dead | #1 `audit-v40/tools-camera-audit-path` |
+| — | FIX | camera_audit_run.sh pointed at input/THRF9FD.glb (removed in v25) — the parity harness was dead | #22 `audit-v40/tools-camera-audit-path` |
 | F-F2/WP | CRITICAL | the wallpaper's `93a3aa0` "v39 engine sync" predated the PoC's v39-audit fixes by 96 minutes: ALL SIX draw-path corrections (A1-A6) + the A7 cleanup missing; LIVE on the shipped SUFFFE/SU0203 waterfall scenes | wallpaper#1 `audit-v40/v39-audit-sync` (verbatim port of 597f6ee) |
 
 **Refuted (no PR):** F-F10 "asset commits should bump MINOR not PATCH" — the
