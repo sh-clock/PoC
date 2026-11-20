@@ -16917,6 +16917,17 @@ int main(int argc, char **argv) {
          * byte-identical.) (R is declared below in this loop in THIS
          * engine's ordering; the scene lives in sc — what R.sc aliases.) */
         sh1x_anims_reset(&sc.sh1x);
+        /* v40 audit (C-F2): multi-shot must ALSO invalidate the driver
+         * bind — the R-restart path does (v38-audit-A1: driver 9
+         * gravityScatter seeds its per-instance liveVy/liveVz/scatter
+         * rolls inside sh1x_anims_bind, which ran once per scene via the
+         * boundFor guard; restoring animsFresh without re-binding left
+         * driver 9 reading ZERO live state — the beans teleport to the
+         * room origin on shot 2+. V-c repro: a crafted gravityScatter
+         * GLB, multi-shot (t=2,t=6) t=6 frame != solo t=6; equal with
+         * this call. Shipped GLBs have no gravityScatter driver (the
+         * defect is latent there) — goldens unchanged. */
+        sh1x_anims_bind_invalidate();
         /* the per-shot GLOBALS the anim/water systems carry in-file: the
          * propAnim RNG stream (spinRng/waterfall/rattle draws), the
          * D_800AFDAC water counter, the lazy water-tile composite gate,
