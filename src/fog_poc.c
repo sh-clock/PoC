@@ -17191,11 +17191,15 @@ int main(int argc, char **argv) {
         /* the per-shot GLOBALS the anim/water systems carry in-file: the
          * propAnim RNG stream (spinRng/waterfall/rattle draws), the
          * D_800AFDAC water counter, the lazy water-tile composite gate,
-         * the belt-scroll accumulator and the TV-flicker pad — so shot i
-         * is bit-identical to the same `--shot t=T` run in a fresh
-         * process (single-shot runs: all already at their boot values). */
+         * the belt-scroll accumulator, the TV-flicker pad and the eased
+         * flare rate (v41-E2: shLensFlareDraw advances nowEffRate once
+         * per render 10843-10845, so shot i>0 started from shot i-1's
+         * smoothed rate) — so shot i is bit-identical to the same
+         * `--shot t=T` run in a fresh process (single-shot runs: all
+         * already at their boot values). */
         g_propRngSeed = 1u;
         g_flaresys.counter = 0;
+        g_flaresys.nowEffRate = 0;
         g_waterTileEverUpdated = 0;
         g_sh1xBeltScroll = 0;
         g_tvpaint_pad = 0;
