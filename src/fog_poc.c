@@ -11937,9 +11937,19 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                 if (!vis) continue;
                 if (pxi3 > 200 || pxi3 < -200 || pyi3 > 160 || pyi3 < -160)
                     continue;      /* map5_s00.c:140-143                  */
-                {   /* the OT bucket bound (field_148.vx>>3 >= OT size)  */
+                {   /* the OT bound — map5_s00.c:133-135 VERBATIM (v40 audit
+                     * A-F5): the engine culls on the RAW average depth,
+                     * `z <= 0 || (z >> 3) >= ORDERING_TABLE_SIZE (2048)`
+                     * (data.h:53; the +128 bucket bias at :166 is the OT
+                     * INDEX, not the cull). The old form
+                     * ((z+128)>>3) >= 1024 dropped every sprite beyond
+                     * 31.5m — the engine keeps them to 64m (the mesh
+                     * field is visible from the far bank). Same form as
+                     * the droplet cull (water.c:406) already in this
+                     * file.                                              */
                     float avgZQ8 = dsum * 0.25f * 256.0f;
-                    if (((int)avgZQ8 + 128) >> 3 >= 1024) continue;
+                    int zQ8 = (int)avgZQ8;
+                    if (zQ8 <= 0 || (zQ8 >> 3) >= 2048) continue;
                 }
                 int b = ((4096 - a->wrT[q]) * 32) >> 12;
                 if (b < 0) b = 0;
