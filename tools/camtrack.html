@@ -10191,13 +10191,25 @@ function applySh1xPropAnims(t) {
   /* v39: the school waterfall tick — the C engine calls sh1x_waterfall_tick
    * next to sh1x_anims_tick at every FIRED 30Hz tick (fog_poc.c:13977,
    * 16797: the PLAYER_IN_MAP_CHUNK camera-proxy gate needs the cam). The
-   * camera = the ACTIVE TRACK camera pose (evalTrack at the same t — the
-   * editor's player stand-in, the waterRipple precedent); the session clock
-   * = this grid's tick time (the wfLastT dt discipline, clamped 0.1). */
-  const wfCam = sh1xWaterCamPose(t);
+   * camera = the ACTIVE TRACK camera pose (evalTrack — the editor's
+   * player stand-in, the waterRipple precedent); the session clock
+   * = this grid's tick time (the wfLastT dt discipline, clamped 0.1).
+   * v40 audit (B-B2): the camera is evaluated PER FIRED TICK at the
+   * tick's own grid time — the engine runs playback_step per tick and
+   * gates each tick's spawn/despawn on that tick's pose (fog_poc.c
+   * 13982-13983 -> 14015-14016); the old single pose evaluated at the
+   * FRAME's target time made seeks/stalls replay every catch-up tick
+   * with the end-frame camera (divergent chunk-gate history + a
+   * one-draw-shifted shared RNG stream vs the engine). Catch-up stays
+   * unbounded: the 2-tick clamp is the engine's realtime V_BLANKS_MAX
+   * stall policy; the deterministic consumers (the shot fast-forward,
+   * fog_poc.c:16974-16993) re-run every tick per-tick — what a seek
+   * re-construction must reproduce (V-b experiment: per-tick sampling
+   * is bit-identical to the engine discipline). */
   while (S.steps < want) {
     sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
-    sh1xWaterfallTick(S, wfCam, (S.steps + 1) / 30);
+    const stepT = (S.steps + 1) / 30;
+    sh1xWaterfallTick(S, sh1xWaterCamPose(stepT), stepT);
     S.steps++;
   }
   S.lastT = t;
