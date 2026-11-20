@@ -109,9 +109,17 @@ SH1X = {
       meshes: [ {     // s_MeshHeader 24B, verbatim
         primitiveCount, vertexCount, normalCount, unkCount3,
         packs: [ {   // s_Primitive 20B, VERBATIM — the renderer's raw input
-          u0,v0, cba, u1,v1, b6, u2,v2, u3,v3,
+          u0,v0, cba, u1,v1, b6, b7, u2,v2, u3,v3,
           faces: [4], normalSlots: [4],
-          texIdx: b6&0x7F, semiTransparent: (b6>>7)&1,
+          // v40 audit (D-F5): texIdx/stp decode from B7, not b6 — the
+          // decomp's s_Primitive bits1 union (model.h): byte 0x6 = field_6
+          // (runtime-only, set to s_Material::field_E at load), byte 0x7 =
+          // materialIdx:7 | isTransparent:1 (the u16 flags bit 15 the
+          // engine tests, bodyprog_80056D8C.c:850/1152). The ripper has
+          // always parsed b7 (ipd2gltf.py _Primitive b7 comment); b6 is
+          // 0x00 in ALL 4,771 packs of the shipped archives — the old
+          // doc decode bound material 0 for 737/1310 HP0003 packs.
+          texIdx: b7&0x7F, semiTransparent: (b7>>7)&1,
           raw: "<base64 20B>"
         } ],
         vertsXY: [ [s16,s16] xN ], vertsZ: [ s16 xN ],
