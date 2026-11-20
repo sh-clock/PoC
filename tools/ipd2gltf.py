@@ -637,7 +637,17 @@ def _tv_paint_extras(room, resolver=None, report=None):
                         f"{tname} not resolved/8bpp (its slot emitted as 0)")
                 continue
             _cl, prows, iw, ih = parts
-            base = 48 + si * 64            # strip x 512 + si*64
+            # v40 audit (D-F6): the strip column = VRAM x - 448 (the
+            # paint CLUT base, fs_queue.c:643-682 clutX=448 D_800DB91C).
+            # fullPage slot i uploads at VRAM x 512 + 64*i (map.c:153-166
+            # tPage[1] = 8+i -> fs_queue.c:657 x = u + ((tPage[1]&0xF)<<6))
+            # => strip column 64 + 64*si, which is what the comment always
+            # claimed ("strip x 512 + si*64"). The old `48 + si*64` put
+            # slot 0 at VRAM 496 (16 into the stale region before the
+            # first slot), shifted every slot 16 left, left columns
+            # 240-255 zero, and polluted 48-63 into the non-slot region —
+            # measured on the shipped SPU0401.glb (slot data at 48-239).
+            base = 64 + si * 64
             for r in range(min(12, len(prows))):
                 hw = prows[r]
                 for c in range(min(64, len(hw), 256 - base)):
@@ -2277,7 +2287,16 @@ class TimFile:
         rep = lambda v: ((v << 3) | (v >> 2)).astype(np.uint8)
         rgb = np.stack([rep(r5), rep(g5), rep(b5)], axis=-1)   # h w 3
         stp_bit = (c & 0x8000) != 0
-        black = (c & 0x7FFF) == 0
+        # v40 audit (D-F1): opaque-branch transparency is EXACT 0x0000 only.
+        # The old `(c & 0x7FFF) == 0` also caught 0x8000 (STP-set black) —
+        # the docstring ("stp=0: color==0x0000 -> alpha 0; else 255") and
+        # the hardware disagree: SwanStation's sampler discards a texel
+        # only when `texture_color.bits == 0` (gpu_sw_backend.cpp:124,
+        # the FULL 16 bits) — 0x8000 is an OPAQUE BLACK texel. Measured on
+        # the shipped corpus: 5,103 of 40,927 texture packs (12.5%) in 22
+        # of 44 rooms carry the 0x8000 texel inside their UV window; 298
+        # opaque-only packs shipped as alphaMode BLEND purely from this.
+        black = (c == 0)
         alpha = np.full((h, w), 255, dtype=np.uint8)
         alpha[black] = 0
         if stp:
@@ -6275,10 +6294,16 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
         room_root_node = builder.json["nodes"][report["map_parent_node"]]
         room_root_node["extras"] = room_root_node.get("extras") or {}
         try:
+            # v40 audit (D-F4): whole-map mode crashed with NameError —
+            # this line referenced `map_rooms`, a main() LOCAL (verified:
+            # `--whole-map THR` on the test corpus = "ERROR ... name
+            # 'map_rooms' is not defined", NO map GLB ever written). Use
+            # the known_rooms PARAMETER (main() passes input_room_names —
+            # every room of this conversion; _room_maplink matches
+            # same-tag neighbors only, so the superset is safe and
+            # identical to the per-room mode's semantics).
             room_root_node["extras"]["SH1X"] = build_sh1x(
-                room, resolver, report,
-                known_rooms={r.name for r in
-                             map_rooms.get(room_prefix(room.name), ())})
+                room, resolver, report, known_rooms=known_rooms)
         except Exception as e:
             report["problems"].append(f"SH1X emission failed: {e}")
             raise

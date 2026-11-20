@@ -109,9 +109,17 @@ SH1X = {
       meshes: [ {     // s_MeshHeader 24B, verbatim
         primitiveCount, vertexCount, normalCount, unkCount3,
         packs: [ {   // s_Primitive 20B, VERBATIM — the renderer's raw input
-          u0,v0, cba, u1,v1, b6, u2,v2, u3,v3,
+          u0,v0, cba, u1,v1, b6, b7, u2,v2, u3,v3,
           faces: [4], normalSlots: [4],
-          texIdx: b6&0x7F, semiTransparent: (b6>>7)&1,
+          // v40 audit (D-F5): texIdx/stp decode from B7, not b6 — the
+          // decomp's s_Primitive bits1 union (model.h): byte 0x6 = field_6
+          // (runtime-only, set to s_Material::field_E at load), byte 0x7 =
+          // materialIdx:7 | isTransparent:1 (the u16 flags bit 15 the
+          // engine tests, bodyprog_80056D8C.c:850/1152). The ripper has
+          // always parsed b7 (ipd2gltf.py _Primitive b7 comment); b6 is
+          // 0x00 in ALL 4,771 packs of the shipped archives — the old
+          // doc decode bound material 0 for 737/1310 HP0003 packs.
+          texIdx: b7&0x7F, semiTransparent: (b7>>7)&1,
           raw: "<base64 20B>"
         } ],
         vertsXY: [ [s16,s16] xN ], vertsZ: [ s16 xN ],
@@ -162,7 +170,7 @@ SH1X = {
 | materials 3x24B | plm.materials[] | ✔ | all 9 fields incl. texPtr |
 | objects 11x16B | plm.objects[] | ✔ | name, meshCount, vertexOffset, normalOffset, flagsByte |
 | meshes n x24B | plm.objects[].meshes[] | ✔ | counts + 5 offsets |
-| packs n x20B | ...meshes[].packs[] | ✔ | u/v x4, cba, b6, faces[4], normalSlots[4] |
+| packs n x20B | ...meshes[].packs[] | ✔ | u/v x4, cba, b6, b7, faces[4], normalSlots[4] (texIdx/stp live in b7 — see the packs note above) |
 | vertsXY n x4B | ...meshes[].vertsXY | ✔ | — |
 | vertsZ n x2B | ...meshes[].vertsZ | ✔ | — |
 | normals n x4B | ...meshes[].normals[] | ✔ | nx,ny,nz,slotCount |
@@ -185,7 +193,7 @@ in the `raw` base64 blobs AND as explicit arrays where their layout is known.
      - quad depth = MAX of 4 vertex SZ (Q8), `<=32→32`, `>far→skip`;
      - bucket = `ot_base + (maxZ >> 3)` (otShift 1);
      - backface cull = dual gte_NormalClip test;
-     - semi-transparency from pack b6 bit 7 (engine bit15 of the u16);
+     - semi-transparency from pack b7 bit 7 (engine bit15 of the u16, model.h bits1);
    - billboards after the buffer's instances.
 4. OT walk far→near, LIFO within bucket. No z-buffer anywhere.
 

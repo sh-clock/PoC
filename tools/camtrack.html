@@ -5768,15 +5768,21 @@ function sanitizeEnv(raw) {
      fogon/nighton/flashlighton booleans, which the World panel derives)   */
   if (!raw || typeof raw !== 'object') return null;
   const e = {};
-  if (Array.isArray(raw.pair) && raw.pair.length === 2) {
+  /* v40 audit (B-B4): the pair is JV_NUM-gated in the C (fog_poc.c:3377-
+   * 3379 — BOTH elements must be numbers or the pair is IGNORED); the
+   * old `|0` coerced strings/booleans and silently kept a pair the
+   * engine drops. For real numbers `x|0` = the C's (int)x truncation. */
+  if (Array.isArray(raw.pair) && raw.pair.length === 2 &&
+      typeof raw.pair[0] === 'number' && typeof raw.pair[1] === 'number') {
     e.pair = [Math.max(0, Math.min(20, raw.pair[0] | 0)), Math.max(0, Math.min(20, raw.pair[1] | 0))];
   }
-  /* v13: the Auto-Mode day/night presets */
-  if (raw.dayEnv != null) e.dayEnv = Math.max(0, Math.min(20, raw.dayEnv | 0));
-  if (raw.nightEnv != null) e.nightEnv = Math.max(0, Math.min(20, raw.nightEnv | 0));
-  if (raw.weatherTarget != null) e.weatherTarget = Math.max(0, Math.min(8, raw.weatherTarget | 0));
-  if (raw.bootWeather != null) e.bootWeather = Math.max(-1, Math.min(6, raw.bootWeather | 0));
-  if (raw.lensFlare != null) e.lensFlare = Math.max(0, Math.min(5, raw.lensFlare | 0));
+  /* v13: the Auto-Mode day/night presets (v40 B-B4: JV_NUM strict — the
+   * C requires type==JV_NUM, fog_poc.c:3163-3169/3390-3407) */
+  if (typeof raw.dayEnv === 'number') e.dayEnv = Math.max(0, Math.min(20, raw.dayEnv | 0));
+  if (typeof raw.nightEnv === 'number') e.nightEnv = Math.max(0, Math.min(20, raw.nightEnv | 0));
+  if (typeof raw.weatherTarget === 'number') e.weatherTarget = Math.max(0, Math.min(8, raw.weatherTarget | 0));
+  if (typeof raw.bootWeather === 'number') e.bootWeather = Math.max(-1, Math.min(6, raw.bootWeather | 0));
+  if (typeof raw.lensFlare === 'number') e.lensFlare = Math.max(0, Math.min(5, raw.lensFlare | 0));
   if (typeof raw.flashlightOn === 'boolean') e.flashlightOn = raw.flashlightOn;
   if (typeof raw.psxWobble === 'boolean') e.psxWobble = raw.psxWobble;
   if (typeof raw.dither === 'boolean') e.dither = raw.dither;
@@ -5785,7 +5791,13 @@ function sanitizeEnv(raw) {
   if (typeof raw.animsDemo === 'boolean') e.animsDemo = raw.animsDemo;
   return Object.keys(e).length ? e : null;
 }
-function num(v, def) { const n = +v; return isFinite(n) ? n : def; }
+/* v40 audit (B-B4): jnum parity (fog_poc.c:549-552) — ONLY a JSON
+ * number counts: strings/booleans/null take the default (the C's
+ * JV_NUM strictness; the old `+v` coerced '2.5'→2.5, null→0, true→1).
+ * ±Infinity (JSON.parse of 1e999 = the C's strtod→inf JV_NUM) flows to
+ * the caller's clamp exactly like the C. NaN cannot occur in
+ * JSON.parse output. */
+function num(v, def) { return (typeof v === 'number') ? v : def; }
 /* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT sanitizer — the export
  * whitelist (mirrors the engine's models[].light parse exactly: strict
  * types, per-field presence, clamps). */
@@ -5803,8 +5815,18 @@ function sanitizeLight(raw) {
   if (raw.ahead != null && isFinite(+raw.ahead)) l.ahead = Math.max(0, +raw.ahead);
   return Object.keys(l).length ? l : null;
 }
+/* v40 audit (B-B4): jvec3 parity (fog_poc.c:587-594) — ANY array with
+ * >=3 elements is accepted and read element-wise: number → itself,
+ * true → 1, anything else (string/false/null) → 0, exactly the C's
+ * calloc'd JValue.num (fog_poc.c:358-361, 492-494). The old
+ * all-or-nothing defaulting diverged from the C's element rule.
+ * (Self-contained: no external helper, so function-extracting
+ * consumers — camtrack_audit.js — keep working unchanged.) */
 function vec3(v, def) {
-  if (Array.isArray(v) && v.length >= 3 && v.slice(0, 3).every(x => isFinite(+x))) return [+v[0], +v[1], +v[2]];
+  if (Array.isArray(v) && v.length >= 3) {
+    const el = (x) => (typeof x === 'number') ? x : (x === true ? 1 : 0);
+    return [el(v[0]), el(v[1]), el(v[2])];
+  }
   return def;
 }
 function pick(v, list, def) { return list.includes(v) ? v : def; }
@@ -5817,14 +5839,15 @@ function sanitizeTrack(raw) {
   tr.enabled = raw.enabled !== false;
   tr.fovDeg = clamp(num(raw.fovDeg, 60), 5, 140);
   /* v12: the per-track weather — strict number clamped to the D0B18 range
-   * 0..8; absent/null/invalid = inherit the model env default */
-  tr.weatherTarget = raw.weatherTarget != null && isFinite(+raw.weatherTarget)
+   * 0..8; absent/null/invalid = inherit the model env default
+   * (v40 B-B4: JV_NUM strict like the C, fog_poc.c:3163-3169) */
+  tr.weatherTarget = typeof raw.weatherTarget === 'number'
       ? Math.max(0, Math.min(8, raw.weatherTarget | 0)) : null;
   /* v13: the per-track day/night env overrides — strict numbers clamped
    * to the 0..20 preset range; absent/null/invalid = inherit the model */
-  tr.envDay = raw.envDay != null && isFinite(+raw.envDay)
+  tr.envDay = typeof raw.envDay === 'number'
       ? Math.max(0, Math.min(20, raw.envDay | 0)) : null;
-  tr.envNight = raw.envNight != null && isFinite(+raw.envNight)
+  tr.envNight = typeof raw.envNight === 'number'
       ? Math.max(0, Math.min(20, raw.envNight | 0)) : null;
   tr.loopMode = pick(raw.loopMode, ['loop', 'pingPong', 'once'],
     (type === 'line' || type === 'polyline' || type === 'spiral' || type === 'zigzag') ? 'pingPong' : 'loop');
@@ -5959,7 +5982,12 @@ function sanitizeTrack(raw) {
     tr.lookAt = vec3(raw.lookAt, tr.center.slice());
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
   } else {
-    tr.position = vec3(raw.position, [0, 1, 0]);
+    /* v40 audit (B-B10): the C parser's default is {1,1,0} (fog_poc.c:3305
+     * `if (!jvec3(raw, "position", p)) { p[0] = 1; p[1] = 1; p[2] = 0; }`)
+     * — the old [0,1,0] was the only default mismatch in the field-by-
+     * field diff: a hand-edited fixed track without a position rendered
+     * 1m apart between editor preview and engine. */
+    tr.position = vec3(raw.position, [1, 1, 0]);
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
     tr.yawSpeedDegS = num(raw.yawSpeedDegS, 0);
     tr.pitchSpeedDegS = num(raw.pitchSpeedDegS, 0);
@@ -6074,6 +6102,19 @@ async function importCamdatText(text, opts) {
 async function importCamdat(file) {
   return importCamdatText(await file.text());
 }
+/* v40 audit (B-B5): the editor auto-adds every opened GLB as a model
+ * (often with tracks: []) and exports unconditionally — but BOTH C
+ * consumers (fog_poc.c:16194-16198, the wallpaper's identical parse)
+ * hard-fail the WHOLE camdat with "no usable track" for a trackless
+ * model. Warn at the moment of writing instead of dropping the model
+ * (dropping would trade the loud failure for a silent wrong camera:
+ * camdat_load's basename match falls back to the FIRST model). */
+function warnTracklessModels() {
+  const tl = state.doc.models.filter(m => !m.tracks.length);
+  if (tl.length)
+    toast('No tracks: ' + tl.map(m => m.file).join(', ') +
+          ' — the engine exits with "no usable track" when booted with that GLB', 'warn');
+}
 function exportCamdat() {
   const json = JSON.stringify(docToJSON(), null, 2);
   const blob = new Blob([json + '\n'], { type: 'application/json' });
@@ -6087,6 +6128,7 @@ function exportCamdat() {
   doAutosave();
   const n = state.doc.models.reduce((a, m) => a + m.tracks.length, 0);
   toast('Exported camdat.json (' + state.doc.models.length + ' model(s), ' + n + ' track(s))');
+  warnTracklessModels();   /* v40 audit (B-B5) */
 }
 async function newDoc() {
   if (state.dirty && !state.exported) {
@@ -7631,6 +7673,9 @@ function sh1xDriverInit(propAnims, header, opts) {
           w.heading = Math.trunc(sh1xJn(s, 'heading', w.heading * 360 / 4096) * 4096 / 360);
           w.width = Math.trunc(sh1xJn(s, 'width', w.width / 4096) * 4096);
           w.tileLen = Math.trunc(sh1xJn(s, 'tileLen', w.tileLen / 4096) * 4096);
+          /* v40 audit (B-B9): an authored 0 hangs the surface scroll while
+           * loop (the C's parse-side clamp, same pattern) */
+          if (w.tileLen < 1) w.tileLen = 1;
           w.scrollSpd = Math.trunc(sh1xJn(s, 'scrollSpeed', w.scrollSpd / 4096) * 4096);
           w.spread = Math.trunc(sh1xJn(s, 'spread', w.spread / 4096) * 4096);
           w.rampHalf = Math.trunc(sh1xJn(s, 'rampHalf', w.rampHalf / 4096) * 4096);
@@ -9447,7 +9492,11 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
         f180 = sh1xMulSh(tv, f180, 12);
       }
     }
-    if (idx0 > 0 && a.wfSeg[idx0 - 1].horiz) {
+    /* v40 audit (A-F6 JS twin): the engine gates the backward-neighbor
+     * taper on the CURRENT segment's horizontal branch too (water.c:156
+     * wraps the whole path; the vertical else :326-393 has no tapers) —
+     * mirrors the C fix (fog_poc.c, sg->horiz && added). */
+    if (idx0 > 0 && sg.horiz && a.wfSeg[idx0 - 1].horiz) {
       /* water.c:284-295 VERBATIM (audit v39-A2): the product < 0
        * branch SUBTRACTS the (negative) product and the else ADDS
        * — var_s1 = rampHalf + |product| in BOTH branches (the old
@@ -10135,13 +10184,25 @@ function applySh1xPropAnims(t) {
   /* v39: the school waterfall tick — the C engine calls sh1x_waterfall_tick
    * next to sh1x_anims_tick at every FIRED 30Hz tick (fog_poc.c:13977,
    * 16797: the PLAYER_IN_MAP_CHUNK camera-proxy gate needs the cam). The
-   * camera = the ACTIVE TRACK camera pose (evalTrack at the same t — the
-   * editor's player stand-in, the waterRipple precedent); the session clock
-   * = this grid's tick time (the wfLastT dt discipline, clamped 0.1). */
-  const wfCam = sh1xWaterCamPose(t);
+   * camera = the ACTIVE TRACK camera pose (evalTrack — the editor's
+   * player stand-in, the waterRipple precedent); the session clock
+   * = this grid's tick time (the wfLastT dt discipline, clamped 0.1).
+   * v40 audit (B-B2): the camera is evaluated PER FIRED TICK at the
+   * tick's own grid time — the engine runs playback_step per tick and
+   * gates each tick's spawn/despawn on that tick's pose (fog_poc.c
+   * 13982-13983 -> 14015-14016); the old single pose evaluated at the
+   * FRAME's target time made seeks/stalls replay every catch-up tick
+   * with the end-frame camera (divergent chunk-gate history + a
+   * one-draw-shifted shared RNG stream vs the engine). Catch-up stays
+   * unbounded: the 2-tick clamp is the engine's realtime V_BLANKS_MAX
+   * stall policy; the deterministic consumers (the shot fast-forward,
+   * fog_poc.c:16974-16993) re-run every tick per-tick — what a seek
+   * re-construction must reproduce (V-b experiment: per-tick sampling
+   * is bit-identical to the engine discipline). */
   while (S.steps < want) {
     sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
-    sh1xWaterfallTick(S, wfCam, (S.steps + 1) / 30);
+    const stepT = (S.steps + 1) / 30;
+    sh1xWaterfallTick(S, sh1xWaterCamPose(stepT), stepT);
     S.steps++;
   }
   S.lastT = t;
@@ -11554,6 +11615,7 @@ const EMBED = {
       doAutosave();
       toast('Saved — the wallpaper camdat.json was updated');
       try { this.bridge.toast('camdat.json saved — the wallpaper will reload'); } catch (e) {}
+      warnTracklessModels();   /* v40 audit (B-B5) */
     } else {
       toast('Save failed — the app reported an error', 'err');
     }

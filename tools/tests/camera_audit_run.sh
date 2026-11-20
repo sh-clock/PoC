@@ -14,7 +14,7 @@ NTRACKS=$(python3 -c "import json;print(len(json.load(open('$TESTJSON'))['models
 
 echo "== C dumps (fog_poc --cam-dump, $NTRACKS tracks x 401 samples) =="
 for ((i=0; i<NTRACKS; i++)); do
-    $POC --glb input/THRF9FD.glb --camdat $TESTJSON --track $i \
+    $POC --glb glbs/THRF9FD.glb --camdat $TESTJSON --track $i \
          --cam-dump $AUD/c_${i}.csv,400 > $AUD/c_${i}.log 2>&1 || {
         echo "FAILED: track $i"; cat $AUD/c_${i}.log; exit 1; }
 done
