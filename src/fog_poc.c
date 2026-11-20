@@ -11993,6 +11993,15 @@ static void sh1x_water_ripple_tick(Sh1x *sx, const ShEnv *env,
             return;
         if (!a->seeded) {
             a->seeded = 1;
+            /* v40 audit (A-F4): the MESH particle's OWN selector draw —
+             * func_800CB0D8 draws it FIRST (map5_s00.c:31-34: field_B=0
+             * mesh, field_C.s_1.field_2 = Rng_GenerateInt(0,2)) BEFORE
+             * the 12 sprite spawns (:36-51). The old spawn drew only 48
+             * of the 49 values and the mesh draw read wrSel[0] (sprite
+             * 0's selector) — every downstream RNG consumer (the droplet
+             * stream etc.) sat one draw off the engine stream. Slot 12
+             * holds the mesh's own selector (wrSel[16], sprites 0..11). */
+            a->wrSel[12] = (int)(sh_rng_next() % 3);
             for (int q = 0; q < 12; q++) {
                 a->wrX[q] = -379904 + (int)(sh_rng_next() % 6144);
                 /* Rng(Q12(-92.75), Q12(-91.25)-1) = the 1.5m box         */
