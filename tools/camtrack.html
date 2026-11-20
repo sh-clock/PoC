@@ -7631,6 +7631,9 @@ function sh1xDriverInit(propAnims, header, opts) {
           w.heading = Math.trunc(sh1xJn(s, 'heading', w.heading * 360 / 4096) * 4096 / 360);
           w.width = Math.trunc(sh1xJn(s, 'width', w.width / 4096) * 4096);
           w.tileLen = Math.trunc(sh1xJn(s, 'tileLen', w.tileLen / 4096) * 4096);
+          /* v40 audit (B-B9): an authored 0 hangs the surface scroll while
+           * loop (the C's parse-side clamp, same pattern) */
+          if (w.tileLen < 1) w.tileLen = 1;
           w.scrollSpd = Math.trunc(sh1xJn(s, 'scrollSpeed', w.scrollSpd / 4096) * 4096);
           w.spread = Math.trunc(sh1xJn(s, 'spread', w.spread / 4096) * 4096);
           w.rampHalf = Math.trunc(sh1xJn(s, 'rampHalf', w.rampHalf / 4096) * 4096);

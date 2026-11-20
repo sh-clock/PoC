@@ -2036,6 +2036,12 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                                            w->width / 4096.0) * 4096.0);
                     w->tileLen = (int)(jnum(s, "tileLen",
                                              w->tileLen / 4096.0) * 4096.0);
+                    /* v40 audit (B-B9): an authored 0 hangs the surface
+                     * scroll `while (wfScroll >= tileLen) -=` loop (the
+                     * v39-A5 segmentCount clamp's adjacent zero — the
+                     * engine's own field_44 is never 0 in real data,
+                     * water.c:704-707). Clamp at parse, the A5 pattern. */
+                    if (w->tileLen < 1) w->tileLen = 1;
                     w->scrollSpd = (int)(jnum(s, "scrollSpeed",
                                               w->scrollSpd / 4096.0)
                                          * 4096.0);
