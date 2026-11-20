@@ -746,9 +746,34 @@ _PROP_ANIMS = {
                  "M1S03_KeyDownTheDrain=113) — spawn on entering the "
                  "chunk, despawn on leaving (map1_s02.c:1542-1562)",
          "spawn": "sharedFunc_800CBC98_1_s02 (water.c:70-92): field_74 "
-                 "particles from the extern emitter table "
-                 "sharedData_800E30C8_1_s02",
+                 "particles from the emitter table below (the v39 stream "
+                 "block — map1_s02.c:1488-1522 IS in the decomp)",
          "despawn": "sharedFunc_800CBD58_1_s02 (water.c:94-107)",
+         # v39: the emitter table VERBATIM — map1_s02.c:1488-1522
+         # (Map_WorldObjectsInit fills sharedData_800E30C8_1_s02).
+         # s_MapOverlayHdr_94 include/bodyprog/map/map.h:341-360.
+         # Decoded meters/degrees; raw Q12 = meters*4096, headings are
+         # Q3.12 angles (4096/rev; 0=+Z, 90=+X). field names follow the
+         # struct. The terminator slot (idx=2) carries len 0.
+         "stream": {
+             "segments": [
+                 {"x": -16.4, "y": 0.1, "z": -51.2, "len": 1.6,
+                  "horizontal": True, "heading": 90.0,
+                  "width": 0.4, "tileLen": 0.5, "scrollSpeed": 0.05,
+                  "spread": 0.4, "rampHalf": 0.5, "flowBase": 0.05},
+                 {"x": -14.8, "y": 0.1, "z": -51.2, "len": 1.6,
+                  "horizontal": True, "heading": 270.0,
+                  "width": 0.4, "tileLen": 0.5, "scrollSpeed": 0.05,
+                  "spread": 0.4, "rampHalf": 0.5, "flowBase": 0.05},
+                 {"len": 0.0, "y": 0.1, "width": 0.4,
+                  "spread": 0.4, "rampHalf": 0.5},
+             ],
+             "droplets": 10, "segmentCount": 2,
+             "struct": "s_MapOverlayHdr_94 map.h:341-360",
+             "src": "map1_s02.c:1488-1522 (field_0/10/18/28/30/34/3C/"
+                    "44/4C/5C/64/6c arrays, field_74=10, field_78=2, "
+                    "the idx=2 terminator)",
+         },
          "src": "map1_s02.c:1542-1562; src/maps/common/particles/"
                 "water.c:20-107"},
     ],
@@ -1814,7 +1839,12 @@ def _room_env_fx(room_name):
     FLAG is per OVERLAY (MapIdx), not per area — a room GLB cannot know its
     overlay — EXCEPT the sewers, where the flag is constant for the whole
     area (DR/DRU = WaterRefract, env_effects.c:131-136) and is attached so
-    sewer GLBs are self-contained. Returns ({}, []) for areas with no FX
+    sewer GLBs are self-contained. v39: the SAME for the nightmare school
+    (the room->overlay binding in the SH1X.env table (derive_room_env's
+    map_points coverage) resolves MAP1_S02/MAP1_S03 rooms; the flag is
+    area-constant for every room those overlays load: Water = WATER.TIM,
+    env_effects.c:137-139) — the school rooms get the SAME self-contained
+    treatment as the sewers. Returns ({}, []) for areas with no FX
     (the graceful no-op contract — old behavior preserved)."""
     tag = _room_tag(room_name)
     known = {t[0] for t in _MAP_INFOS}
@@ -1843,7 +1873,108 @@ def _room_env_fx(room_name):
                "mapIdx": 29 if tag == "DR" else 36,
                "eventFlag": None,
                "src": "env_effects.c:131-136 (MapIdx_MAP5_S00/MAP6_S03)"}
+    elif tag == "SU":
+        # v39: the nightmare school — the overlay binding comes from the
+        # SH1X.env table (derive_room_env). MAP1_S02 = mapIdx 5, MAP1_S03 = 6
+        # (include/bodyprog/map/map.h:26-70). Both load WATER.TIM
+        # (env_effects.c:137-139). Rooms whose overlay binding is unknown
+        # (not in the env table) emit nothing (the no-op contract).
+        ov = (_room_env_table().get(room_name.upper()) or {}).get("overlay")
+        if ov == "MAP1_S02":
+            env = {"effectTexFlag": "Water", "tim": "WATER.TIM",
+                   "mapIdx": 5, "eventFlag": None,
+                   "src": "env_effects.c:137-139 (MapIdx_MAP1_S02)"}
+        elif ov == "MAP1_S03":
+            env = {"effectTexFlag": "Water", "tim": "WATER.TIM",
+                   "mapIdx": 6, "eventFlag": None,
+                   "src": "env_effects.c:137-139 (MapIdx_MAP1_S03)"}
     return env, zones
+
+
+_WATER_TEX_SRC = (
+    "Map_EffectTexturesLoad env_effects.c:205-207 (case EffectTextureFlag_"
+    "Water: Fs_QueueStartReadTim(FILE_TIM_WATER_TIM, ..., &D_800A908C)) + "
+    "Fs_QueuePostLoadTim fs_queue.c:643-678 (the D_800A908C NTSC upload "
+    "descriptor data.c:118 = {tPage {0,13}, u=0, v=0, clutX=224, clutY=0}: "
+    "pixels -> VRAM page 13 x=832 y=0 (128x128 texels, 4bpp), CLUT rows "
+    "0/1 -> (224,0)/(224,1)). Consumers draw with tpage 45 (0x2D: page X "
+    "13, ABR-1 ADDITIVE, 4bpp) + clut words 0xE (row 0) / 0x4E (row 1) — "
+    "water.c:424/489-490, the setSemiTrans(1) additive quads."
+)
+
+
+def _room_water_tex(room_name, resolver, report):
+    """v39: SH1X.waterTex — the WATER.TIM effect texture, VERBATIM.
+
+    Emitted for rooms whose envEffects is the school Water effect (the
+    overlay binding resolved MAP1_S02/MAP1_S03). The block carries the
+    full decoded TIM: 128x128 4bpp pixels (2 texels/byte, low nibble =
+    even u), the 2 CLUT rows (16 u16 each, raw 15-bit), the VRAM upload
+    positions and the tpage/clut words the game's draw code uses. The
+    pixel regions the school water samples (water.c):
+      u 64..95,  v 64..127 — the stream surface strip tile (32x64)
+      u 64..95 / 96..127, v 0..63 / 64..127 — the 4 droplet sprites
+      u 0..63, v 32*frame..+31 — the map1_s03 spray frames (4 frames)
+    The pixels are the RAW 4bpp nibble sheet (unbiased, no palette
+    applied). A missing WATER.TIM resolves to None (the consumer's
+    legacy approximation path — graceful no-op)."""
+    entry = None
+    try:
+        entry, _rec = resolver.resolve("WATER", room_name)
+    except Exception:
+        entry = None
+    if entry is None:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterTex: WATER.TIM not resolved — "
+                f"waterTex extras omitted (legacy approximation path)")
+        return None
+    try:
+        tim = TimFile("WATER", entry.read_bytes())
+    except Exception as e:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterTex: WATER.TIM: {e}")
+        return None
+    if tim.width != 128 or tim.height != 128 or tim.clut_w != 16 \
+            or tim.clut_h < 2:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterTex: WATER.TIM is {tim.width}x"
+                f"{tim.height} clut {tim.clut_w}x{tim.clut_h} — unexpected "
+                f"layout, waterTex extras omitted")
+        return None
+    clut_rows = []
+    for r in range(2):
+        row = struct.unpack_from("<16H", tim.clut_data, r * 32)
+        clut_rows.append([int(c) & 0xFFFF for c in row])
+    return {
+        "tim": "WATER.TIM", "bpp": 4,
+        "width": 128, "height": 128,
+        "pixels": _b64(bytes(tim.img_data[:8192])),
+        "clut": clut_rows,
+        "vram": {"pixelX": 832, "pixelY": 0, "clutX": 224, "clutY": 0,
+                 "note": "NTSC D_800A908C upload (data.c:118); PAL "
+                          "(224,0)->(928,432) (data.c:95 + CLUT_BASE "
+                          "env_effects.c:107)"},
+        "tpage": 45, "clutWords": [14, 78],
+        "regions": {
+            "streamStrip": {"u": [64, 95], "v": [64, 127],
+                             "src": "water.c:693-696 (u 64..95, v 64..127 "
+                                     "body tiles; leading window "
+                                     "v [127-t,127])"},
+            "dropletSprites": {"u": [[64, 95], [96, 127]],
+                                    "v": [[0, 63], [64, 127]],
+                                    "src": "water.c:424-433 (u0 0x40/0x60 "
+                                            "+ (frame&2)*16, v window "
+                                            "field_17C + (frame&1)<<6)"},
+            "sprayFrames": {"u": [0, 63], "v": [0, 127],
+                             "frames": 4, "frameV": 32,
+                             "src": "map1_s03.c:164-167 (u 0..63, "
+                                     "v 32*frame..+31)"},
+        },
+        "src": _WATER_TEX_SRC,
+    }
 
 
 def _room_maplink(room_name, known_rooms):
@@ -5486,6 +5617,12 @@ def build_sh1x(room, resolver, report, known_rooms=None):
     wfl = _room_water_floor(room, resolver, report)
     if wfl is not None:
         sh1x["waterFloor"] = wfl
+    # v39: the WATER.TIM effect texture (the school Water rooms — the
+    # stream surface + droplet + spray sprites sample it; water.c)
+    if env_fx.get("effectTexFlag") == "Water":
+        wtx = _room_water_tex(room.name, resolver, report)
+        if wtx is not None:
+            sh1x["waterTex"] = wtx
     # userLight defaults: the engine's flashlight attribs (Game_Flashlight
     # AttribsSet effects.c:210-218) — consumers may override everything;
     # the PoC's standing directive (light rides the CAMERA) is the default
