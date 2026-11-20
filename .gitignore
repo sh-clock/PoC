@@ -24,3 +24,4 @@ shots/probe_x.png
 shots/probe_day.png
 fog_poc binary
 __pycache__/
+*.pdb
