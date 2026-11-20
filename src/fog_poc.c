@@ -11131,6 +11131,27 @@ static void fx_water_scroll_sync(const Sh1x *sx, const ShEnv *env,
             wz -= Z.z * extraAhead;
         }
     }
+    /* GATE 2 + the water branch's own inhibit (lens_flare.c:59-93
+     * structure — the maintainer's reimplementation of audit A-F3;
+     * PR #3's hunk was rejected for the stale PAL constant 120):
+     * the whole water branch is reachable only past the flare branch's
+     * `scr_l_pos.vz > DIV_FAST(ReadGeomScreen(), 2)` gate — the early
+     * `return` skips func_8008E5B4 and its D_800AFDAC++ too. proj =
+     * ReadGeomScreen() = SCREEN_GEOM_DIST = gsScreenHeight = 224 on
+     * NTSC (v40; data.h:40-47, draw.c:35, game_main.c:84) — the SAME
+     * `> 112` Q8 gate as the fx_pass draw side, where the light must
+     * be more than 0.4375m ahead of the camera. flare_inhibit_f set
+     * bypasses the entire first block (the gate does not apply then);
+     * water_inhibit_f gates the water branch itself (:78).           */
+    if (!g_flaresys.flareInhibit) {
+        mat4 view = mat4_view_from_quat(cam->pos, cam->q);
+        float vzq = view.m[2] * wx + view.m[6] * wy +
+                    view.m[10] * wz + view.m[14];
+        float d = -vzq;                   /* forward depth (m)          */
+        if (!(d > 0.05f) || !((int)(d * 256.0f) > 112))
+            return;                       /* lens_flare.c:73-75        */
+    }
+    if (g_flaresys.waterInhibit) return; /* lens_flare.c:78            */
     /* the zone test (LensFlare_WaterZoneGet on the LIGHT position):
      * engine x = glTF x; engine z = -glTF z (meters) */
     for (int zi = 0; zi < sx->nWaterZones; zi++) {
@@ -11974,7 +11995,11 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
              * func_80055D78 port); the old hardcoded `8' was the
              * documented approximation. mesh quads tpage 43 bits 5-6 =
              * 01 = ADDITIVE (B+F saturating — v32.2 relabel).          */
-            int sel = a->wrSel[0];
+            /* v40 (A-F4): the mesh reads its OWN selector (slot 12) —
+             * map5_s00.c:226-231 draws the mesh's quads with
+             * g_Particle_Buffer[idx].field_C.s_1.field_2, the MESH
+             * particle's own value (field_B=0), NOT sprite 0's.     */
+            int sel = a->wrSel[12];
             unsigned char tile[32][32][3];
             if (sel == 2) memcpy(tile, g_waterTileRGB, sizeof(tile));
             else fx_water_static_tile(sel, tile);
@@ -12133,6 +12158,17 @@ static void sh1x_water_ripple_tick(Sh1x *sx, const ShEnv *env,
             return;
         if (!a->seeded) {
             a->seeded = 1;
+            /* v40 (A-F4, the maintainer's reimplementation — PR #4's
+             * hunk was rejected as incomplete: it added this draw but
+             * never updated the read site): func_800CB0D8 draws the
+             * MESH particle's OWN selector FIRST (map5_s00.c:31-35:
+             * field_B=0 mesh, field_C.s_1.field_2 = Rng_GenerateInt
+             * (0,2)) BEFORE the 12 sprite spawns (:36-51). The old
+             * spawn drew only 48 of the 49 values and the mesh draw
+             * read wrSel[0] (sprite 0's selector) — every downstream
+             * RNG consumer sat one draw off the engine stream. Slot
+             * 12 holds the mesh's own selector (wrSel[16]). */
+            a->wrSel[12] = (int)(sh_rng_next() % 3);
             for (int q = 0; q < 12; q++) {
                 a->wrX[q] = -379904 + (int)(sh_rng_next() % 6144);
                 /* Rng(Q12(-92.75), Q12(-91.25)-1) = the 1.5m box         */
@@ -16707,6 +16743,20 @@ int main(int argc, char **argv) {
                     g_userLightWorld[1] = cd.lightPos[1];
                     g_userLightWorld[2] = cd.lightPos[2];
                 }
+                /* v40 (A-F3 follow-up): the camdat's light.ahead was DEAD
+                 * — the value loaded into g_userLightAheadM but mode stayed
+                 * 0/1, and only mode 2 consumes it (fx_water_scroll_sync /
+                 * fx_pass's extraAhead). The engine-true consequence: the
+                 * verbatim Gate-2 (vz > 112 Q8 — the light must be >0.4375m
+                 * ahead of the camera) freezes the water scroll for the
+                 * default 0.32m camera anchor (an engine-impossible
+                 * geometry — the engine's Harry light sits 2-5m ahead of
+                 * the trailing camera). "follow":"camera" + ahead>0 now
+                 * selects mode 2 (the CLI --userlight ahead:D geometry).
+                 * "follow":"world" keeps mode 1 (ahead is a camera-relative
+                 * extension; a world light ignores it).                    */
+                if (cd.lightAhead > 0.0f && !cd.lightFollow)
+                    g_userLightMode = 2;
                 g_userLightAheadM = cd.lightAhead;
                 if (cd.hasLightRot) {
                     g_userLightHasRot = 1;
