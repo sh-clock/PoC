@@ -2315,6 +2315,12 @@ window.SHView = (function () {
     /* sprite systems */
     flakes: null, streaks: null, splashes: null,
 
+    /* v39: the school-water FX — the registered additive-quad mesh + the
+     * per-frame hook (the camtrack glue's sh1xWaterFxUpdate; the hook owns
+     * the geometry update and the visibility, SHView restores visible=false
+     * after the RT render — the sprites' discipline) */
+    waterMesh: null, waterHook: null,
+
     /* scratch */
     _m4: null, _m4b: null, _v3: null, _col: null,
     camPos: [0, 0, 0], camAxes: null, camFwd: [0, 0, -1],
@@ -3346,6 +3352,12 @@ window.SHView = (function () {
     /* the per-vertex engine pass (the exact pipeline) */
     if (rec) perVertexPass(rec, viewE, env);
 
+    /* v39: the school-water FX — the SH1X waterfall draw hook (water.c:109-711
+     * via the camtrack glue: the verbatim quad math + the GPU additive raster
+     * path). Runs after the per-vertex pass and before the RT render, like the
+     * sprite buffer updates (the C engine's FX pass follows the room sync). */
+    if (V.waterHook) V.waterHook();
+
     /* particle collection + sprite buffers (exact math) */
     const parts = collectParticles(env, snow, viewE);
     updateFlakeBuffers(parts.flakes);
@@ -3393,6 +3405,10 @@ window.SHView = (function () {
     V.streaks.visible = spriteVis[1];
     V.splashes.visible = spriteVis[2];
     }
+    /* v39: the water quads are RT-ONLY (the editor orbit view never shows the
+     * engine FX — the sprites' discipline); restore regardless of drawRT so a
+     * hidden PiP never leaks the water into the orbit render. */
+    if (V.waterMesh) V.waterMesh.visible = false;
 
     /* the post pass uniforms (the exact overlay + quantize math) */
     V.postMat.uniforms.uBright.value = V.enabled ? env.screenBrightness : 0;
@@ -3545,6 +3561,13 @@ window.SHView = (function () {
     for (const rec of V.models.values())
       for (const m of rec.shMats) m.uniforms.uPsx.value = on ? 1 : 0;
   }
+  /* v39: register the school-water FX mesh + its per-frame update hook
+   * (called from syncAndDraw AFTER the per-vertex pass, BEFORE the RT
+   * render; the hook sets V.waterMesh.visible, this module restores false). */
+  function setWaterFx(mesh, hook) {
+    V.waterMesh = mesh || null;
+    V.waterHook = hook || null;
+  }
   function setDither(on) { V.dither = !!on; }
   function setParticles(on) {
     V.particlesOn = !!on;
@@ -3555,7 +3578,8 @@ window.SHView = (function () {
   return {
     V, init, registerModel, syncAndDraw, blitFaithful,
     setPair, setFlashlight, toggleFlashlight, lightning, setLensFlare,
-    setWeatherTarget, setBootWeather, setPsx, setDither, setParticles, setEnabled
+    setWeatherTarget, setBootWeather, setPsx, setDither, setParticles,
+    setEnabled, setWaterFx
   };
 })();
 
@@ -4912,7 +4936,7 @@ window.SHUI = (function () {
    ovals, fixed + rotating) for glTF rooms and writes them as camdat.json.
    Standalone authoring tool for the es-fca glTF room-viewer project.
    ========================================================================== */
-const APP_VERSION = '1.4.1';   /* v13.5 = v13.4 + THE ROOM-ORIGINAL ENV DERIVATION (T7 — the rain-indoors fix): a newly added GLB (or a legacy un-authored entry) gets its World & Weather defaults DERIVED from the GLB's UNBIASED SH1X.env (the verbatim map-overlay pair + the field_17 weather recipe) instead of the generic app day defaults — the nightmare school no longer boots in broad daylight with snow, indoor sequences no longer rain; the day/night Auto-Mode fields follow the room's own map family (town: day 1 / night 6; day-lit interiors: 2 / 7; night-only locations — amusement park, alt sewers, resort: 6 / 6; dark nightmare-only interiors — school/hospital/Nowhere: 7 / 7; Nowhere fog: 9 / 9), the weather = field_17 VERBATIM, the flashlight = the preset-0 Dark+FlashlightAllowed signature; a "use original" button re-authors the ACTIVE model from the same derivation. v13.4 (T2) = all SH1X driver families in the preview + animsDemo retired; v13.3 = the S20 env surfacing; v13 = DAY/NIGHT ENVIRONMENTS + the EMBED bridge + offline three.js; v12 = PER-TRACK WEATHER; v10 = lazyRateDegS default; v9 = fog-mode render fix, 30Hz tick grid, lookMode lazy */
+const APP_VERSION = '1.4.2';   /* v39 = THE SCHOOL WATERFALL (water.c VERBATIM, the fog_poc.c v39 port mirrored in-page): the SH1X propAnims driver "particles" (<waterfall>) ticks + draws the map1_s02 ditch stream — the PLAYER_IN_MAP_CHUNK(-1,-2) camera-proxy gate, the water.c:20-107 spawn / 154-180 / 326-340 droplet advance / 702-707 surface scroll, the water.c:109-443 droplet FT4s + 446-711 stream GT4s (the Q24 cross/elongation fields, the DuckStation 0/0=-1 division, the sliding leading v-window, the Gouraud corners, the culls) emitted as additive GPU quads through the viewer's own RT camera, WATER.TIM embedded as the base64 default sheet + the SH1X.waterTex EXTRAs override, the true-depth FrontSide reference pass (the C's fb->z culled-draw semantics — v39.2), __camtrack.setWaterOn/waterQuads/sh1xDebugState + ?water=0. v13.5 = v13.4 + THE ROOM-ORIGINAL ENV DERIVATION (T7 — the rain-indoors fix): a newly added GLB (or a legacy un-authored entry) gets its World & Weather defaults DERIVED from the GLB's UNBIASED SH1X.env (the verbatim map-overlay pair + the field_17 weather recipe) instead of the generic app day defaults — the nightmare school no longer boots in broad daylight with snow, indoor sequences no longer rain; the day/night Auto-Mode fields follow the room's own map family (town: day 1 / night 6; day-lit interiors: 2 / 7; night-only locations — amusement park, alt sewers, resort: 6 / 6; dark nightmare-only interiors — school/hospital/Nowhere: 7 / 7; Nowhere fog: 9 / 9), the weather = field_17 VERBATIM, the flashlight = the preset-0 Dark+FlashlightAllowed signature; a "use original" button re-authors the ACTIVE model from the same derivation. v13.4 (T2) = all SH1X driver families in the preview + animsDemo retired; v13.3 = the S20 env surfacing; v13 = DAY/NIGHT ENVIRONMENTS + the EMBED bridge + offline three.js; v12 = PER-TRACK WEATHER; v10 = lazyRateDegS default; v9 = fog-mode render fix, 30Hz tick grid, lookMode lazy */
 const LS_KEY = 'camtrack.autosave.v1';
 const PALETTE = ['#4fc3f7', '#ffb74d', '#81c784', '#f06292', '#9575cd', '#4db6ac', '#ffd54f', '#e57373', '#7986cb', '#a1887f'];
 
@@ -6527,7 +6551,11 @@ function registerModel(name, gltf) {
   const box = { min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] };
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
   three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims, sh1xHeader: (sh1x && sh1x.header) || null,
-    sh1xEnv: (sh1x && sh1x.env) || null });
+    sh1xEnv: (sh1x && sh1x.env) || null,
+    /* v39: the school-water sheet — the SH1X.waterTex EXTRAs decoded at
+     * load (fog_poc.c:1801-1833; absent/malformed = null -> the
+     * compiled-in WATER.TIM default, sh1xWaterTexDefault) */
+    sh1xWaterTex: sh1xWaterTexFromExtras(sh1x && sh1x.waterTex) });
   /* v33 (S20): surface the room's ORIGINAL environment (SH1X.env — the
    * v33 GLBs carry it; the PoC/wallpaper boot it by default when the
    * exported camdat leaves the World & Weather pair unselected). */
@@ -7529,6 +7557,20 @@ function sh1xDriverInit(propAnims, header, opts) {
       wfAlive: new Array(16).fill(0), wfX: new Array(16).fill(0),
       wfY: new Array(16).fill(0), wfZ: new Array(16).fill(0),
       wfVy: new Array(16).fill(0), wfEm: new Array(16).fill(0),
+      /* v39: the school waterfall — the VERBATIM stream table (Sh1xWaterSeg
+       * fog_poc.c:1210-1221: x/y/z, len, horiz, heading, width, tileLen,
+       * scrollSpd, spread, rampHalf, flowBase — all raw Q12, game y-down
+       * frame; heading = raw Q12 angle, 4096/rev). wfScroll = field_54 (the
+       * per-seg surface scroll phase), wfSel/wfAlong/wfVyAcc = the droplet
+       * state (field_C.s_1.field_0 / field_10.s_0.field_0 / field_C.s_2.field_2),
+       * wfLastT = the tick's own session-clock dt base. */
+      wfSeg: [0, 1, 2, 3].map(() => ({ x: 0, y: 0, z: 0, len: 0, horiz: 0,
+        heading: 0, width: 0, tileLen: 0, scrollSpd: 0, spread: 0,
+        rampHalf: 0, flowBase: 0 })),
+      wfSegCount: 2, wfDrops: 10, wfHasStream: 0, wfSurfaceOn: 0,
+      wfScroll: [0, 0, 0, 0], wfSel: new Array(16).fill(0),
+      wfAlong: new Array(16).fill(0), wfVyAcc: new Array(16).fill(0),
+      wfLastT: 0,
       scatterAng: new Array(16).fill(0), scatterAmp: new Array(16).fill(0),
       liveVy: new Array(16).fill(0), liveVz: new Array(16).fill(0),
       seeded: 0, isCabin: 0
@@ -7542,6 +7584,63 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.manifestLevel = p ? 0 : 1;             /* non-numeric pos = overlay manifest */
     const r0 = Array.isArray(e.rot0) && e.rot0.length >= 3 ? e.rot0 : null;
     if (r0) { a.rot0 = [+r0[0], +r0[1], +r0[2]]; }
+    /* v39: the particles/<waterfall> stream block — the VERBATIM
+     * s_MapOverlayHdr_94 emitter table (the v39 ripper's
+     * propAnims[].stream; map1_s02.c:1488-1522, fog_poc.c:1961-2027).
+     * The DEFAULTS below are the SAME verbatim raw Q12 values (the C Q12()
+     * truncation toward zero: -16.4f->-67174, 0.1f->409, -51.2f->-209715,
+     * 1.6f->6553, 0.4f->1638, 0.5f->2048, 0.05f->204; Q12_ANGLE
+     * 90deg->1024, 270deg->3072) so pre-v39 GLBs (no stream block)
+     * render identically. The terminator slot 2 carries ONLY the fields
+     * map1_s02.c:1516-1521 sets (len 0, y 409, width 1638, spread 1638,
+     * rampHalf 2048); the rest stay zero (the parse's BSS zeros). */
+    if (a.driver === 22) {
+      /* x, y, z, len, horiz, heading, width, tileLen, scrollSpd, spread,
+       * rampHalf, flowBase — map1_s02.c:1488-1522 verbatim                  */
+      const defSeg = [
+        [-67174, 409, -209715, 6553, 1, 1024, 1638, 2048, 204, 1638, 2048, 204],
+        [-60620, 409, -209715, 6553, 1, 3072, 1638, 2048, 204, 1638, 2048, 204],
+        [0, 409, 0, 0, 0, 0, 1638, 0, 0, 1638, 2048, 0]
+      ];
+      for (let sg = 0; sg < 4; sg++) {
+        const w = a.wfSeg[sg], d = defSeg[sg < 3 ? sg : 3 - 1];
+        w.x = d[0]; w.y = d[1]; w.z = d[2]; w.len = d[3]; w.horiz = d[4];
+        w.heading = d[5]; w.width = d[6]; w.tileLen = d[7]; w.scrollSpd = d[8];
+        w.spread = d[9]; w.rampHalf = d[10]; w.flowBase = d[11];
+      }
+      a.wfSegCount = 2;                        /* field_78 (map1_s02.c:1514) */
+      a.wfDrops = 10;                           /* field_74 (:1511)          */
+      const st = e.stream;
+      if (st && typeof st === 'object') {
+        const segs = Array.isArray(st.segments) ? st.segments : [];
+        let nsg = segs.length;
+        if (nsg > 4) nsg = 4;
+        for (let sg = 0; sg < nsg; sg++) {
+          const s = segs[sg];
+          if (!s) continue;
+          const w = a.wfSeg[sg];
+          /* the C parse: default = the CURRENT raw value expressed in
+           * meters/degrees, re-quantized with (int) truncation           */
+          w.x = Math.trunc(sh1xJn(s, 'x', w.x / 4096) * 4096);
+          w.y = Math.trunc(sh1xJn(s, 'y', w.y / 4096) * 4096);
+          w.z = Math.trunc(sh1xJn(s, 'z', w.z / 4096) * 4096);
+          w.len = Math.trunc(sh1xJn(s, 'len', w.len / 4096) * 4096);
+          w.horiz = sh1xJb(s, 'horizontal', w.horiz !== 0) ? 1 : 0;
+          w.heading = Math.trunc(sh1xJn(s, 'heading', w.heading * 360 / 4096) * 4096 / 360);
+          w.width = Math.trunc(sh1xJn(s, 'width', w.width / 4096) * 4096);
+          w.tileLen = Math.trunc(sh1xJn(s, 'tileLen', w.tileLen / 4096) * 4096);
+          w.scrollSpd = Math.trunc(sh1xJn(s, 'scrollSpeed', w.scrollSpd / 4096) * 4096);
+          w.spread = Math.trunc(sh1xJn(s, 'spread', w.spread / 4096) * 4096);
+          w.rampHalf = Math.trunc(sh1xJn(s, 'rampHalf', w.rampHalf / 4096) * 4096);
+          w.flowBase = Math.trunc(sh1xJn(s, 'flowBase', w.flowBase / 4096) * 4096);
+        }
+        a.wfSegCount = sh1xJi(st, 'segmentCount', a.wfSegCount);
+        a.wfDrops = sh1xJi(st, 'droplets', a.wfDrops);
+        if (a.wfDrops > 16) a.wfDrops = 16;
+        if (a.wfSegCount > 3) a.wfSegCount = 3;
+      }
+      a.wfHasStream = 1;
+    }
     a.rate = sh1xJn(e, 'rate', sh1xJn(e, 'rngBase', 0.0));
     a.rngBase = sh1xJn(e, 'rngBase', -180.0);
     a.rngMask = sh1xJi(e, 'rngMask', 0x1FF);
@@ -8337,35 +8436,14 @@ function sh1xDriverTick(S, dt) {
                  engine's DRAW pass (sh1x_water_fx_draw) — no mesh pose, no
                  per-tick state (documented engine-only FX) */
       break;
-    case 22: { /* particles/<waterfall> — water.c:20-107 logic (FX-only:
-                 the droplets are engine draws; the state ticks so the
-                 shared RNG stream stays engine-shaped) */
-      if (a.seeded) {
-        for (let q = 0; q < 10; q++) {
-          if (!a.wfAlive[q]) {
-            const em = sh1xRngNext(S) & 1;
-            const spread = sh1xRngNext(S) % 6553; /* Q12(1.6) */
-            a.wfEm[q] = em;
-            /* emitter 0 @90deg: x+spread; emitter 1 @270deg: x-spread */
-            a.wfX[q] = (em ? -60620 : -67174) + (em ? -spread : spread);
-            a.wfY[q] = 409;                      /* Q12(0.1) */
-            a.wfZ[q] = -209715;                  /* Q12(-51.2) */
-            a.wfVy[q] = 0;
-            a.wfAlive[q] = 1;
-          } else {
-            /* fall: vel capped Q12(6.0), vy += dt*vel; recycle at the end */
-            a.wfVy[q] += 1336;                   /* g raw */
-            if (a.wfVy[q] > 24576) a.wfVy[q] = 24576;
-            a.wfY[q] += sh1xMulSh(dtRaw, a.wfVy[q], 12);
-            if (a.wfY[q] > 409 + 8601)           /* band end */
-              a.wfAlive[q] = 0;
-          }
-        }
-      } else {
-        a.seeded = 1;             /* sharedFunc_800CBC98 spawn */
-      }
+    case 22:  /* particles/<waterfall> — the school water. The tick lives in
+                 sh1xWaterfallTick (the PLAYER_IN_MAP_CHUNK camera-proxy gate
+                 needs the cam; applySh1xPropAnims calls it next to
+                 sh1xDriverTick per FIRED 30Hz tick — fog_poc.c:10175-10181).
+                 See water.c:20-107 (the spawn), 154-180 (the droplet
+                 advance) and 702-707 (the surface scroll) — all VERBATIM
+                 there. The DRAW lives in sh1xSchoolWaterDraw. */
       break;
-    }
     case 7:   /* cutscene: idle (engine-true default) */
     default:
       break;
@@ -8693,9 +8771,696 @@ function sh1xDriverDebugState(S) {
       d.raw = { vy: a.rawVy, vel: a.rawVel };
     if (a.driver === 11) d.flicker = S.lightFlicker;
     if (a.driver === 13 || a.driver === 15) d.master = a.mvMaster;
+    if (a.driver === 22) {
+      /* v39: the waterfall observable (the WFDBG analog — the gate, the
+       * spawn state, the scroll phase and the per-droplet sel/along) */
+      let alive = 0;
+      for (let q = 0; q < a.wfDrops; q++) if (a.wfAlive[q]) alive++;
+      d.wf = {
+        seeded: a.seeded, surfaceOn: a.wfSurfaceOn,
+        segCount: a.wfSegCount, drops: a.wfDrops, alive: alive,
+        scroll: a.wfScroll.slice(0, a.wfSegCount),
+        sel: a.wfSel.slice(0, a.wfDrops),
+        along: a.wfAlong.slice(0, a.wfDrops),
+        chunkGate: a.chunkGate.slice(0, 2),
+        lastT: a.wfLastT
+      };
+    }
     out.push(d);
   }
   return out;
+}
+
+/* ==================================================================== */
+/* v39: THE SCHOOL WATERFALL — water.c VERBATIM (the fog_poc.c v39 port
+ * mirrored: sh_wf_spawn :9458, sh1x_waterfall_tick :9508,
+ * sh_light_build_table :5118, sh_light_query_pos :5140, sh_div_ds :11374,
+ * sh_wspr_project :11320, sh1x_school_water_draw :11380). All the
+ * positions/lengths are raw Q12 in the GAME frame (y-down); the draw
+ * projects through ctx.mvpE/viewE — the viewer's OWN camera eval — and
+ * emits quads to the ctx sinks (the GPU additive raster path).
+ * ==================================================================== */
+
+/* WATER.TIM (sh1_assets/TIM, the CDN upload) — the school water sheet,
+ * VERBATIM pixel data (128x128 4bpp + 2 CLUT rows; the 8192 pixel bytes
+ * base64-encoded — the same embedded-constant pattern as SH1X_SINE_B64).
+ * Upload (engine): s_FsImageDesc D_800A908C {tPage {0,13}, u 0, v 0,
+ * clut (224,0)} (screen/data.c:118 NTSC; PAL (928,432) data.c:95 +
+ * CLUT_BASE env_effects.c:107). Sampled by water.c with tpage 45 (0x2D:
+ * page-13, ABR-1 ADDITIVE, 4bpp) + clut words 0xE (row 0)/0x4E (row 1):
+ * the stream strip u 64..95 v 64..127, the droplet sprites u 64..95/
+ * 96..127 v 0..63/64..127, the map1_s03 spray frames u 0..63
+ * v 32*frame..+31. The waterTex EXTRAs (the v39 ripper) OVERRIDE these
+ * compiled-in defaults at load (sh1xWaterTexFromExtras — fog_poc.c:1796-1833,
+ * the UNBIASED contract). */
+const SH1X_WATER_TIM_B64 = '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';
+/* the 2 CLUT rows, u16 5:5:5(+STP) — water_tim_data.h g_waterTimClut */
+const SH1X_WATER_TIM_CLUT = [
+  [0x8400, 0x8420, 0x8421, 0x8821, 0x8841, 0x8842, 0x8c42, 0x8c62,
+   0x8c63, 0x9063, 0x9083, 0x9084, 0x9484, 0x94a4, 0x94a5, 0x98a5],
+  [0x8c00, 0x8c60, 0x8c63, 0x9042, 0x9082, 0x9084, 0x9463, 0x94a3,
+   0x94a5, 0x9884, 0x98c4, 0x98c6, 0x9cc6, 0x9ce6, 0x9ce7, 0xa0e7]
+];
+
+/* the sh1xSineTable decoder generalized (RFC 4648; self-contained — the
+ * SH1X-DRIVERS block must stay Node-harness-runnable, no atob) */
+function sh1xB64Bytes(b64) {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const n = b64.length - (b64.endsWith('=') ? 1 : 0);
+  const out = new Uint8Array((n * 3) >> 2);
+  let acc = 0, bits = 0, w = 0;
+  for (let i = 0; i < b64.length; i++) {
+    const v = L.indexOf(b64[i]);
+    if (v < 0) continue;               /* '=' padding */
+    acc = (acc << 6) | v; bits += 6;
+    if (bits >= 8) { bits -= 8; out[w++] = (acc >> bits) & 0xFF; }
+  }
+  return out;
+}
+
+/* the sheet decode — 4bpp: 2 texels/byte, low nibble = even u (the
+ * TimFile layout, fog_poc.c:1809-1816). idx[v*128+u] = the nibble index,
+ * clut[row*16+k] = the 15-bit entries (fog_poc.c:1817-1825). Returns null
+ * for a bad payload (the caller falls back to the compiled-in default). */
+function sh1xWaterTexDecode(pixels, clut) {
+  if (!pixels || pixels.length !== 8192 || !Array.isArray(clut) || clut.length < 2)
+    return null;
+  const idx = new Uint8Array(128 * 128);
+  for (let v = 0; v < 128; v++) {
+    const ro = v * 64;
+    for (let ub = 0; ub < 64; ub++) {
+      const b = pixels[ro + ub];
+      idx[v * 128 + ub * 2] = b & 0xF;
+      idx[v * 128 + ub * 2 + 1] = b >> 4;
+    }
+  }
+  const c = new Uint16Array(32);
+  for (let r = 0; r < 2; r++) {
+    const row = Array.isArray(clut[r]) ? clut[r] : [];
+    for (let k = 0; k < 16 && k < row.length; k++)
+      c[r * 16 + k] = (row[k] & 0xFFFF) | 0;
+  }
+  return { idx: idx, clut: c };
+}
+
+/* the GLB SH1X.waterTex EXTRAs -> the sheet (the sh1x_load parse,
+ * fog_poc.c:1801-1833 — overrides the compiled-in default at load).
+ * null = absent/malformed -> sh1xWaterTexDefault(). */
+function sh1xWaterTexFromExtras(wtx) {
+  if (!wtx || typeof wtx !== 'object') return null;
+  return sh1xWaterTexDecode(sh1xB64Bytes(String(wtx.pixels || '')),
+                           Array.isArray(wtx.clut) ? wtx.clut : []);
+}
+
+let _sh1xWaterDef = null;
+/* fog_poc.c:1575 sh_watertex_default — the compiled-in sheet if no EXTRAs
+ * (decoded ONCE; the sheet object caches the viewer-side atlas texture). */
+function sh1xWaterTexDefault() {
+  if (_sh1xWaterDef) return _sh1xWaterDef;
+  _sh1xWaterDef = sh1xWaterTexDecode(sh1xB64Bytes(SH1X_WATER_TIM_B64),
+                                     SH1X_WATER_TIM_CLUT);
+  return _sh1xWaterDef;
+}
+
+/* fog_poc.c:9458 sh_wf_spawn — water.c:20-68 VERBATIM (the droplet
+ * spawn/respawn; arg1=2 the initial spawn — a RANDOM segment + the
+ * scatter along the heading; arg1=3 the respawn at segment arg2, NO
+ * scatter). The engine stores the segment in wfSel>>2 (field_C.s_1.field_0),
+ * the position-along in wfAlong (field_10.s_0.field_0), the flow speed in
+ * wfVy (field_10.s_0.field_2). Rng_GenerateUInt(a,b) = a + Rng%(b-a+1);
+ * Math_Sin/Cos = the verbatim LUT (sh1xSinQ12/sh1xCosQ12). */
+function sh1xWfSpawn(S, a, q, arg1, arg2) {
+  let var_s2 = arg2;
+  if (arg1 === 2) {
+    var_s2 = sh1xRngNext(S) % a.wfSegCount;              /* water.c:30 */
+    a.wfAlong[q] = sh1xRngNext(S) % a.wfSeg[var_s2].len;  /* water.c:31 */
+  } else {
+    var_s2 = var_s2 % a.wfSegCount;                      /* water.c:35 */
+    a.wfAlong[q] = 0;                                    /* water.c:36 */
+  }
+  a.wfX[q] = a.wfSeg[var_s2].x;                          /* water.c:39 */
+  a.wfY[q] = a.wfSeg[var_s2].y;                          /* water.c:40 */
+  a.wfZ[q] = a.wfSeg[var_s2].z;                          /* water.c:41 */
+  if (a.wfSeg[var_s2].horiz) {
+    if (arg1 === 2) {
+      a.wfX[q] += sh1xMulSh(a.wfAlong[q],
+              sh1xSinQ12(a.wfSeg[var_s2].heading), 12);  /* water.c:47 */
+      a.wfZ[q] += sh1xMulSh(a.wfAlong[q],
+              sh1xCosQ12(a.wfSeg[var_s2].heading), 12);  /* water.c:48 */
+    }
+    /* water.c:51 — (field_6c * Rng_GenerateUInt(96, 159)) >> 7 */
+    a.wfVy[q] = sh1xMulSh(a.wfSeg[var_s2].flowBase,
+            96 + (sh1xRngNext(S) % 64), 7);
+  } else {
+    if (arg1 === 2) a.wfY[q] += a.wfAlong[q];             /* water.c:57 */
+    a.wfVy[q] = 112 + (sh1xRngNext(S) % 32);             /* water.c:60 */
+    a.wfVyAcc[q] = 0;                                     /* water.c:61 */
+  }
+  /* water.c:64-67 — (Rng%3 ? Rng%3+1 : 0) + segment*4 (the sprite sel) */
+  const t = sh1xRngNext(S) % 3;
+  a.wfSel[q] = (t ? (t + 1) : 0) + (var_s2 * 4);
+  a.wfAlive[q] = 1;
+}
+
+/* fog_poc.c:9508 sh1x_waterfall_tick — the school waterfall per-tick, the
+ * PLAYER_IN_MAP_CHUNK(-1,-2) camera-proxy gate (map1_s02.c:1537-1562:
+ * spawn on entering the chunk with the drain flag set — a.gated carries the
+ * eventGate 113 state, the editor's animsDemo previews it SET; despawn on
+ * leaving — the waterRipple precedent) + the VERBATIM spawn (water.c:70-92),
+ * the droplet advance (water.c:154-180 horizontal / 326-340 vertical) and
+ * the surface scroll (water.c:702-707 — the engine advances it after the
+ * draw; the tick/draw split advances it in the tick, fog_poc.c's documented
+ * one-frame scroll lead of dt*scrollSpd ~ 0.0017 m).
+ * MAP_CHUNK_IDX(pos) = trunc(pos/40m) + sign (game.h:41-42) on the GAME-frame
+ * camera position (game x = engine x, game z = -engine z; the camtrack's
+ * glTF world IS the engine frame); MAP_CHUNK_IDX_FROM_GRID(n) = n>=0 ? n+1
+ * : n (game.h:44-46). cam = {x, y, z} ENGINE meters (the track camera pose);
+ * sessionT = the session clock (the drivers' 30Hz grid) — dt derives from
+ * a.wfLastT and clamps at 0.1 like the env tick. */
+function sh1xWaterfallTick(S, cam, sessionT) {
+  if (!S || !cam) return;
+  for (let i = 0; i < S.anims.length; i++) {
+    const a = S.anims[i];
+    if (a.driver !== 22 || !a.wfHasStream) continue;
+    /* the game-frame camera (fog_poc.c:9514-9515: gameX = cam.x, gameZ =
+     * -cam.z; the camtrack world = the glTF/engine frame) */
+    const camXgame = Math.trunc(cam.x * 4096);   /* C: (int)(cam->pos.x*4096.0f) */
+    const camZgame = Math.trunc(-cam.z * 4096);
+    const idxX = sh1xDivT(camXgame, 163840) + (camXgame > 0 ? 1 : -1);
+    const idxZ = sh1xDivT(camZgame, 163840) + (camZgame > 0 ? 1 : -1);
+    const gateX = (a.chunkGate[0] >= 0) ? a.chunkGate[0] + 1 : a.chunkGate[0];
+    const gateZ = (a.chunkGate[1] >= 0) ? a.chunkGate[1] + 1 : a.chunkGate[1];
+    const inChunk = (idxX === gateX && idxZ === gateZ);
+    if (!inChunk || a.gated) {
+      /* the despawn (water.c:94-107 / map1_s02.c:1560-1563) */
+      if (a.seeded) {
+        for (let q = 0; q < 16; q++) a.wfAlive[q] = 0;
+        a.seeded = 0;
+        a.wfSurfaceOn = 0;    /* D_800C4414 &= ~(1 << 3) */
+      }
+      a.wfLastT = sessionT;
+      continue;
+    }
+    let dt = sessionT - a.wfLastT;
+    if (dt < 0) dt = 0;
+    if (dt > 0.1) dt = 0.1;    /* clamp like the env tick */
+    a.wfLastT = sessionT;
+    const dtRaw = Math.trunc(dt * 4096);   /* C: (int)(dt * 4096.0) */
+    if (!a.seeded) {
+      a.seeded = 1;             /* sharedFunc_800CBC98 */
+      a.wfSurfaceOn = 1;        /* D_800C4414 |= 1 << 3 */
+      for (let q = 0; q < a.wfDrops; q++)
+        sh1xWfSpawn(S, a, q, 2, 0);           /* water.c:75-84 */
+      for (let sgi = 0; sgi < a.wfSegCount; sgi++)
+        a.wfScroll[sgi] = 0;                   /* water.c:86-89 */
+    }
+    /* the surface scroll (water.c:702-707) */
+    for (let sgi = 0; sgi < a.wfSegCount; sgi++) {
+      a.wfScroll[sgi] += sh1xMulSh(dtRaw, a.wfSeg[sgi].scrollSpd, 12);
+      while (a.wfScroll[sgi] >= a.wfSeg[sgi].tileLen)
+        a.wfScroll[sgi] -= a.wfSeg[sgi].tileLen;
+    }
+    /* the droplet advance */
+    for (let q = 0; q < a.wfDrops; q++) {
+      if (!a.wfAlive[q]) continue;
+      let idx0 = a.wfSel[q] >> 2;               /* water.c:154 */
+      if (idx0 < 0 || idx0 > 2) idx0 = 0;
+      if (a.wfSeg[idx0].horiz) {
+        /* water.c:158-180 VERBATIM */
+        const temp_s4 = sh1xMulSh(dtRaw, a.wfVy[q], 12);
+        if (a.wfAlong[q] + temp_s4 < a.wfSeg[idx0].len) {
+          a.wfX[q] += sh1xMulSh(temp_s4, sh1xSinQ12(a.wfSeg[idx0].heading), 12);
+          a.wfZ[q] += sh1xMulSh(temp_s4, sh1xCosQ12(a.wfSeg[idx0].heading), 12);
+        } else if (a.wfAlong[q] + temp_s4 >=
+                a.wfSeg[idx0].len + a.wfSeg[idx0].rampHalf) {
+          sh1xWfSpawn(S, a, q, 3, idx0 + 1);     /* water.c:167 */
+          continue;
+        } else if (a.wfAlong[q] < a.wfSeg[idx0].len) {
+          const d = a.wfSeg[idx0].len - a.wfAlong[q];
+          a.wfX[q] += sh1xMulSh(d, sh1xSinQ12(a.wfSeg[idx0].heading), 12);
+          a.wfZ[q] += sh1xMulSh(d, sh1xCosQ12(a.wfSeg[idx0].heading), 12);
+        }
+        a.wfAlong[q] += temp_s4;                /* water.c:180 */
+      } else {
+        /* water.c:328-340 — the vertical fall (map1_s03's drain cutscene;
+         * 1336 = the engine's g_GravitySpeed raw) */
+        a.wfVyAcc[q] += sh1xMulSh(1336, a.wfVy[q], 7);
+        if (a.wfVyAcc[q] > 24576) a.wfVyAcc[q] = 24576;   /* MIN(Q12(6)) */
+        const temp_s4 = sh1xMulSh(dtRaw, a.wfVyAcc[q], 12);
+        if (a.wfAlong[q] + temp_s4 >=
+                a.wfSeg[idx0].len + a.wfSeg[idx0].rampHalf) {
+          sh1xWfSpawn(S, a, q, 3, idx0 + 1);
+          continue;
+        }
+        a.wfAlong[q] += temp_s4;
+        a.wfY[q] += temp_s4;
+      }
+    }
+  }
+}
+
+/* fog_poc.c:11374 sh_div_ds — DuckStation's signed DIV-by-zero semantics
+ * (cpu_core.cpp:745-751: LO = (num >= 0) ? -1 : 1) covering water.c:229's
+ * 0/0 (the terminator len 0) — used by the last-segment taper divisions. */
+function sh1xDivDs(num, denom) {
+  if (denom === 0) return (num >= 0) ? -1 : 1;
+  if (num === -2147483648 && denom === -1) return num;
+  return Math.trunc(num / denom);
+}
+
+/* func_80055648 — the axis-falloff light table (fog_poc.c:5118-5135,
+ * VERBATIM; used by func_80055D78 position queries — characters/effects in
+ * the engine). The table consumes the ENGINE-frame (y-down) direction
+ * components — the caller flips y/z of the glTF-space dir (fog_poc.c:5689-
+ * 5691, the MINOR-1 note). tmpl = D_800AE1B4 {vx=0, vy=204, vz=-311}. */
+function sh1xLightBuildTable(tbl, dir, intensity) {
+  for (let i = 0; i < 3; i++) {
+    const d = dir[i];
+    /* C int64 division, operands positive -> Math.trunc == the C trunc */
+    const t1 = Math.trunc((d + 5324) * 4096 / 9420);  /* Q12((dir+Q12(1.3))/Q12(2.3)) */
+    const v1 = Math.trunc((5324 - d) * 4096 / 9420);
+    const t0 = Math.floor(4194304 / t1);   /* C: (int)(4194304 / (uint32)t1) */
+    const lo = Math.floor(4194304 / v1);
+    for (let j = 0; j < 2; j++) {
+      const t = j ? lo : t0;
+      tbl[i][j].vy = sh1xMulSh(204, intensity, 12);      /* (tmpl[1]*intensity)>>12 */
+      tbl[i][j].vx = sh1xMulSh(0, (j ? v1 : t1), 12);    /* tmpl[0]=0 -> 0 */
+      tbl[i][j].vz = sh1xMulSh(sh1xMulSh(-311, t, 10), intensity, 12);
+    }
+  }
+}
+
+/* func_80055D78 — the position-query light value (fog_poc.c:5140-5172
+ * VERBATIM; GAME-frame Q12 positions — the engine stores L->pos in the
+ * ENGINE frame so the query negates its y/z HERE, fog_poc.c:5151-5153).
+ * env = { pos: [3] Q12 glTF, field0, field20, field3 } (the ShEnv subset).
+ * sh1xLightQueryPos(tbl, env, posX, posY, posZ) with GAME Q12 positions. */
+const _wfLqPos = [0, 0, 0];
+function sh1xLightQueryPos(tbl, env, posX, posY, posZ) {
+  _wfLqPos[0] = (posX >> 4) - (env.pos[0] >> 4);
+  _wfLqPos[1] = (posY >> 4) - ((-env.pos[1]) >> 4);
+  _wfLqPos[2] = (posZ >> 4) - ((-env.pos[2]) >> 4);
+  let var_a3 = 0xFF;
+  if (env.field0 !== 0) {         /* SHENUM_0 */
+    for (let i = 0; i < 3; i++) {
+      let tempX = _wfLqPos[i];
+      let side = 0;
+      if (tempX < 0) { tempX = -tempX; side = 1; }
+      const temp_v1 = tbl[i][side].vy +
+        sh1xMulSh(tbl[i][side].vz, (tempX - tbl[i][side].vx), 12);
+      if (temp_v1 < var_a3) var_a3 = temp_v1;
+    }
+  } else {
+    var_a3 = 0;
+  }
+  var_a3 += env.field20 >> 5;
+  if (var_a3 < 0) var_a3 = 0;
+  if (var_a3 > env.field3) var_a3 = env.field3;
+  return var_a3;
+}
+
+/* fog_poc.c:11320 sh_wspr_project — one school-water world point through
+ * the viewer's OWN camera eval (ctx.mvpE/ctx.viewE — 16-element column-major
+ * mat4 `elements`, the SAME projection the room geometry renders through,
+ * so the water composites over the floor) -> NDC -> the RT framebuffer.
+ * out = [sx, sy, zm] (a 3-slot scratch); false = behind the near plane. */
+function sh1xWsprProject(ctx, wx, wy, wz, out) {
+  const m = ctx.mvpE, v = ctx.viewE;
+  const cx = m[0] * wx + m[4] * wy + m[8] * wz + m[12];
+  const cy = m[1] * wx + m[5] * wy + m[9] * wz + m[13];
+  const cw = m[3] * wx + m[7] * wy + m[11] * wz + m[15];
+  if (cw <= 1e-6) return false;
+  const vz = v[2] * wx + v[6] * wy + v[10] * wz + v[14];
+  if (-vz <= 0.05) return false;
+  out[0] = ((cx / cw) + 1) * 0.5 * ctx.fbW;
+  out[1] = (1 - ((cy / cw) + 1) * 0.5) * ctx.fbH;
+  out[2] = -vz;
+  return true;
+}
+
+/* ---- the draw's scratch (module-level, no per-frame allocations) -------- */
+const _wfScratch16 = () => [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0],
+  [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]];
+const _wfRowsX = _wfScratch16(), _wfRowsYm = _wfScratch16(),
+      _wfRowsZ = _wfScratch16(), _wfRowsB = _wfScratch16();
+const _wfF264 = [[0, 0], [0, 0]];
+const _wfWX = [0, 0, 0, 0], _wfWY = [0, 0, 0, 0], _wfWZ = [0, 0, 0, 0];
+const _wfSX = [0, 0, 0, 0], _wfSY = [0, 0, 0, 0], _wfZQ = [0, 0, 0, 0];
+const _wfXv = [0, 0, 0, 0], _wfYv = [0, 0, 0, 0], _wfZv = [0, 0, 0, 0];
+const _wfP3 = [0, 0, 0], _wfCr = [0, 0, 0, 0];
+const _wfLt = [
+  [{ vy: 0, vx: 0, vz: 0 }, { vy: 0, vx: 0, vz: 0 }],
+  [{ vy: 0, vx: 0, vz: 0 }, { vy: 0, vx: 0, vz: 0 }],
+  [{ vy: 0, vx: 0, vz: 0 }, { vy: 0, vx: 0, vz: 0 }]
+];
+const _wfDirEng = [0, 0, 0];
+
+/* fog_poc.c:11380 sh1x_school_water_draw — water.c:109-444 (the droplet
+ * quads) + 446-711 (the stream surface strips), VERBATIM. ctx = the viewer
+ * render context:
+ *   mvpE / viewE : the viewer camera's own projection (16-element
+ *                   column-major mat4s — the SAME pipeline the room floor
+ *                   geometry renders through);
+ *   fbW / fbH     : the faithful render target size (the engine framebuffer);
+ *   camYawDeg     : the vertical branch's view angle (vwGetViewAngle's vy —
+ *                   cam_yaw_deg fog_poc.c:11366-11372; only map1_s03's
+ *                   vertical stream strips use it — dead for the school's
+ *                   horizontal data);
+ *   env           : { pos: [3] Q12 glTF, dir: [3] Q12 glTF, intensity,
+ *                     field0, field20, field3 } (the ShEnv light subset);
+ *   emitGT4 / emitFT4 : the rasterizer sinks (the C's fx_blit_wsheet_gt4 /
+ *                     ft4 — the GPU additive path). The sinks receive the
+ *                     WORLD glTF corner positions, the CLUT row, the UV
+ *                     window, the corner brightness (cr=cg=cb — grayscale)
+ *                     and the prim's own projected depth (the OT bucket
+ *                     input, water.c:439/698). */
+function sh1xSchoolWaterDraw(S, a, ctx) {
+  if (!a.seeded || !a.wfHasStream) return;
+  const cullX = 200 * ctx.fbW / 320;   /* the PSX +/-200px window, RT-scaled */
+  const cullY = 160 * ctx.fbH / 224;
+  /* the axis-falloff light table — the engine builds it per frame
+   * (sh_env_update_pose, fog_poc.c:5688-5696); once per draw here. The
+   * table consumes the ENGINE-frame dir (y/z flip of the glTF dir). */
+  const env = ctx.env;
+  _wfDirEng[0] = env.dir[0];
+  _wfDirEng[1] = -env.dir[1];
+  _wfDirEng[2] = -env.dir[2];
+  sh1xLightBuildTable(_wfLt, _wfDirEng, env.intensity);
+
+  /* ---------------- the stream surface (water.c:446-711) ------------- */
+  if (a.wfSurfaceOn) {
+    for (let sgi = 0; sgi < a.wfSegCount; sgi++) {
+      const sg = a.wfSeg[sgi];
+      let temp_s0 = sg.width >> 1;               /* water.c:494 */
+      let s25C = 0, s25E = 0;
+      const f264 = _wfF264;
+      if (sg.horiz) {
+        s25C = sh1xSinQ12(sg.heading);
+        s25E = sh1xCosQ12(sg.heading);
+        f264[0][0] = sh1xMulSh(temp_s0, s25E, 12);
+        f264[0][1] = -f264[0][0];
+        f264[1][0] = sh1xMulSh(-temp_s0, s25C, 12);
+        f264[1][1] = -f264[1][0];
+      } else {
+        /* the vertical branch rides the VIEW yaw (field_0.field_30.vy,
+         * vwGetViewAngle) — the camera's yaw analog (cam_yaw_deg). */
+        const vy = Math.trunc(ctx.camYawDeg * 4096 / 360);
+        f264[0][0] = sh1xMulSh(temp_s0, sh1xSinQ12(vy - 1024), 12);
+        f264[1][0] = sh1xMulSh(temp_s0, sh1xCosQ12(vy - 1024), 12);
+        f264[0][1] = sh1xMulSh(temp_s0, sh1xSinQ12(vy + 1024), 12);
+        f264[1][1] = sh1xMulSh(temp_s0, sh1xCosQ12(vy + 1024), 12);
+      }
+      /* the last segment's end-taper bound (water.c:513-520): field_26E =
+       * len[i] - len[terminator] (the first assignment below is dead —
+       * overwritten immediately, transcribed verbatim from fog_poc.c:11423). */
+      let f26E = (sgi === a.wfSegCount - 1) ? a.wfSeg[a.wfSegCount].len : -1;
+      if (sgi === a.wfSegCount - 1)
+        f26E = sg.len - a.wfSeg[a.wfSegCount].len;
+      if (f26E < 0) f26E = -1;          /* 0xFFFF sentinel (no taper) */
+      let sp14 = 0;
+      let j = 0, var_s4 = 0;
+      for (;;) {
+        if (j >= 16) break;
+        let var_s2 = 0;
+        let f26C = sg.y;
+        if (sg.horiz) {
+          if (var_s4 !== 0) {
+            if (var_s4 === sg.len) f26C = a.wfSeg[sgi + 1].y;
+            else if (sg.len !== 0)
+              f26C = sg.y + sh1xDivT((a.wfSeg[sgi + 1].y - sg.y) * var_s4, sg.len);
+          }
+          if (f26E >= 0 && f26E < var_s4) {
+            /* the end taper (water.c:549-560) — dead for the map1_s02
+             * terminator len 0 (var_s4 <= len); the division rides
+             * sh1xDivDs (DuckStation 0/0). */
+            var_s2 = sh1xDivDs((var_s4 - f26E) << 12,
+                               a.wfSeg[a.wfSegCount].len);
+            temp_s0 = sh1xMulSh(4096 - var_s2, sg.width >> 1, 12) +
+                      sh1xMulSh(var_s2, a.wfSeg[sgi + 1].width >> 1, 12);
+            f264[0][0] = sh1xMulSh(temp_s0, s25E, 12);
+            f264[0][1] = -f264[0][0];
+            f264[1][0] = sh1xMulSh(-temp_s0, s25C, 12);
+            f264[1][1] = -f264[1][0];
+          }
+        }
+        for (let k = 0; k < 2; k++) {
+          let var_fp, sp18, sp1C;
+          if (sg.horiz) {
+            var_fp = sg.x + f264[0][k] + sh1xMulSh(var_s4, s25C, 12);
+            sp18 = f26C;
+            sp1C = sg.z + f264[1][k] + sh1xMulSh(var_s4, s25E, 12);
+          } else {
+            var_fp = sg.x + f264[0][k];
+            sp18 = sg.y + var_s4;
+            sp1C = sg.z + f264[1][k];
+          }
+          /* the Gouraud corner brightness (water.c:578) —
+           * Q12_MULT_PRECISE(cos(var_s2 >> 2), light(vertex)) */
+          let br = sh1xMulSh(sh1xCosQ12(var_s2 >> 2),
+                  sh1xLightQueryPos(_wfLt, env, var_fp, sp18, sp1C), 12);
+          if (br < 0) br = 0;
+          if (br > 255) br = 255;
+          _wfRowsB[j][k] = br;
+          /* the neighbor tapers (water.c:580-618) */
+          if (sgi < a.wfSegCount - 1 && sg.horiz &&
+              a.wfSeg[sgi + 1].horiz) {
+            const tv0_8 = sh1xSinQ12(sg.heading - a.wfSeg[sgi + 1].heading);
+            let vs2 = sh1xMulSh(a.wfSeg[sgi + 1].spread, tv0_8, 12);
+            if (k === 0) vs2 = -vs2;
+            const tv1_3 = sg.len - var_s4;
+            if (tv1_3 < vs2) {
+              _wfRowsB[j][k] = sh1xMulSh(
+                tv1_3 >= 0 ? sh1xDivT(tv1_3 << 12, vs2 ? vs2 : 1) : 0,
+                _wfRowsB[j][k], 12);
+            }
+          }
+          if (sgi > 0 && sg.horiz && a.wfSeg[sgi - 1].horiz) {
+            let vs2 = sh1xMulSh(a.wfSeg[sgi - 1].spread,
+                    sh1xSinQ12(a.wfSeg[sgi - 1].heading - sg.heading), 12);
+            if (k === 0) vs2 = -vs2;
+            const vs1 = sg.rampHalf - (vs2 < 0 ? -vs2 : vs2);
+            if (var_s4 < vs1) {
+              _wfRowsB[j][k] = sh1xMulSh(
+                sh1xDivT(var_s4 << 12, vs1 ? vs1 : 1), _wfRowsB[j][k], 12);
+            }
+          }
+          _wfRowsX[j][k] = var_fp;
+          _wfRowsYm[j][k] = sp18;
+          _wfRowsZ[j][k] = sp1C;
+        }
+        /* the row advance (water.c:632-655) */
+        if (var_s4 !== sg.len) {
+          if (j !== 0) {
+            if (sg.len < var_s4 + sg.tileLen) {
+              sp14 = sg.len - var_s4;
+              var_s4 = sg.len;
+            } else {
+              var_s4 += sg.tileLen;
+            }
+          } else {
+            var_s4 += a.wfScroll[sgi];
+          }
+        } else break;
+        j++;
+      }
+      /* the strip quads (water.c:657-700) — the 16-row cap walk can read
+       * one STALE row (the engine's own 16-row scratch overflow quirk —
+       * the C port keeps it; the guard below limits k+1 to the written rows) */
+      for (let k = 0; k < j; k++) {
+        if (k + 1 >= 16) break;
+        let vNear, vSpan;
+        if (k === 0) {
+          const t = (sg.tileLen !== 0)
+            ? sh1xDivT(a.wfScroll[sgi] << 6, sg.tileLen) : 0;
+          vNear = 0x7F - t;              /* water.c:661-663 */
+          vSpan = t;
+        } else {
+          vNear = 0x40;                 /* water.c:668 */
+          if (k + 1 === j)
+            vSpan = (sg.tileLen !== 0) ? sh1xDivT(sp14 << 6, sg.tileLen) : 0;
+          else
+            vSpan = 0x3F;
+        }
+        let vis = 1;
+        for (let c = 0; c < 4; c++) {
+          const rj = (c < 2) ? k : k + 1;
+          const rk = (c & 1) ? 1 : 0;
+          /* game Q12 -> glTF meters (x, -y, -z)/4096 */
+          _wfWX[c] = _wfRowsX[rj][rk] / 4096;
+          _wfWY[c] = -_wfRowsYm[rj][rk] / 4096;
+          _wfWZ[c] = -_wfRowsZ[rj][rk] / 4096;
+          if (!sh1xWsprProject(ctx, _wfWX[c], _wfWY[c], _wfWZ[c], _wfP3)) {
+            vis = 0; break;
+          }
+          _wfSX[c] = _wfP3[0]; _wfSY[c] = _wfP3[1]; _wfZQ[c] = _wfP3[2];
+        }
+        if (!vis) continue;
+        const avgZ = (_wfZQ[0] + _wfZQ[1] + _wfZQ[2] + _wfZQ[3]) * 0.25;
+        if (avgZ <= 0 || avgZ * 256 >= 16384) continue;
+        if (Math.abs(_wfSX[3] - ctx.fbW * 0.5) > cullX) continue;
+        if (Math.abs(_wfSY[3] - ctx.fbH * 0.5) > cullY) continue;
+        _wfCr[0] = _wfRowsB[k][0]; _wfCr[1] = _wfRowsB[k][1];
+        _wfCr[2] = _wfRowsB[k + 1][0]; _wfCr[3] = _wfRowsB[k + 1][1];
+        /* clut ROW 1 (the 0x4E word); strip tile u 64..95; the sliding
+         * leading window v [127-t, 127] (k=0) / body v 64..127; the sink's
+         * own depth gate = the prim's plain avg depth (fog_poc.c:11746-11753) */
+        ctx.emitGT4(_wfWX, _wfWY, _wfWZ, 1, 64, vNear, 95, vNear + vSpan,
+                   _wfCr, avgZ);
+      }
+    }
+  }
+
+  /* ---------------- the droplets (water.c:109-443) ------------------ */
+  for (let q = 0; q < a.wfDrops; q++) {
+    if (!a.wfAlive[q]) continue;
+    const sel = a.wfSel[q];
+    let idx0 = sel >> 2;                             /* water.c:154 */
+    if (idx0 < 0 || idx0 > 2) idx0 = 0;
+    const sg = a.wfSeg[idx0];
+    const along = a.wfAlong[q];
+    let v17C = 0, v17D = 63, f174 = sg.y, f176 = sg.y;
+    let var_s3 = 4096;
+    if (sg.horiz) {
+      if (along < sg.rampHalf) {
+        var_s3 = (sg.rampHalf !== 0)
+          ? sh1xDivT(along << 12, sg.rampHalf) : 0;
+        v17C = 0;
+        v17D = var_s3 >> 6;
+        f174 = sg.y;
+      } else if (along > sg.len) {
+        var_s3 = (sg.rampHalf !== 0)
+          ? sh1xDivT((sg.len + sg.rampHalf - along) << 12, sg.rampHalf) : 0;
+        v17C = 63 - (var_s3 >> 6);
+        v17D = var_s3 >> 6;
+        f176 = a.wfSeg[idx0 + 1].y;
+      } else {
+        var_s3 = 4096;
+        v17C = 0;
+        v17D = 63;
+      }
+      if (along >= sg.rampHalf) {
+        const dl = (sg.len !== 0) ? sg.len : 1;
+        f174 = sg.y + sh1xDivT((a.wfSeg[idx0 + 1].y - sg.y) *
+                               (along - sg.rampHalf), dl);
+      }
+      if (along <= sg.len) {
+        const dl = (sg.len !== 0) ? sg.len : 1;
+        f176 = sg.y + sh1xDivT((a.wfSeg[idx0 + 1].y - sg.y) * along, dl);
+      }
+    } else {
+      if (along < sg.rampHalf) {
+        var_s3 = (sg.rampHalf !== 0)
+          ? sh1xDivT(along << 12, sg.rampHalf) : 0;
+        v17C = 0;
+        v17D = var_s3 >> 6;
+      } else if (along > sg.len) {
+        var_s3 = (sg.rampHalf !== 0)
+          ? sh1xDivT((sg.len + sg.rampHalf - along) << 12, sg.rampHalf) : 0;
+        v17C = 63 - (var_s3 >> 6);
+        v17D = var_s3 >> 6;
+      } else {
+        var_s3 = 4096;
+        v17C = 0;
+        v17D = 63;
+      }
+    }
+    let f180, f164, f168, f16C, f170;
+    if (idx0 === a.wfSegCount - 1 &&
+        (sg.len - a.wfSeg[a.wfSegCount].len) < along) {
+      /* the last-segment end taper (water.c:224-243) — the division by
+       * the terminator len 0 rides sh1xDivDs (DuckStation's 0/0 = -1).
+       * NOTE the fixed-point scale: f164/168/16C/170 stay Q24 (the
+       * env_effects.c:498-504 scratchpad cache is a PLAIN Q12*Q12 product;
+       * Q12_MULT_PRECISE(var_s3, Q24) also stays Q24) — the vertex math's
+       * >> 12 (water.c:306-324) is the Q24->Q12 conversion. */
+      const term = a.wfSeg[a.wfSegCount].len;
+      const minLA = (sg.len >= along) ? along : sg.len;
+      const var_s1 = sh1xDivDs((minLA - (sg.len - term)) << 12, term);
+      f180 = sh1xMulSh(var_s3 >> 5, sh1xCosQ12(var_s1 >> 2), 12);
+      const f178 = sh1xMulSh(4096 - var_s1, sg.spread >> 1, 12) +
+                   sh1xMulSh(var_s1, a.wfSeg[idx0 + 1].spread >> 1, 12);
+      const f17A = sh1xMulSh(4096 - var_s1, sg.rampHalf, 12) +
+                    sh1xMulSh(var_s1, a.wfSeg[idx0 + 1].rampHalf, 12);
+      f164 = f178 * sh1xSinQ12(sg.heading);
+      f168 = f178 * sh1xCosQ12(sg.heading);
+      f16C = sh1xMulSh(var_s3, f17A * sh1xSinQ12(sg.heading), 12);
+      f170 = sh1xMulSh(var_s3, f17A * sh1xCosQ12(sg.heading), 12);
+    } else {
+      f180 = var_s3 >> 5;
+      f164 = (sg.spread >> 1) * sh1xSinQ12(sg.heading);
+      f168 = (sg.spread >> 1) * sh1xCosQ12(sg.heading);
+      f16C = sh1xMulSh(var_s3, sg.rampHalf * sh1xSinQ12(sg.heading), 12);
+      f170 = sh1xMulSh(var_s3, sg.rampHalf * sh1xCosQ12(sg.heading), 12);
+    }
+    /* the neighbor brightness tapers (water.c:256-302) */
+    if (idx0 < a.wfSegCount - 1 && a.wfSeg[idx0 + 1].horiz) {
+      const var_s1 = Math.abs(sh1xMulSh(a.wfSeg[idx0 + 1].spread,
+              sh1xSinQ12(sg.heading - a.wfSeg[idx0 + 1].heading), 12));
+      const var_v1 = sg.len - along;
+      if (var_v1 < var_s1) {
+        const tv = (var_v1 >= 0)
+          ? sh1xDivT(var_v1 << 12, var_s1 ? var_s1 : 1) : 0;
+        f180 = sh1xMulSh(tv, f180, 12);
+      }
+    }
+    if (idx0 > 0 && a.wfSeg[idx0 - 1].horiz) {
+      const vs3 = sg.rampHalf;
+      const cross = sh1xMulSh(a.wfSeg[idx0 - 1].spread,
+              sh1xSinQ12(a.wfSeg[idx0 - 1].heading - sg.heading), 12);
+      const var_s1 = (cross < 0) ? vs3 + cross : vs3 - cross;
+      if (along < var_s1)
+        f180 = sh1xMulSh(sh1xDivT(along << 12, var_s1 ? var_s1 : 1),
+                         f180, 12);
+    }
+    /* the quad vertices (water.c:306-324) — game Q12, the exact
+     * (-f164 >> 12) arithmetic-shift semantics */
+    _wfXv[0] = a.wfX[q] + (f168 >> 12);
+    _wfYv[0] = f174;
+    _wfZv[0] = a.wfZ[q] + (-f164 >> 12);
+    _wfXv[1] = a.wfX[q] + (-f168 >> 12);
+    _wfYv[1] = f174;
+    _wfZv[1] = a.wfZ[q] + (f164 >> 12);
+    _wfXv[2] = a.wfX[q] + ((f168 - f16C) >> 12);
+    _wfYv[2] = f176;
+    _wfZv[2] = a.wfZ[q] + ((-f164 - f170) >> 12);
+    _wfXv[3] = a.wfX[q] + ((-f168 - f16C) >> 12);
+    _wfYv[3] = f176;
+    _wfZv[3] = a.wfZ[q] + ((f164 - f170) >> 12);
+    let vis = 1;
+    for (let c = 0; c < 4; c++) {
+      /* game Q12 -> glTF meters (x, -y, -z)/4096 */
+      _wfWX[c] = _wfXv[c] / 4096;
+      _wfWY[c] = -_wfYv[c] / 4096;
+      _wfWZ[c] = -_wfZv[c] / 4096;
+      if (!sh1xWsprProject(ctx, _wfWX[c], _wfWY[c], _wfWZ[c], _wfP3)) {
+        vis = 0; break;
+      }
+      _wfSX[c] = _wfP3[0]; _wfSY[c] = _wfP3[1]; _wfZQ[c] = _wfP3[2];
+    }
+    if (!vis) continue;
+    /* the GTE avg z (Q8) — the C: (int)((zq0+..+zq3) * (256*0.25)) */
+    const f160 = Math.trunc((_wfZQ[0] + _wfZQ[1] + _wfZQ[2] + _wfZQ[3]) * 64);
+    if (f160 <= 0 || (f160 >> 3) >= 2048) continue;  /* water.c:406 */
+    if (Math.abs(_wfSX[3] - ctx.fbW * 0.5) > cullX) continue;  /* :411 */
+    if (Math.abs(_wfSY[3] - ctx.fbH * 0.5) > cullY) continue;  /* :416 */
+    /* the UVs (water.c:423-433): u 64/95 + (sel&2)*16, the window
+     * v17C + (sel&1)*64 with span v17D; clut ROW 0 (the 0xE word) */
+    const u0 = 64 + ((sel & 0x2) * 16);
+    const u1 = 95 + ((sel & 0x2) * 16);
+    const vv0 = v17C + ((sel & 0x1) << 6);
+    /* the brightness (water.c:436) = (f180 * light) >> 7 — the light at
+     * the droplet's GAME Q12 position */
+    let br = sh1xMulSh(f180,
+            sh1xLightQueryPos(_wfLt, env, a.wfX[q], a.wfY[q], a.wfZ[q]), 7);
+    if (br < 0) br = 0;
+    if (br > 255) br = 255;
+    /* depthM = the prim's OWN average depth — the water-family gate
+     * (fog_poc.c:11746-11753: the game's +0x100 OT bucket bias documents
+     * the OT-slot granularity, water.c:439; the painter gate uses the
+     * plain depth) */
+    ctx.emitFT4(_wfWX, _wfWY, _wfWZ, 0, u0, vv0, u1, vv0 + v17D, br,
+                f160 / 256);
+  }
 }
 /* ==== SH1X-DRIVERS-END ==== */
 
@@ -8877,6 +9642,429 @@ function updateLightGizmo() {
   }
 }
 
+/* ==================================================================== */
+/* v39: THE SCHOOL WATER FX GLUE — the three.js render of the SH1X driver */
+/* waterfall (the sh1xSchoolWaterDraw sinks -> the GPU additive quads). */
+/* The C engine rasterizes the quads through its own CPU framebuffer    */
+/* (fog_poc.c fx_blit_wsheet_ft4/gt4); here the SAME quads ride the      */
+/* faithful RT's WebGL pipeline:                                        */
+/*  - the world-space corner positions + the per-corner brightness + the */
+/*    UV window come from the VERBATIM math in the SH1X-DRIVERS block;   */
+/*  - the projection = the viewer's own rtCam eval (the SAME pipeline   */
+/*    the floor geometry renders through — sh1xWsprProject's mvp/view); */
+/*  - the TPAGE-45 ABR-1 ADDITIVE blend (B5+F5 clamp 31, water.c:435/686) */
+/*    rides a ONE/ONE GPU blend of repl5(F5); the RT accumulates 8-bit   */
+/*    and the POST pass re-quantizes to 5 — a documented ±1/31 LSB      */
+/*    composite deviation vs the C's per-prim 5-bit FB writes;           */
+/*  - the PSX AFFINE varying interpolation (no perspective correction -
+ *    the C rasterizers' screen-space linear UV/Gouraud) follows SH_VERT's
+ *    established w-multiply discipline, with the prim's PLAIN average
+ *    depth as the flat per-quad w/depth (the C's painter gate,
+ *    fog_poc.c:11214-11215 - occluded only by opaque geometry strictly
+ *    NEARER; the coplanar ditch-bed tie DRAWS, while a bucket-grid tie
+ *    vs the depthFunc-LESS room floor would reject - the 1-px A/B class);
+/*    vertex;                                                            */
+/*  - the 0x0000 texel hole ((tc & 0x7FFF) == 0) = the atlas alpha 0.    */
+/* ==================================================================== */
+
+/* FOGPOC_NOWATER's analog — the A/B kill switch (?water=0 at boot, or
+ * __camtrack.setWaterOn(bool) at runtime) */
+let wfWaterOn = true;
+try {
+  wfWaterOn = new URLSearchParams(location.search).get('water') !== '0';
+} catch (e) { /* file:// or such — keep on */ }
+
+const WATER_VERT = `
+  attribute vec3 shWcol;     /* the per-corner prim/Gouraud brightness 0..255 */
+  attribute float shWb;      /* the prim's own plain avg depth, m (water.c:439) */
+  varying vec3 vWcol;
+  varying vec2 vUvw;
+  varying float vW;          /* the noperspective (affine) unwrap weight */
+  varying float vBkt;         /* the prim's depthM — the C's painter-gate input */
+  uniform float uPsx;
+  uniform vec2 uPixScale;    /* (RT_W/320, RT_H/240) — the GTE grid */
+  void main() {
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    float depth = -mvPosition.z;
+    vec4 clip = projectionMatrix * mvPosition;
+    vBkt = shWb;
+    if (uPsx > 0.5 && clip.w > 0.0) {
+      /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
+         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
+      vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
+                         (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 240.0 * uPixScale.y);
+      screen = floor(screen / uPixScale) * uPixScale;
+      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
+                      1.0 - screen.y / (240.0 * uPixScale.y) * 2.0);
+      /* the water prim's own PLAIN avg depth (shWb) — the C's painter gate
+         input (fog_poc.c:11214-11215: skip only when opaque geometry is
+         strictly NEARER; ties draw). The GL depth TEST is OFF (the room's
+         bucketed/mixed-w PSX depth is NOT the C's fb->z reference — see the
+         WATER_FRAG gate); the z below only keeps the clip volume valid. */
+      float zclip = projectionMatrix[2].z * (-shWb) + projectionMatrix[3].z;
+      gl_Position = vec4(ndc * shWb, zclip, shWb);
+      /* the PSX AFFINE varyings (the w cancels — screen-space linear) */
+      vWcol = shWcol * shWb;
+      vUvw = uv * shWb;
+      vW = shWb;
+    } else {
+      gl_Position = clip;
+      vWcol = shWcol; vUvw = uv; vW = 1.0;
+    }
+  }`;
+const WATER_FRAG = `
+  uniform sampler2D map;
+  /* v39.1 THE C's PAINTER GATE (fog_poc.c:11214-11215 / water.c:439):
+   *   skip the fragment iff the room's covering depth is STRICTLY nearer
+   *   than the prim's own plain average depth (ties draw — the coplanar
+   *   ditch-bed strip rides ON its bed exactly like the engine's OT
+   *   (z+0x100)>>3 bucket under-draw). The reference = the room's TRUE
+   *   perspective-correct per-pixel view depth (the wfDepthRT pass —
+   *   16-bit RG, meters, clear 64m = the C's fb->z 1e30 "no data").
+   * The GL depth TEST is OFF: the app's own room depth carries the v5
+   * OT-bucket snap + the mixed-w PSX construction (big quads with
+   * behind-camera vertices rasterize affine-warped NEAR depths over the
+   * ditch window), which the C's raster NEVER writes to fb->z — the
+   * C marks behind-camera triangles offscreen and skips them
+   * (fog_poc.c:8096-8098). Comparing against it rejected ~the whole
+   * strip (1 px A/B vs the C's 1184). */
+  uniform sampler2D uRoomDepth;
+  uniform vec2 uRtSize;      /* the faithful RT's size — the depth pass's own */
+  varying vec3 vWcol;
+  varying vec2 vUvw;
+  varying float vW;
+  varying float vBkt;
+  void main() {
+    /* the C gate: if (depthM > 0 && fb->z[pi] < depthM) continue; */
+    if (vBkt > 0.0) {
+      vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
+      float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
+      if (roomD < vBkt) discard;
+    }
+    float iw = 1.0 / vW;          /* unwrap the affine (PSX) varyings */
+    vec2 uvf = vUvw * iw;
+    vec3 primf = vWcol * iw;       /* the affine Gouraud corners */
+    vec4 texel = texture2D(map, uvf);
+    if (texel.a < 0.5) discard;    /* the PS1 0x0000 hole ((tc&0x7FFF)==0) */
+    /* the setRGB0 modulation (water.c:436/688-691): F5 = min(31, texel5*prim>>7);
+       the ABR-1 additive output repl5(F5) — the blend adds it (ONE/ONE) */
+    vec3 t5 = floor(texel.rgb * 255.0 / 8.0 + 0.5);
+    vec3 f5 = min(vec3(31.0), floor(t5 * primf / 128.0));
+    gl_FragColor = vec4(floor(f5 * 255.0 / 31.0 + 0.5) / 255.0, 1.0);
+  }`;
+
+/* the preallocated quad buffers (WF_MAX_QUADS covers the worst case:
+ * 3 segments x 15 strip quads + 16 droplets = 61) — decode/draw per frame,
+ * zero per-frame allocations */
+const WF_MAX_QUADS = 96;
+const wfPos = new Float32Array(WF_MAX_QUADS * 4 * 3);
+const wfCol = new Float32Array(WF_MAX_QUADS * 4 * 3);
+const wfUv = new Float32Array(WF_MAX_QUADS * 4 * 2);
+const wfBkt = new Float32Array(WF_MAX_QUADS * 4);
+const wfIdx = new Uint16Array(WF_MAX_QUADS * 6);
+let wfQuads = 0;
+let wfMesh = null, wfMat = null;
+let _wfMvp = null;     /* the scratch mat4 — created with the mesh */
+let _wfFwdV = null;    /* the scratch Vector3 — created with the mesh */
+const _wfUvC = new Float32Array(8);   /* the per-corner atlas UV scratch */
+
+/* build/cache the 128x256 RGBA atlas for one sheet (row v 0..127 = the
+ * clut row 0 decode, v 128..255 = row 1 — the 2 bank decode of
+ * fog_poc.c:1809-1825). Cached ON the sheet object. */
+function sh1xWaterAtlas(sheet) {
+  if (sheet._atlasTex) return sheet._atlasTex;
+  const repl5 = v => (v << 3) | (v >> 2);
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 256;
+  const ctx2 = cv.getContext('2d');
+  const img = ctx2.createImageData(128, 256);
+  for (let row = 0; row < 2; row++) {
+    for (let v = 0; v < 128; v++) {
+      for (let u = 0; u < 128; u++) {
+        const entry = sheet.clut[row * 16 + sheet.idx[v * 128 + u]];
+        const o = ((row * 128 + v) * 128 + u) * 4;
+        if ((entry & 0x7FFF) === 0) { img.data[o + 3] = 0; continue; }  /* hole */
+        img.data[o] = repl5(entry & 31);
+        img.data[o + 1] = repl5((entry >> 5) & 31);
+        img.data[o + 2] = repl5((entry >> 10) & 31);
+        img.data[o + 3] = 255;
+      }
+    }
+  }
+  ctx2.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.flipY = false;    /* v = canvas y directly */
+  sheet._atlasTex = tex;
+  return tex;
+}
+
+/* the C's fx_blit_wsheet_ft4/gt4 sink — one quad into the buffers.
+ * cols = the per-corner brightness array (GT4 Gouraud) or the flat prim
+ * (FT4); the corner order = the POLY_FT4/GT4's (u spans corner0->corner1,
+ * v corner0->corner2); the indices split on the PSX 1-2 diagonal
+ * (v0,v1,v2)+(v1,v3,v2). */
+function wfEmitQuad(wx, wy, wz, clutRow, u0, v0, u1, v1, cols, depthM) {
+  if (wfQuads >= WF_MAX_QUADS) return;
+  const b = wfQuads * 4;
+  /* the prim's own PLAIN average depth — the C's painter gate input
+   * (fog_poc.c:11214-11215: `fb->z[pi] < depthM -> skip` — occluded only
+   * by opaque geometry strictly NEARER than the prim; ties draw — the
+   * coplanar ditch-bed strip rides ON its bed like the engine's OT
+   * (z+0x100)>>3 bucket under-draw). The GL depth test is OFF (see
+   * WATER_FRAG): the comparison reference is the wfDepthRT true-depth
+   * pass, NOT the room's v5 bucketed GL depth. */
+  const bkt = Math.max(depthM, 0);
+  const U0 = u0 / 128, U1 = u1 / 128;
+  const V0 = (clutRow * 128 + v0) / 256, V1 = (clutRow * 128 + v1) / 256;
+  const uvC = _wfUvC;   /* corner order: (U0,V0)(U1,V0)(U0,V1)(U1,V1) */
+  uvC[0] = U0; uvC[1] = V0; uvC[2] = U1; uvC[3] = V0;
+  uvC[4] = U0; uvC[5] = V1; uvC[6] = U1; uvC[7] = V1;
+  const flat = (typeof cols !== 'object');
+  for (let c = 0; c < 4; c++) {
+    const p = (b + c) * 3, uvi = (b + c) * 2;
+    wfPos[p] = wx[c]; wfPos[p + 1] = wy[c]; wfPos[p + 2] = wz[c];
+    const cc = flat ? cols : cols[c];
+    wfCol[p] = cc; wfCol[p + 1] = cc; wfCol[p + 2] = cc;   /* cr=cg=cb */
+    wfUv[uvi] = uvC[c * 2]; wfUv[uvi + 1] = uvC[c * 2 + 1];
+    wfBkt[b + c] = bkt;
+  }
+  const ii = wfQuads * 6, i0 = b;
+  wfIdx[ii] = i0; wfIdx[ii + 1] = i0 + 1; wfIdx[ii + 2] = i0 + 2;
+  wfIdx[ii + 3] = i0 + 1; wfIdx[ii + 4] = i0 + 3; wfIdx[ii + 5] = i0 + 2;
+  wfQuads++;
+}
+/* the ctx sinks (the C blit signatures — world positions instead of the
+ * CPU-raster screen coords; the GPU path projects them itself) */
+const wfSinkGT4 = function (wx, wy, wz, clutRow, u0, v0, u1, v1, cr, depthM) {
+  wfEmitQuad(wx, wy, wz, clutRow, u0, v0, u1, v1, cr, depthM);
+};
+const wfSinkFT4 = function (wx, wy, wz, clutRow, u0, v0, u1, v1, prim, depthM) {
+  wfEmitQuad(wx, wy, wz, clutRow, u0, v0, u1, v1, prim, depthM);
+};
+
+/* create the additive water mesh (once, at boot) + register it with SHView */
+function sh1xWaterEnsureMesh() {
+  if (wfMesh) return wfMesh;
+  _wfMvp = new THREE.Matrix4();
+  _wfFwdV = new THREE.Vector3();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(wfPos, 3));
+  geo.setAttribute('shWcol', new THREE.BufferAttribute(wfCol, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(wfUv, 2));
+  geo.setAttribute('shWb', new THREE.BufferAttribute(wfBkt, 1));
+  geo.setIndex(new THREE.BufferAttribute(wfIdx, 1));
+  geo.setDrawRange(0, 0);
+  wfMat = new THREE.ShaderMaterial({
+    vertexShader: WATER_VERT, fragmentShader: WATER_FRAG,
+    uniforms: {
+      map: { value: null },
+      uRoomDepth: { value: null },
+      uRtSize: { value: new THREE.Vector2(
+        (window.SHView ? window.SHView.V.RT_W : 640),
+        (window.SHView ? window.SHView.V.RT_H : 360)) },
+      uPsx: { value: 1 },
+      uPixScale: { value: new THREE.Vector2(
+        (window.SHView ? window.SHView.V.RT_W : 640) / 320,
+        (window.SHView ? window.SHView.V.RT_H : 360) / 240) }
+    },
+    /* TPAGE-45 ABR-1: additive, occluded by nearer opaque geometry (the
+     * C's fb->z depthM gate — implemented as the WATER_FRAG's sampled
+     * true-depth discard); the GL depth TEST is OFF (the app's room depth
+     * is the v5 bucketed/mixed-w PSX construction — NOT the C's fb->z
+     * reference), depthWrite off (the PSX has no depth buffer; the C's
+     * water blits never write fb->z) */
+    transparent: true, depthWrite: false, depthTest: false,
+    blending: THREE.AdditiveBlending
+  });
+  wfMesh = new THREE.Mesh(geo, wfMat);
+  wfMesh.frustumCulled = false;
+  wfMesh.visible = false;
+  wfMesh.renderOrder = 20;   /* the sprites' additive FX pass */
+  scene.add(wfMesh);
+  return wfMesh;
+}
+
+/* the tick's camera proxy — the ACTIVE TRACK camera pose (the player
+ * stand-in, the waterRipple precedent): engine/glTF meters. */
+function sh1xWaterCamPose(t) {
+  const tr = playTarget() || selTrack();
+  if (!tr) return null;
+  const ev = evalTrack(tr, t);
+  return { x: ev.pos[0], y: ev.pos[1], z: ev.pos[2] };
+}
+
+/* v39.1 THE ROOM TRUE-DEPTH REFERENCE PASS — the C's water gate
+ * (fog_poc.c:11214-11215 `fb->z[pi] < depthM -> skip`) compares the prim's
+ * plain avg depth against the room's covering depth. The C's fb->z holds
+ * the room raster's own depth (the GTE vertex depths, behind-camera
+ * triangles SKIPPED — fog_poc.c:8096-8098). The app's faithful room render
+ * writes GL depth through the v5 OT-bucket snap + the mixed-w PSX
+ * construction — big quads with behind-camera vertices rasterize
+ * affine-warped NEAR depths over the ditch window, rejecting ~the whole
+ * strip (the measured 1-px A/B vs the C's 1184 with the same camera).
+ * The reference here is therefore a SEPARATE depth-only pass with a plain
+ * perspective-correct material (the TRUE per-pixel view depth, meters,
+ * 16-bit RG over 0..64m, cleared to 64m = the C's fb->z 1e30 no-data).
+ * The engine's own OT semantics are unchanged — the water still under-
+ * draws the coplanar ditch bed only where the bed is genuinely nearer. */
+let wfDepthRT = null, wfDepthMat = null;
+const WF_DEPTH_VERT = `
+  varying float vViewZ;
+  void main() {
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vViewZ = -mvPosition.z;
+    gl_Position = projectionMatrix * mvPosition;
+  }`;
+const WF_DEPTH_FRAG = `
+  varying float vViewZ;
+  void main() {
+    /* 16-bit RG pack of the TRUE view depth over 0..64 m (1 mm steps):
+     *   R = floor(v*255)/255, G = fract(v*255) — the WATER_FRAG decodes
+     *   (R*255 + G)/255 * 64. The clear (1,1) = 64.25 m = no data. */
+    float v = clamp(vViewZ, 0.0, 64.0) / 64.0;
+    float q = v * 255.0;
+    gl_FragColor = vec4(floor(q) / 255.0, fract(q), 0.0, 1.0);
+  }`;
+function sh1xWaterDepthPass(SV) {
+  const V = SV.V;
+  const r = V.renderer;
+  if (!wfDepthRT || wfDepthRT.width !== V.RT_W || wfDepthRT.height !== V.RT_H) {
+    if (wfDepthRT) wfDepthRT.dispose();
+    wfDepthRT = new THREE.WebGLRenderTarget(V.RT_W, V.RT_H, {
+      depthBuffer: true, stencilBuffer: false });
+    wfDepthRT.texture.magFilter = THREE.NearestFilter;
+    wfDepthRT.texture.minFilter = THREE.NearestFilter;
+    wfDepthRT.texture.generateMipmaps = false;
+  }
+  if (!wfDepthMat) {
+    wfDepthMat = new THREE.ShaderMaterial({
+      vertexShader: WF_DEPTH_VERT, fragmentShader: WF_DEPTH_FRAG,
+      /* v39.2 THE SIDE FIX — FrontSide, NOT DoubleSide. The reference
+       * this pass produces is the C engine's fb->z (fog_poc.c:11214
+       * `fb->z[pi] < depthM -> skip`), and the C's fb->z is written ONLY
+       * by quads the ENGINE actually draws: Gfx_MeshDraw's per-quad
+       * gte_nclip test culls back-facing quads BEFORE the raster, so the
+       * ditch bed's DOWN-facing underside (N_BACK2_0's bottom plane at
+         * y=-0.32, ~1.3m from the below-ground ditch camera) never
+       * rasterizes and never writes fb->z there. MEASURED on the C
+       * (FOGPOC_ZDBG probe at the stream's A/B bbox, the same ditch
+       * camera): fb->z = 3.1m (the far bank N_BACK2) across the whole
+       * stream window, 1.3m ONLY at the right edge — the water's own
+       * avg depths (1.5..2.8m) all pass the gate -> the strip draws
+       * (the C's 1183-px A/B). With DoubleSide here the bed's underside
+       * wrote ~1.3m over the ENTIRE window and rejected ~the whole
+       * strip (the measured 1-px A/B). The faithful shMats stay
+       * DoubleSide (the converter emits either triangle order — the
+       * C raster_tri's both-windings note covers the WINDING, not the
+       * facing); the depth reference mirrors the C's culled-draw
+       * semantics instead. */
+      side: THREE.FrontSide,
+      depthTest: true, depthWrite: true
+    });
+  }
+  /* render the ACTIVE room (the model's own posed scene — the hook runs
+   * after applySh1xPropAnims, the same frame's poses) with everything
+   * else hidden, into the depth RT */
+  const rec = three.loaded.get(state.activeFile);
+  const root = rec && rec.scene;
+  if (!root) return;
+  const hidden = [];
+  for (const c of scene.children) {
+    if (c !== root && c.visible) { hidden.push(c); c.visible = false; }
+  }
+  const prevOverride = scene.overrideMaterial;
+  const prevAutoClear = r.autoClear;
+  const prevRT = r.getRenderTarget();
+  if (!_wfPrevCol) _wfPrevCol = new THREE.Color();
+  if (!_wfPrevClear) _wfPrevClear = new THREE.Color();
+  /* v39.2: getClearColor(target) RETURNS the target object — aliasing the
+   * saved color with the scratch that setClearColor(white) then mutates
+   * leaked WHITE as the renderer's clear color after every water frame
+   * (the restore below would set the mutated white). Save a COPY. */
+  const prevClear = r.getClearColor(_wfPrevClear).clone();
+  scene.overrideMaterial = wfDepthMat;
+  r.autoClear = true;
+  r.setRenderTarget(wfDepthRT);
+  r.setClearColor(_wfPrevCol.setRGB(1, 1, 1), 1);
+  r.clear(true, true, true);
+  r.render(scene, V.rtCam);
+  scene.overrideMaterial = prevOverride;
+  r.setRenderTarget(prevRT);
+  r.setClearColor(prevClear, 1);
+  r.autoClear = prevAutoClear;
+  for (const c of hidden) c.visible = true;
+  if (wfMat.uniforms.uRoomDepth.value !== wfDepthRT.texture)
+    wfMat.uniforms.uRoomDepth.value = wfDepthRT.texture;
+}
+let _wfPrevCol = null, _wfPrevClear = null;   /* THREE.Colors — created lazily (THREE loads at initThree) */
+
+/* THE per-frame water FX update — the SHView.syncAndDraw hook. Builds the
+ * ctx from the RT camera (the faithful view's own eval) + the live ShEnv,
+ * runs the VERBATIM draw over the driver state and fills the quad buffers. */
+function sh1xWaterFxUpdate() {
+  const SV = window.SHView;
+  if (!SV || !SV.V.ready) return;
+  if (!wfMesh) { sh1xWaterEnsureMesh(); SV.setWaterFx(wfMesh, sh1xWaterFxUpdate); }
+  wfQuads = 0;
+  let drew = 0;
+  if (wfWaterOn) {
+    const rec = three.loaded.get(state.activeFile);
+    if (rec && rec.sh1xSt && rec.sh1xSt.anims.length) {
+      const S = rec.sh1xSt;
+      /* the sheet: the GLB's waterTex EXTRAs, else the compiled-in default */
+      const sheet = rec.sh1xWaterTex || sh1xWaterTexDefault();
+      const tex = sheet ? sh1xWaterAtlas(sheet) : null;
+      if (tex && tex !== wfMat.uniforms.map.value) wfMat.uniforms.map.value = tex;
+      wfMat.uniforms.uPsx.value = SV.V.psxWobble ? 1 : 0;
+      wfMat.uniforms.uRtSize.value.set(SV.V.RT_W, SV.V.RT_H);
+      /* the ctx: the RT camera's OWN projection (the same pipeline the floor
+       * geometry renders through — sh1xWsprProject's mvp/view contract) */
+      const rtCam = SV.V.rtCam;
+      _wfMvp.multiplyMatrices(rtCam.projectionMatrix, rtCam.matrixWorldInverse);
+      rtCam.getWorldDirection(_wfFwdV);
+      const envL = SV.V.env;
+      const ctx = {
+        mvpE: _wfMvp.elements, viewE: rtCam.matrixWorldInverse.elements,
+        fbW: SV.V.RT_W, fbH: SV.V.RT_H,
+        /* the vertical branch's vwGetViewAngle analog (cam_yaw_deg,
+         * fog_poc.c:11366-11372: atan2(fwd.x, fwd.z) in degrees) */
+        camYawDeg: Math.atan2(_wfFwdV.x, _wfFwdV.z) * (180 / Math.PI),
+        /* the ShEnv light subset (pos/dir in glTF Q12 = the C's ENGINE frame;
+         * intensity = the blended spot) */
+        env: {
+          pos: envL.light.pos, dir: envL.light.dir,
+          intensity: envL.light.intensity,
+          field0: envL.field_0, field20: envL.field_20, field3: envL.field_3
+        },
+        emitGT4: wfSinkGT4,
+        emitFT4: wfSinkFT4
+      };
+      for (const a of S.anims) {
+        if (a.driver !== 22) continue;
+        sh1xSchoolWaterDraw(S, a, ctx);   /* water.c:109-711 VERBATIM */
+      }
+      drew = wfQuads;
+      if (drew > 0) {
+        const geo = wfMesh.geometry;
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.shWcol.needsUpdate = true;
+        geo.attributes.uv.needsUpdate = true;
+        geo.attributes.shWb.needsUpdate = true;
+        geo.index.needsUpdate = true;
+        geo.setDrawRange(0, drew * 6);
+        /* the C's painter-gate reference: the room's TRUE depth pass (the
+         * RT camera's own frame — the water frags sample it by pixel) */
+        sh1xWaterDepthPass(SV);
+      }
+    }
+  }
+  if (wfMesh) wfMesh.visible = drew > 0;
+}
+
 function applySh1xPropAnims(t) {
   const rec = three.loaded.get(state.activeFile);
   if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) {
@@ -8890,7 +10078,18 @@ function applySh1xPropAnims(t) {
   if (want > SH1X_MAX_STEPS) want = SH1X_MAX_STEPS;
   if (want < rec.sh1xSt.steps) sh1xDriverReset(rec);   /* seek back: re-run from t=0 */
   const S = rec.sh1xSt;
-  while (S.steps < want) { sh1xDriverTick(S, 1 / 30); S.steps++; }  /* the 30Hz grid */
+  /* v39: the school waterfall tick — the C engine calls sh1x_waterfall_tick
+   * next to sh1x_anims_tick at every FIRED 30Hz tick (fog_poc.c:13977,
+   * 16797: the PLAYER_IN_MAP_CHUNK camera-proxy gate needs the cam). The
+   * camera = the ACTIVE TRACK camera pose (evalTrack at the same t — the
+   * editor's player stand-in, the waterRipple precedent); the session clock
+   * = this grid's tick time (the wfLastT dt discipline, clamped 0.1). */
+  const wfCam = sh1xWaterCamPose(t);
+  while (S.steps < want) {
+    sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
+    sh1xWaterfallTick(S, wfCam, (S.steps + 1) / 30);
+    S.steps++;
+  }
   S.lastT = t;
   /* apply the live pose per bound NODE (all its primitive items share the
    * bind group's animIdx/animInst — one pose per node) */
@@ -9983,6 +11182,13 @@ window.__camtrack = {
     if (!rec || !rec.sh1xSt) return null;
     return sh1xDriverDebugState(rec.sh1xSt);
   },
+  /* v39: the school-water kill switch (FOGPOC_NOWATER's analog — the A/B
+   * diff toggle; also the ?water=0 URL boot param) */
+  get waterOn() { return wfWaterOn; },
+  setWaterOn(on) { wfWaterOn = !!on; },
+  /* v39: the live school-water draw counter (the observable for the
+   * verification — the quad count the last faithful frame drew) */
+  get waterQuads() { return wfQuads; },
   /* v13.5 (T7): the user-light gizmo debug state (automation surface) */
   lightGizmoInfo() {
     const m = activeModel();
@@ -10316,6 +11522,11 @@ const EMBED = {
       three: THREE, renderer, scene, pipCam,
       overlays: [camBody, trackRoot, gizmoRoot, gridGroup]
     });
+    /* v39: the school-water FX — the additive-quad mesh + the per-frame
+     * draw hook (created once; SHView calls it from syncAndDraw after the
+     * per-vertex pass and restores visible=false after the RT render) */
+    sh1xWaterEnsureMesh();
+    window.SHView.setWaterFx(wfMesh, sh1xWaterFxUpdate);
     window.SHUI.init({
       getActiveModel: () => activeModel(),
       /* v13.5 (T7): the room-original env derivation for the ACTIVE model
