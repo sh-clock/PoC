@@ -11022,6 +11022,31 @@ static void fx_water_scroll_sync(const Sh1x *sx, const ShEnv *env,
             wz -= Z.z * extraAhead;
         }
     }
+    /* GATE 2 (v40 audit A-F3; lens_flare.c:59-76 + the PoC's own fx_pass
+     * 10333/10465): the flare branch's `scr_l_pos.vz <= proj/2` early
+     * `return` skips the WHOLE water branch — func_8008E5B4 and its
+     * D_800AFDAC++ never run in that state. flare_inhibit_f set bypasses
+     * the entire first block (the gate does not apply then). The tick
+     * previously advanced the counter on Gate-1 + zone-hit only, so the
+     * DR floor scrolled while the glint was gated off — an engine-
+     * impossible state. Same projection as fx_pass: proj =
+     * ReadGeomScreen() = 240, the gate vz > 120 Q8 (0.47m ahead).
+     * NOTE (maintainer decision flagged in the PR): the default
+     * camera-mounted light (anchor 0.32m) FAILS this gate — the engine's
+     * Harry light passes because the trailing/fixed camera sits 2-5m
+     * behind it. With this verbatim gate, camera-mounted-light scenes
+     * freeze the floor scroll (engine-true for that geometry);
+     * --userlight ahead:D restores the engine's trailing-camera
+     * geometry and the scroll. */
+    if (!g_flaresys.flareInhibit) {
+        mat4 view = mat4_view_from_quat(cam->pos, cam->q);
+        float vz = view.m[2] * wx + view.m[6] * wy + view.m[10] * wz +
+                   view.m[14];
+        float d = -vz;                       /* forward depth            */
+        if (!(d > 0.05f) || !((int)(d * 256.0f) > 120))
+            return;                          /* lens_flare.c:73-75      */
+    }
+    if (g_flaresys.waterInhibit) return;     /* lens_flare.c:78          */
     /* the zone test (LensFlare_WaterZoneGet on the LIGHT position):
      * engine x = glTF x; engine z = -glTF z (meters) */
     for (int zi = 0; zi < sx->nWaterZones; zi++) {
