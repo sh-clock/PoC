@@ -5959,7 +5959,12 @@ function sanitizeTrack(raw) {
     tr.lookAt = vec3(raw.lookAt, tr.center.slice());
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
   } else {
-    tr.position = vec3(raw.position, [0, 1, 0]);
+    /* v40 audit (B-B10): the C parser's default is {1,1,0} (fog_poc.c:3305
+     * `if (!jvec3(raw, "position", p)) { p[0] = 1; p[1] = 1; p[2] = 0; }`)
+     * — the old [0,1,0] was the only default mismatch in the field-by-
+     * field diff: a hand-edited fixed track without a position rendered
+     * 1m apart between editor preview and engine. */
+    tr.position = vec3(raw.position, [1, 1, 0]);
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
     tr.yawSpeedDegS = num(raw.yawSpeedDegS, 0);
     tr.pitchSpeedDegS = num(raw.pitchSpeedDegS, 0);
