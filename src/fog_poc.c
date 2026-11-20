@@ -1801,7 +1801,17 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
             sx->hasWaterFloorClut = 1;
             for (int k = 0; k < 16; k++) {
                 const JValue *cv = jat(cl, k);
-                if (cv) sx->waterFloorClut[k] = (unsigned short)((int)cv->num & 0x7FFF);
+                /* v40 audit (D-F2): keep the FULL 16 bits — the ripper
+                 * emits the CLUT entry VERBATIM (& 0xFFFF, ipd2gltf.py
+                 * _room_water_floor) and the consumer's own floor builder
+                 * (g_waterFloorTex alpha classes) reads c & 0x8000 to
+                 * pick ABR-1 additive (alpha 255) vs opaque (alpha 127).
+                 * The old & 0x7FFF destroyed the STP bit, so every
+                 * STP-set palette entry (DR0100/DRFD00: ALL 16 entries,
+                 * e.g. 0x8421) classified as opaque-replace — the
+                 * engine's func_8008E4EC field_E=45 ABR-1 ADDITIVE
+                 * floor rendered wrong. */
+                if (cv) sx->waterFloorClut[k] = (unsigned short)((int)cv->num & 0xFFFF);
             }
         }
     }
