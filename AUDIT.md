@@ -646,3 +646,58 @@ configs byte-identical to v11 + verify.sh all-pass + VLM fog check).
 | bank-count clamp | `sh_particle_weather_tick` post-switch clamps | engine has NO clamp (latent overrun: D0B18(6) fields 40/5 -> temp*2 up to 600 > 300) | v12: verbatim math + lawful clamps (D10 documented) |
 | STP-hole veil | `raster_tri` AUDIT NOTE (behavior kept) | Gfx_MeshDraw:1157-1174 literal reading vs the v3 user-verified ground truth | analyzed + tested + REVERTED (+33 mean RGB; VLM: washed-out); v3 == ground truth per the task book |
 | v11 package goldens | `reference_shots/` regenerated | the shipped v11 set was not reproducible by the v11 binary (D11) | v12: full golden set regenerated from this binary; nightoff uses --no-flashlight |
+
+## V40 audit round (2026-11-20) — the QA fleet's verified findings + PR index
+
+Six-agent parallel audit fleet (A: water, B: camtrack, C: drivers/lighting,
+D: ripper/EXTRAs, E: dynamic stress, F: wallpaper sync) + a 4-agent targeted
+verification wave (V-a..V-d) + coordinator re-verification of every headline
+finding with runnable A/B repros. **21 confirmed bugs, 1 refuted false
+positive, 0 shipped false positives.** All fixes land as one-PR-per-bug on
+`audit-v40/*` branches (the user's PR-based reporting directive); the
+integration branch `v40-integration` carries all of them together with the
+full test battery green (3 self-test goldens byte-identical, camera parity
+30/30, roundtrip byte-identical, whole-map functional).
+
+| ID | Sev | Bug (one line) | PR |
+|----|-----|----------------|----|
+| A-F1 | MAJOR | glint blit: packed-nibble fetch on the UNPACKED DR_WAVE sheet = wrong half + forced index 0 on odd columns | #1 `audit-v40/fix-glint-texel-nibble` |
+| A-F3 | MINOR | scroll tick omits shLensFlareExec Gate-2 (scroll advanced in an engine-impossible state; NOTE: verbatim gate freezes camera-mounted-light floors — maintainer decision) | #3 |
+| A-F4 | MINOR | ripple mesh reads sprite 0's selector; the mesh's own RNG draw missing (stream off by one) | #4 |
+| A-F5 | MINOR | ripple sprite cull `((z+128)>>3)>=1024` vs engine `(z>>3)>=2048` (drops 31.5-64m sprites) | #5 |
+| A-F6 | MINOR | droplet backward taper leaks into vertical droplets (latent on shipped streams) | #6 |
+| B-B1 | MAJOR | `once` loopMode wrapped endlessly in the engine; the editor holds at the end pose | #7 |
+| B-B2 | MINOR | camtrack waterfall tick: one camera pose for all catch-up ticks vs the engine's per-tick poses | #20 |
+| B-B4 | MINOR | editor num()/vec3()/pair coerce where the engine's JV_NUM is strict (silent preview-vs-engine divergence) | #18 |
+| B-B5 | MINOR | editor exports models with `tracks: []` that make BOTH C consumers hard-fail (now warns) | #21 |
+| B-B9 | MINOR | authored `tileLen: 0` hangs the surface-scroll while loop (C + JS) | #8 |
+| B-B10 | MINOR | fixed-track position default `[0,1,0]` vs the C's `{1,1,0}` | #19 |
+| C-F1 | MAJOR | g_SysWork.lightIntensity multiply only in the enum-2 branch; the decomp applies it for EVERY light mode (effects.c:476) — the boiler-room Spot light never flickered | #9 |
+| C-F2 | MINOR | multi-shot reset lacks sh1x_anims_bind_invalidate (driver 9 zeroed live state on shots 2+) | #10 |
+| C-F3 | MINOR | live_save_final re-calls the water pair at the held tick time (save-final != shot on water rooms) | #11 |
+| D-F1 | CRITICAL | ripper TIM decode: opaque-branch transparency caught 0x8000 (STP-set black) — 12.5% of shipped packs affected; SwanStation: only exact 0x0000 | #14 |
+| D-F2 | CRITICAL | waterFloor clut15 parse `&0x7FFF` destroyed the STP bit the floor builder's own alpha classes need (DR0100/DRFD00 all-16-STP palettes rendered opaque-replace) | #2 |
+| D-F4 | MAJOR | `--whole-map` 100% broken since inception (NameError: map_rooms — a main() local) | #15 |
+| D-F5 | MAJOR(doc) | SH1X schema doc decoded texIdx/semiTransparent from b6; the decomp's bits1 union uses b7 (737/1310 HP0003 packs mis-bound per the doc) | #17 |
+| D-F6 | MINOR | tvPaint strip column base 48 vs 64 (VRAM 512+64*si - clut base 448) | #16 |
+| E-F1 | MAJOR | `--cam nan inf...` exited 0 with a flat frame + 8 UBSAN reports; `--t nan` hangs the realtime window | #12 |
+| E-F3 | MINOR | `--track -1` silently fell back to track 0 | #13 |
+| — | FIX | camera_audit_run.sh pointed at input/THRF9FD.glb (removed in v25) — the parity harness was dead | #22 `audit-v40/tools-camera-audit-path` |
+| F-F2/WP | CRITICAL | the wallpaper's `93a3aa0` "v39 engine sync" predated the PoC's v39-audit fixes by 96 minutes: ALL SIX draw-path corrections (A1-A6) + the A7 cleanup missing; LIVE on the shipped SUFFFE/SU0203 waterfall scenes | wallpaper#1 `audit-v40/v39-audit-sync` (verbatim port of 597f6ee) |
+
+**Refuted (no PR):** F-F10 "asset commits should bump MINOR not PATCH" — the
+CI's asset=PATCH bump matches the user's own worked example
+(`1.7.30 -> 1.7.31` = last-segment bump). The wording-vs-example ambiguity is
+the user's to adjudicate; no change made.
+
+**Follow-up observations (recorded, not PR'd — primary agent's judgment):**
+the shot path binds driver 9 after its fast-forward (a gravityScatter never
+visibly falls in `--shot` mode even after C-F2); the R-restart rebind re-seeds
+driver 9 from the fallen pose, not the authored heights; `engine_fog_80055A50`'s
+`(temp << 7)` is latent UB for negative OTZ; the wallpaper's `sh1_hw_render.c`
+GPU backends walk a pre-v24 render_frame (no propAnims/flare/water on the
+opt-in GPU path — default software backend unaffected); the committed
+`sh1.keystore` signs official CI releases (user's own repo, noted); the
+wallpaper engine twin still needs the other V40 engine fixes at the next sync
+(glint nibble, waterFloor STP, scroll Gate-2, ripple selector/depth,
+once-mode, lightFlicker — the PoC PRs #2-#13 are the canonical hunks).
