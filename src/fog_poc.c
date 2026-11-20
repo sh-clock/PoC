@@ -5664,12 +5664,13 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
          * — v27.2 (B-3): g_SysWork.lightIntensity is the lightFlicker
          * value when the boiler-room driver is LIVE (map1_s05.c:395:
          * g_SysWork.lightIntensity = Q12(1.35) + flicker; engine-fresh
-         * the driver is flag-129-gated and the multiplier stays 1.0). */
-        {
-            int flickerQ12 = (int)(g_sh1xLightFlicker * 4096.0f);
-            env->light.intensity =
-                (int)(((int64_t)lightWeight * flickerQ12) >> 12);
-        }
+         * the driver is flag-129-gated and the multiplier stays 1.0).
+         * v40 audit (C-F1): the multiply itself now lives BELOW the
+         * if/else — the decomp applies it for EVERY light mode
+         * (effects.c:476, unconditional), and the old placement here
+         * left the Spot/flashlight branch (the boiler room's own
+         * lightMode) without the flicker. */
+        env->light.intensity = lightWeight;
     } else {
     /* T7 (v35): the AUTHORED beam — sh_light_dir_from_rot (the verbatim
      * func_8003F4DC rot math) over the authored rot (CLI --userlightrot /
@@ -5728,6 +5729,21 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
         L->pos[0] = (int)(camPos.x * 4096.0f);
         L->pos[1] = (int)(camPos.y * 4096.0f);
         L->pos[2] = (int)(camPos.z * 4096.0f);
+    }
+
+    /* v40 audit (C-F1): the decomp's ONE multiply site — effects.c:476
+     *   lightIntensity = Q12_MULT(<the mode's light weight>, g_SysWork.lightIntensity)
+     * runs for EVERY light mode (None/Spot/Directional), AFTER
+     * func_8003F4DC produced the mode's weight. The enum-2 branch sets
+     * env->light.intensity = lightWeight above; the flashlight/authored
+     * branch carries the preset spotLightIntensity — this single shared
+     * multiply covers both. g_sh1xLightFlicker is 1.0 unless the room
+     * drives the lightFlicker driver (map1_s05 boiler room), so rooms
+     * without the driver are bit-identical. */
+    {
+        int flickerQ12 = (int)(g_sh1xLightFlicker * 4096.0f);
+        env->light.intensity = (int)(((int64_t)env->light.intensity *
+                                      flickerQ12) >> 12);
     }
 
     /* WorldEnv_LightTransform (identity world matrix):
