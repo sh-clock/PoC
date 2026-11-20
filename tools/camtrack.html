@@ -7600,7 +7600,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       const defSeg = [
         [-67174, 409, -209715, 6553, 1, 1024, 1638, 2048, 204, 1638, 2048, 204],
         [-60620, 409, -209715, 6553, 1, 3072, 1638, 2048, 204, 1638, 2048, 204],
-        [0, 409, 0, 0, 0, 0, 1638, 0, 0, 1638, 2048, 0]
+        [0, 409, 0, 0, 1, 0, 1638, 0, 0, 1638, 2048, 0],
+        /* ^horiz=1 (audit v39-A6): field_30==0 IS the horizontal
+         * branch — BSS-zero reads as horizontal, not vertical */
       ];
       for (let sg = 0; sg < 4; sg++) {
         const w = a.wfSeg[sg], d = defSeg[sg < 3 ? sg : 3 - 1];
@@ -7638,6 +7640,10 @@ function sh1xDriverInit(propAnims, header, opts) {
         a.wfDrops = sh1xJi(st, 'droplets', a.wfDrops);
         if (a.wfDrops > 16) a.wfDrops = 16;
         if (a.wfSegCount > 3) a.wfSegCount = 3;
+        if (a.wfSegCount < 1) a.wfSegCount = 1;  /* audit v39-A5: an
+                                          authored 0 would hit Rng%0
+                                          (the C's SIGFPE / the JS's NaN)
+                                          and OOB wfSeg reads */
       }
       a.wfHasStream = 1;
     }
@@ -8793,9 +8799,9 @@ function sh1xDriverDebugState(S) {
 
 /* ==================================================================== */
 /* v39: THE SCHOOL WATERFALL — water.c VERBATIM (the fog_poc.c v39 port
- * mirrored: sh_wf_spawn :9458, sh1x_waterfall_tick :9508,
- * sh_light_build_table :5118, sh_light_query_pos :5140, sh_div_ds :11374,
- * sh_wspr_project :11320, sh1x_school_water_draw :11380). All the
+ * mirrored: sh_wf_spawn :9463, sh1x_waterfall_tick :9513,
+ * sh_light_build_table :5123, sh_light_query_pos :5145, sh_div_ds :11373,
+ * sh_wspr_project :11319, sh1x_school_water_draw :11379). All the
  * positions/lengths are raw Q12 in the GAME frame (y-down); the draw
  * projects through ctx.mvpE/viewE — the viewer's OWN camera eval — and
  * emits quads to the ctx sinks (the GPU additive raster path).
@@ -8882,7 +8888,7 @@ function sh1xWaterTexDefault() {
   return _sh1xWaterDef;
 }
 
-/* fog_poc.c:9458 sh_wf_spawn — water.c:20-68 VERBATIM (the droplet
+/* fog_poc.c:9463 sh_wf_spawn — water.c:20-68 VERBATIM (the droplet
  * spawn/respawn; arg1=2 the initial spawn — a RANDOM segment + the
  * scatter along the heading; arg1=3 the respawn at segment arg2, NO
  * scatter). The engine stores the segment in wfSel>>2 (field_C.s_1.field_0),
@@ -8922,7 +8928,7 @@ function sh1xWfSpawn(S, a, q, arg1, arg2) {
   a.wfAlive[q] = 1;
 }
 
-/* fog_poc.c:9508 sh1x_waterfall_tick — the school waterfall per-tick, the
+/* fog_poc.c:9513 sh1x_waterfall_tick — the school waterfall per-tick, the
  * PLAYER_IN_MAP_CHUNK(-1,-2) camera-proxy gate (map1_s02.c:1537-1562:
  * spawn on entering the chunk with the drain flag set — a.gated carries the
  * eventGate 113 state, the editor's animsDemo previews it SET; despawn on
@@ -9019,7 +9025,7 @@ function sh1xWaterfallTick(S, cam, sessionT) {
   }
 }
 
-/* fog_poc.c:11374 sh_div_ds — DuckStation's signed DIV-by-zero semantics
+/* fog_poc.c:11373 sh_div_ds — DuckStation's signed DIV-by-zero semantics
  * (cpu_core.cpp:745-751: LO = (num >= 0) ? -1 : 1) covering water.c:229's
  * 0/0 (the terminator len 0) — used by the last-segment taper divisions. */
 function sh1xDivDs(num, denom) {
@@ -9028,7 +9034,7 @@ function sh1xDivDs(num, denom) {
   return Math.trunc(num / denom);
 }
 
-/* func_80055648 — the axis-falloff light table (fog_poc.c:5118-5135,
+/* func_80055648 — the axis-falloff light table (fog_poc.c:5123-5140,
  * VERBATIM; used by func_80055D78 position queries — characters/effects in
  * the engine). The table consumes the ENGINE-frame (y-down) direction
  * components — the caller flips y/z of the glTF-space dir (fog_poc.c:5689-
@@ -9050,7 +9056,7 @@ function sh1xLightBuildTable(tbl, dir, intensity) {
   }
 }
 
-/* func_80055D78 — the position-query light value (fog_poc.c:5140-5172
+/* func_80055D78 — the position-query light value (fog_poc.c:5145-5177
  * VERBATIM; GAME-frame Q12 positions — the engine stores L->pos in the
  * ENGINE frame so the query negates its y/z HERE, fog_poc.c:5151-5153).
  * env = { pos: [3] Q12 glTF, field0, field20, field3 } (the ShEnv subset).
@@ -9079,7 +9085,7 @@ function sh1xLightQueryPos(tbl, env, posX, posY, posZ) {
   return var_a3;
 }
 
-/* fog_poc.c:11320 sh_wspr_project — one school-water world point through
+/* fog_poc.c:11319 sh_wspr_project — one school-water world point through
  * the viewer's OWN camera eval (ctx.mvpE/ctx.viewE — 16-element column-major
  * mat4 `elements`, the SAME projection the room geometry renders through,
  * so the water composites over the floor) -> NDC -> the RT framebuffer.
@@ -9115,7 +9121,7 @@ const _wfLt = [
 ];
 const _wfDirEng = [0, 0, 0];
 
-/* fog_poc.c:11380 sh1x_school_water_draw — water.c:109-444 (the droplet
+/* fog_poc.c:11379 sh1x_school_water_draw — water.c:109-444 (the droplet
  * quads) + 446-711 (the stream surface strips), VERBATIM. ctx = the viewer
  * render context:
  *   mvpE / viewE : the viewer camera's own projection (16-element
@@ -9123,9 +9129,10 @@ const _wfDirEng = [0, 0, 0];
  *                   geometry renders through);
  *   fbW / fbH     : the faithful render target size (the engine framebuffer);
  *   camYawDeg     : the vertical branch's view angle (vwGetViewAngle's vy —
- *                   cam_yaw_deg fog_poc.c:11366-11372; only map1_s03's
- *                   vertical stream strips use it — dead for the school's
- *                   horizontal data);
+ *                   cam_yaw_deg fog_poc.c:11365-11371; map1_s03's vertical
+ *                   stream strips AND the vertical falling-droplet EC/FC
+ *                   cross pair (env_effects.c:505-510, audit v39-A4) use
+ *                   it — dead for the school's all-horizontal data);
  *   env           : { pos: [3] Q12 glTF, dir: [3] Q12 glTF, intensity,
  *                     field0, field20, field3 } (the ShEnv light subset);
  *   emitGT4 / emitFT4 : the rasterizer sinks (the C's fx_blit_wsheet_gt4 /
@@ -9235,14 +9242,17 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
             }
           }
           if (sgi > 0 && sg.horiz && a.wfSeg[sgi - 1].horiz) {
+            /* water.c:602-618 VERBATIM (audit v39-A1: no rampHalf,
+             * no abs — the OLD rampHalf-|vs2| form inverted the ±
+             * branch, dropped the k=0 sign flip AND invented the
+             * rampHalf term, producing a spurious row-0 fade pumping
+             * with the scroll period on the default data).          */
             let vs2 = sh1xMulSh(a.wfSeg[sgi - 1].spread,
                     sh1xSinQ12(a.wfSeg[sgi - 1].heading - sg.heading), 12);
             if (k === 0) vs2 = -vs2;
-            const vs1 = sg.rampHalf - (vs2 < 0 ? -vs2 : vs2);
-            if (var_s4 < vs1) {
+            if (var_s4 < vs2)
               _wfRowsB[j][k] = sh1xMulSh(
-                sh1xDivT(var_s4 << 12, vs1 ? vs1 : 1), _wfRowsB[j][k], 12);
-            }
+                sh1xDivT(var_s4 << 12, vs2 ? vs2 : 1), _wfRowsB[j][k], 12);
           }
           _wfRowsX[j][k] = var_fp;
           _wfRowsYm[j][k] = sp18;
@@ -9295,15 +9305,16 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
           _wfSX[c] = _wfP3[0]; _wfSY[c] = _wfP3[1]; _wfZQ[c] = _wfP3[2];
         }
         if (!vis) continue;
+        /* audit v39-A3: water.c:657-700 addPrims EVERY strip quad
+         * unconditionally (the GPU clips) — the invented avgZ/corner
+         * culls are removed; the blit clips to the framebuffer itself. */
         const avgZ = (_wfZQ[0] + _wfZQ[1] + _wfZQ[2] + _wfZQ[3]) * 0.25;
-        if (avgZ <= 0 || avgZ * 256 >= 16384) continue;
-        if (Math.abs(_wfSX[3] - ctx.fbW * 0.5) > cullX) continue;
-        if (Math.abs(_wfSY[3] - ctx.fbH * 0.5) > cullY) continue;
         _wfCr[0] = _wfRowsB[k][0]; _wfCr[1] = _wfRowsB[k][1];
         _wfCr[2] = _wfRowsB[k + 1][0]; _wfCr[3] = _wfRowsB[k + 1][1];
         /* clut ROW 1 (the 0x4E word); strip tile u 64..95; the sliding
-         * leading window v [127-t, 127] (k=0) / body v 64..127; the sink's
-         * own depth gate = the prim's plain avg depth (fog_poc.c:11746-11753) */
+         * leading window v [127-t, 127] (k=0) / body v 64..127; the
+         * sink's own depth gate = the prim's plain avg depth (the v37
+         * water-family gate) */
         ctx.emitGT4(_wfWX, _wfWY, _wfWZ, 1, 64, vNear, 95, vNear + vSpan,
                    _wfCr, avgZ);
       }
@@ -9320,6 +9331,7 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
     const along = a.wfAlong[q];
     let v17C = 0, v17D = 63, f174 = sg.y, f176 = sg.y;
     let var_s3 = 4096;
+    let f180V = 0, f16CV = 0;   /* the vertical branch (water.c:369-370) */
     if (sg.horiz) {
       if (along < sg.rampHalf) {
         var_s3 = (sg.rampHalf !== 0)
@@ -9348,6 +9360,9 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
         f176 = sg.y + sh1xDivT((a.wfSeg[idx0 + 1].y - sg.y) * along, dl);
       }
     } else {
+      /* water.c:344-367 — the vertical fall's v-window (the same
+       * ramp band; no height interps — the LIVE vy carries the
+       * descent, water.c:374-391)                              */
       if (along < sg.rampHalf) {
         var_s3 = (sg.rampHalf !== 0)
           ? sh1xDivT(along << 12, sg.rampHalf) : 0;
@@ -9363,8 +9378,13 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
         v17C = 0;
         v17D = 63;
       }
+      /* water.c:369-370 — field_180 = var_s3>>5; field_16C =
+       * Q12_MULT_PRECISE(var_s3, rampHalf) — the VERTICAL
+       * elongation (no trig), audit v39-A4.                    */
+      f180V = var_s3 >> 5;
+      f16CV = sh1xMulSh(var_s3, sg.rampHalf, 12);
     }
-    let f180, f164, f168, f16C, f170;
+    let f180 = 0, f164 = 0, f168 = 0, f16C = 0, f170 = 0;
     if (idx0 === a.wfSegCount - 1 &&
         (sg.len - a.wfSeg[a.wfSegCount].len) < along) {
       /* the last-segment end taper (water.c:224-243) — the division by
@@ -9392,7 +9412,31 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
       f16C = sh1xMulSh(var_s3, sg.rampHalf * sh1xSinQ12(sg.heading), 12);
       f170 = sh1xMulSh(var_s3, sg.rampHalf * sh1xCosQ12(sg.heading), 12);
     }
-    /* the neighbor brightness tapers (water.c:256-302) */
+    if (!sg.horiz) {
+      /* the vertical fall's state (water.c:369-370, audit v39-A4):
+       * field_180 = var_s3>>5; field_16C (the VERTICAL elongation,
+       * Q12 — added to vy_8 UNshifted) = Q12_MULT_PRECISE(var_s3,
+       * rampHalf); the cross pair = the EC/FC view-yaw +-90 pair
+       * (env_effects.c:505-510), NOT the segment heading.         */
+      f180 = f180V;
+      const vy = Math.trunc(ctx.camYawDeg * 4096 / 360);
+      const ecx0 = sh1xMulSh(sg.spread >> 1, sh1xSinQ12(vy - 1024), 12);
+      const ecy0 = sh1xMulSh(sg.spread >> 1, sh1xSinQ12(vy + 1024), 12);
+      const fcx0 = sh1xMulSh(sg.spread >> 1, sh1xCosQ12(vy - 1024), 12);
+      const fcy0 = sh1xMulSh(sg.spread >> 1, sh1xCosQ12(vy + 1024), 12);
+      /* water.c:374-391: the LIVE vy_8 heights (the droplet DESCENDS
+       * on screen) + the vertical elongation. */
+      _wfXv[0] = a.wfX[q] + ecx0; _wfYv[0] = a.wfY[q];
+      _wfZv[0] = a.wfZ[q] + fcx0;
+      _wfXv[1] = a.wfX[q] + ecy0; _wfYv[1] = a.wfY[q];
+      _wfZv[1] = a.wfZ[q] + fcy0;
+      _wfXv[2] = a.wfX[q] + ecx0; _wfYv[2] = a.wfY[q] + f16CV;
+      _wfZv[2] = a.wfZ[q] + fcx0;
+      _wfXv[3] = a.wfX[q] + ecy0; _wfYv[3] = a.wfY[q] + f16CV;
+      _wfZv[3] = a.wfZ[q] + fcy0;
+    } else
+    /* the neighbor brightness tapers (water.c:256-302 — the
+     * HORIZONTAL branch only; water.c:259/282 gate on field_30==0)  */
     if (idx0 < a.wfSegCount - 1 && a.wfSeg[idx0 + 1].horiz) {
       const var_s1 = Math.abs(sh1xMulSh(a.wfSeg[idx0 + 1].spread,
               sh1xSinQ12(sg.heading - a.wfSeg[idx0 + 1].heading), 12));
@@ -9404,16 +9448,24 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
       }
     }
     if (idx0 > 0 && a.wfSeg[idx0 - 1].horiz) {
+      /* water.c:284-295 VERBATIM (audit v39-A2): the product < 0
+       * branch SUBTRACTS the (negative) product and the else ADDS
+       * — var_s1 = rampHalf + |product| in BOTH branches (the old
+       * code inverted the ±, shortening the fade distance).       */
       const vs3 = sg.rampHalf;
       const cross = sh1xMulSh(a.wfSeg[idx0 - 1].spread,
               sh1xSinQ12(a.wfSeg[idx0 - 1].heading - sg.heading), 12);
-      const var_s1 = (cross < 0) ? vs3 + cross : vs3 - cross;
+      const var_s1 = (cross < 0) ? vs3 - cross : vs3 + cross;
       if (along < var_s1)
         f180 = sh1xMulSh(sh1xDivT(along << 12, var_s1 ? var_s1 : 1),
                          f180, 12);
     }
     /* the quad vertices (water.c:306-324) — game Q12, the exact
-     * (-f164 >> 12) arithmetic-shift semantics */
+     * (-f164 >> 12) arithmetic-shift semantics (the HORIZONTAL
+     * branch; the vertical computed its own above)                  */
+    if (!sg.horiz) {
+      /* filled by the vertical branch above */
+    } else {
     _wfXv[0] = a.wfX[q] + (f168 >> 12);
     _wfYv[0] = f174;
     _wfZv[0] = a.wfZ[q] + (-f164 >> 12);
@@ -9426,6 +9478,7 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
     _wfXv[3] = a.wfX[q] + ((-f168 - f16C) >> 12);
     _wfYv[3] = f176;
     _wfZv[3] = a.wfZ[q] + ((f164 - f170) >> 12);
+    }
     let vis = 1;
     for (let c = 0; c < 4; c++) {
       /* game Q12 -> glTF meters (x, -y, -z)/4096 */
@@ -9454,10 +9507,11 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
             sh1xLightQueryPos(_wfLt, env, a.wfX[q], a.wfY[q], a.wfZ[q]), 7);
     if (br < 0) br = 0;
     if (br > 255) br = 255;
-    /* depthM = the prim's OWN average depth — the water-family gate
-     * (fog_poc.c:11746-11753: the game's +0x100 OT bucket bias documents
-     * the OT-slot granularity, water.c:439; the painter gate uses the
-     * plain depth) */
+    /* depthM = the prim's OWN average depth — the engine's established
+     * water-family gate (v37 W1-5: the ripple mesh/sprites pass dsum*0.25
+     * with the (zQ8+128)>>3 OT note; the game's own +0x100 bucket bias
+     * (water.c:439) documents the OT-slot granularity, the painter gate
+     * uses the plain depth) */
     ctx.emitFT4(_wfWX, _wfWY, _wfWZ, 0, u0, vv0, u1, vv0 + v17D, br,
                 f160 / 256);
   }
@@ -9660,7 +9714,7 @@ function updateLightGizmo() {
  *    the C rasterizers' screen-space linear UV/Gouraud) follows SH_VERT's
  *    established w-multiply discipline, with the prim's PLAIN average
  *    depth as the flat per-quad w/depth (the C's painter gate,
- *    fog_poc.c:11214-11215 - occluded only by opaque geometry strictly
+ *    fog_poc.c:11218-11219 - occluded only by opaque geometry strictly
  *    NEARER; the coplanar ditch-bed tie DRAWS, while a bucket-grid tie
  *    vs the depthFunc-LESS room floor would reject - the 1-px A/B class);
 /*    vertex;                                                            */
@@ -9697,7 +9751,7 @@ const WATER_VERT = `
       vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
                       1.0 - screen.y / (240.0 * uPixScale.y) * 2.0);
       /* the water prim's own PLAIN avg depth (shWb) — the C's painter gate
-         input (fog_poc.c:11214-11215: skip only when opaque geometry is
+         input (fog_poc.c:11218-11219: skip only when opaque geometry is
          strictly NEARER; ties draw). The GL depth TEST is OFF (the room's
          bucketed/mixed-w PSX depth is NOT the C's fb->z reference — see the
          WATER_FRAG gate); the z below only keeps the clip volume valid. */
@@ -9714,7 +9768,7 @@ const WATER_VERT = `
   }`;
 const WATER_FRAG = `
   uniform sampler2D map;
-  /* v39.1 THE C's PAINTER GATE (fog_poc.c:11214-11215 / water.c:439):
+  /* v39.1 THE C's PAINTER GATE (fog_poc.c:11218-11219 / water.c:439):
    *   skip the fragment iff the room's covering depth is STRICTLY nearer
    *   than the prim's own plain average depth (ties draw — the coplanar
    *   ditch-bed strip rides ON its bed exactly like the engine's OT
@@ -9811,7 +9865,7 @@ function wfEmitQuad(wx, wy, wz, clutRow, u0, v0, u1, v1, cols, depthM) {
   if (wfQuads >= WF_MAX_QUADS) return;
   const b = wfQuads * 4;
   /* the prim's own PLAIN average depth — the C's painter gate input
-   * (fog_poc.c:11214-11215: `fb->z[pi] < depthM -> skip` — occluded only
+   * (fog_poc.c:11218-11219: `fb->z[pi] < depthM -> skip` — occluded only
    * by opaque geometry strictly NEARER than the prim; ties draw — the
    * coplanar ditch-bed strip rides ON its bed like the engine's OT
    * (z+0x100)>>3 bucket under-draw). The GL depth test is OFF (see
@@ -9871,12 +9925,12 @@ function sh1xWaterEnsureMesh() {
         (window.SHView ? window.SHView.V.RT_W : 640) / 320,
         (window.SHView ? window.SHView.V.RT_H : 360) / 240) }
     },
-    /* TPAGE-45 ABR-1: additive, occluded by nearer opaque geometry (the
-     * C's fb->z depthM gate — implemented as the WATER_FRAG's sampled
-     * true-depth discard); the GL depth TEST is OFF (the app's room depth
-     * is the v5 bucketed/mixed-w PSX construction — NOT the C's fb->z
-     * reference), depthWrite off (the PSX has no depth buffer; the C's
-     * water blits never write fb->z) */
+    /* TPAGE-45 ABR-1: additive, occluded only by opaque geometry
+     * strictly NEARER (the C's fb->z depthM gate — implemented as the
+     * WATER_FRAG's sampled true-depth discard); the GL depth TEST is
+     * OFF (the app's room depth is the v5 bucketed/mixed-w PSX
+     * construction — NOT the C's fb->z reference), depthWrite off (the
+     * PSX has no depth buffer; the C's water blits never write fb->z) */
     transparent: true, depthWrite: false, depthTest: false,
     blending: THREE.AdditiveBlending
   });
@@ -9898,7 +9952,7 @@ function sh1xWaterCamPose(t) {
 }
 
 /* v39.1 THE ROOM TRUE-DEPTH REFERENCE PASS — the C's water gate
- * (fog_poc.c:11214-11215 `fb->z[pi] < depthM -> skip`) compares the prim's
+ * (fog_poc.c:11218-11219 `fb->z[pi] < depthM -> skip`) compares the prim's
  * plain avg depth against the room's covering depth. The C's fb->z holds
  * the room raster's own depth (the GTE vertex depths, behind-camera
  * triangles SKIPPED — fog_poc.c:8096-8098). The app's faithful room render
@@ -9944,7 +9998,7 @@ function sh1xWaterDepthPass(SV) {
     wfDepthMat = new THREE.ShaderMaterial({
       vertexShader: WF_DEPTH_VERT, fragmentShader: WF_DEPTH_FRAG,
       /* v39.2 THE SIDE FIX — FrontSide, NOT DoubleSide. The reference
-       * this pass produces is the C engine's fb->z (fog_poc.c:11214
+       * this pass produces is the C engine's fb->z (fog_poc.c:11218
        * `fb->z[pi] < depthM -> skip`), and the C's fb->z is written ONLY
        * by quads the ENGINE actually draws: Gfx_MeshDraw's per-quad
        * gte_nclip test culls back-facing quads BEFORE the raster, so the
@@ -10031,7 +10085,7 @@ function sh1xWaterFxUpdate() {
         mvpE: _wfMvp.elements, viewE: rtCam.matrixWorldInverse.elements,
         fbW: SV.V.RT_W, fbH: SV.V.RT_H,
         /* the vertical branch's vwGetViewAngle analog (cam_yaw_deg,
-         * fog_poc.c:11366-11372: atan2(fwd.x, fwd.z) in degrees) */
+         * fog_poc.c:11365-11371: atan2(fwd.x, fwd.z) in degrees) */
         camYawDeg: Math.atan2(_wfFwdV.x, _wfFwdV.z) * (180 / Math.PI),
         /* the ShEnv light subset (pos/dir in glTF Q12 = the C's ENGINE frame;
          * intensity = the blended spot) */
