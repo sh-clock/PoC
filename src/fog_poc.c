@@ -11979,12 +11979,16 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
             if ((R->env->cur.effectsInfo.flags[0] & SHENV_FLAG_FLASHLIGHT) &&
                 (R->env->cur.effectsInfo.flags[0] & SHENV_FLAG_DARKENV))
                 continue;
-            /* v37 (W1-4): the spawn + the per-GAME-FRAME t walk now run
-             * in the TICK discipline (sh1x_water_ripple_tick — the same
-             * fix class as the v34 scroll counter: map5_s00.c:94-99 walks
-             * per game frame; the old render-pass walk froze between
-             * --shot frames). The draw only READS the state; unseeded =
-             * not drawn (engine-true: field_B == 0 until the init tick). */
+            /* v37 (W1-4): the per-GAME-FRAME t walk runs in the TICK
+             * discipline (sh1x_water_ripple_tick — the same fix class as
+             * the v34 scroll counter: map5_s00.c:94-99 walks per game
+             * frame; the old render-pass walk froze between --shot
+             * frames). v41 (audit A-3): the SPAWN moved OUT of the tick
+             * to sh1x_water_ripple_spawn — the engine's func_800CB0D8
+             * runs from Map_WorldObjectsInit at MAP LOAD, before frame 1
+             * (map5_s00.c:1247-1250); the particles exist from load, so
+             * the draw gates alone decide. The draw only READS the
+             * state; unseeded = no driver-21 entry was loaded. */
             if (!a->seeded) continue;
             /* the 5x5 mesh (func_800CB25C:166-231): grid x -93.5 +
              * col*0.75, z 9.6 - row*0.75, y 0.5 (engine); 4x4 quads,
@@ -12132,15 +12136,67 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
     (void)sx;
 }
 
-/* v37 (W1-4): the water-ripple per-GAME-FRAME tick — the spawn
- * (func_800CB0D8 / Map_WorldObjectsInit, ONCE) + the t random-walk
- * (map5_s00.c:94-99: t += Rng_GenerateUInt(-32, 31), CLAMP 0..4095 per
- * GAME FRAME while the system draws — i.e. gated by the player position
- * AND the flashlight-darkness gate, exactly like the draw). Runs from the
- * same tick sites as fx_water_scroll_sync (the 30Hz discipline); the v32
- * render-pass walk froze between --shot frames (the same defect class
- * the v34 scroll-counter fix resolved). W1-8: the Z spawn base =
- * Q12(7.35) = 30105 (the truncating TO_FIXED), not 30106. */
+/* v41 (audit A-3): the water-ripple SPAWN — func_800CB0D8 VERBATIM,
+ * which the engine calls from Map_WorldObjectsInit (map5_s00.c:1247-
+ * 1250) at MAP LOAD: UNCONDITIONALLY, before ANY per-frame consumer of
+ * the shared RNG stream. The v37 design (W1-4) nested these 49 draws
+ * (the mesh selector + 12 sprites x {x, z, t, sel}) inside
+ * sh1x_water_ripple_tick's GATED path, so a camera that never passed
+ * the player/darkness gates never consumed them (every LATER stream
+ * consumer — spinRng/rngWalk/lightFlicker/waterfall — sat 49 draws off
+ * the engine sequence), and when the gates DID pass the spawn ran
+ * AFTER that tick's other consumers (the fired-tick order is anims ->
+ * scroll -> ripple), inverting the engine's load-then-per-frame order.
+ * The gates gate ONLY the per-particle draw + t-walk in the engine
+ * (func_800CB25C:76-99); the spawn itself is a map-load call. Runs at
+ * the engine's own sites: scene load (the Map_WorldObjectsInit
+ * stand-in in main), the per-shot engine-fresh reset (a fresh process
+ * re-parses the map: the same 49 draws from the reset seed 1) and the
+ * R restart (the engine re-enters WorldObjectsInit on every room
+ * reload). W1-8: the Z spawn base = Q12(7.35) = 30105 (the truncating
+ * TO_FIXED), not 30106. */
+static void sh1x_water_ripple_spawn(Sh1x *sx) {
+    if (!sx) return;
+    for (int i = 0; i < sx->nAnims; i++) {
+        Sh1xPropAnim *a = &sx->anims[i];
+        if (a->driver != 21) continue;
+        a->seeded = 1;
+        /* v40 (A-F4, the maintainer's reimplementation — PR #4's hunk
+         * was rejected as incomplete: it added this draw but never
+         * updated the read site): func_800CB0D8 draws the MESH
+         * particle's OWN selector FIRST (map5_s00.c:31-35: field_B=0
+         * mesh, field_C.s_1.field_2 = Rng_GenerateInt(0,2)) BEFORE the
+         * 12 sprite spawns (:36-51). The old spawn drew only 48 of the
+         * 49 values and the mesh draw read wrSel[0] (sprite 0's
+         * selector) — every downstream RNG consumer sat one draw off
+         * the engine stream. Slot 12 holds the mesh's own selector
+         * (wrSel[16]). */
+        a->wrSel[12] = (int)(sh_rng_next() % 3);
+        for (int q = 0; q < 12; q++) {
+            a->wrX[q] = -379904 + (int)(sh_rng_next() % 6144);
+            /* Rng(Q12(-92.75), Q12(-91.25)-1) = the 1.5m box         */
+            a->wrZ[q] = 30105 + (int)(sh_rng_next() % 6144);
+            /* Rng(Q12(7.35), Q12(8.85)-1); Q12(7.35) = 30105          */
+            a->wrT[q] = (int)(sh_rng_next() % 4096);
+            a->wrSel[q] = (int)(sh_rng_next() % 3);
+        }
+        return;   /* one waterRipple entry per room GLB (one spawn set)  */
+    }
+}
+
+/* v37 (W1-4): the water-ripple per-GAME-FRAME t-walk tick — the t
+ * random-walk (map5_s00.c:94-99: t += Rng_GenerateUInt(-32, 31), CLAMP
+ * 0..4095 per GAME FRAME while the system draws — i.e. gated by the
+ * player position AND the flashlight-darkness gate, exactly like the
+ * draw: the walk lives inside the gated func_800CB25C, and only the
+ * field_B != 0 SPRITES walk — they exist only after the load-time
+ * spawn). Runs from the same tick sites as fx_water_scroll_sync (the
+ * 30Hz discipline); the v32 render-pass walk froze between --shot
+ * frames (the same defect class the v34 scroll-counter fix resolved).
+ * v41 (audit A-3): the SPAWN itself moved to sh1x_water_ripple_spawn
+ * (map load / per-shot fresh / R restart — the engine's
+ * Map_WorldObjectsInit sites), so the shared stream order is
+ * spawn-at-load THEN per-frame consumers, exactly like the engine. */
 static void sh1x_water_ripple_tick(Sh1x *sx, const ShEnv *env,
                                     const CamPose *cam) {
     if (!sx || !env || !cam) return;
@@ -12156,28 +12212,11 @@ static void sh1x_water_ripple_tick(Sh1x *sx, const ShEnv *env,
         if ((env->cur.effectsInfo.flags[0] & SHENV_FLAG_FLASHLIGHT) &&
             (env->cur.effectsInfo.flags[0] & SHENV_FLAG_DARKENV))
             return;
-        if (!a->seeded) {
-            a->seeded = 1;
-            /* v40 (A-F4, the maintainer's reimplementation — PR #4's
-             * hunk was rejected as incomplete: it added this draw but
-             * never updated the read site): func_800CB0D8 draws the
-             * MESH particle's OWN selector FIRST (map5_s00.c:31-35:
-             * field_B=0 mesh, field_C.s_1.field_2 = Rng_GenerateInt
-             * (0,2)) BEFORE the 12 sprite spawns (:36-51). The old
-             * spawn drew only 48 of the 49 values and the mesh draw
-             * read wrSel[0] (sprite 0's selector) — every downstream
-             * RNG consumer sat one draw off the engine stream. Slot
-             * 12 holds the mesh's own selector (wrSel[16]). */
-            a->wrSel[12] = (int)(sh_rng_next() % 3);
-            for (int q = 0; q < 12; q++) {
-                a->wrX[q] = -379904 + (int)(sh_rng_next() % 6144);
-                /* Rng(Q12(-92.75), Q12(-91.25)-1) = the 1.5m box         */
-                a->wrZ[q] = 30105 + (int)(sh_rng_next() % 6144);
-                /* Rng(Q12(7.35), Q12(8.85)-1); Q12(7.35) = 30105          */
-                a->wrT[q] = (int)(sh_rng_next() % 4096);
-                a->wrSel[q] = (int)(sh_rng_next() % 3);
-            }
-        }
+        /* engine-true: no particles = no walk (func_800CB25C:95 tests
+         * field_B != 0 — the sprites exist only past the load-time
+         * spawn). Unseeded here = no driver-21 entry / a reset is
+         * pending its re-spawn. */
+        if (!a->seeded) return;
         /* the per-frame t walk (func_800CB25C:94-99)                    */
         for (int q = 0; q < 12; q++) {
             a->wrT[q] += (int)(sh_rng_next() & 63) - 32;
@@ -14789,6 +14828,13 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         sh1x_anims_reset((Sh1x *)&A->R.sc->sh1x); /* v38: drivers fresh    */
         sh1x_anims_bind_invalidate();      /* v38-audit-A1: re-seed drvr 9 */
         A->animsPrimed = 0;               /* v38: re-prime the gate state */
+        /* v41 (audit A-3): the room-reload WorldObjectsInit — the engine
+         * re-enters Map_WorldObjectsInit -> func_800CB0D8 on every map
+         * load, so the restart re-runs the ripple spawn (a fresh 49-draw
+         * set from the CURRENT shared stream — the engine RNG is global
+         * and persists across room reloads; the fresh-process seed reset
+         * is V41-A-1's separate fix). */
+        sh1x_water_ripple_spawn((Sh1x *)&A->R.sc->sh1x);
         break;
     case K_PLUS:  if (A->play.speed < 8.0)    A->play.speed *= 2.0; break;
     case K_MINUS: if (A->play.speed > 0.125)  A->play.speed *= 0.5; break;
@@ -16430,6 +16476,16 @@ int main(int argc, char **argv) {
             printf("mapLink: %d neighbor room(s) merged (cliff continuation)\n",
                    nb);
     }
+    /* v41 (audit A-3): the map-load WorldObjectsInit stand-in — the
+     * engine's Map_WorldObjectsInit (map5_s00.c:1247-1250) calls
+     * func_800CB0D8 (the water-ripple spawn: 49 shared-RNG draws)
+     * UNCONDITIONALLY at map load, BEFORE the first frame's per-frame
+     * consumers. Placed after the neighbor merge so the assembled
+     * scene is complete; the helper takes the first driver-21 entry
+     * (one spawn set per room GLB, like the engine's one call per
+     * map). GLBs without a waterRipple anim consume NOTHING (the loop
+     * finds no driver-21 entry) — shipped rooms are unaffected. */
+    sh1x_water_ripple_spawn(&sc.sh1x);
     printf("GLB %s: %d draw items, %d verts, %d indices, %d textures, bounds "
            "(%.1f..%.1f, %.1f..%.1f, %.1f..%.1f) diag %.2f m\n",
            glbPath, sc.itemCount, sc.vertCount, sc.idxCount, sc.texCount,
@@ -17199,6 +17255,14 @@ int main(int argc, char **argv) {
         g_waterTileEverUpdated = 0;
         g_sh1xBeltScroll = 0;
         g_tvpaint_pad = 0;
+        /* v41 (audit A-3): re-run the map-load ripple spawn AFTER the
+         * seed reset — a fresh process consumed the 49 draws at scene
+         * load (the Map_WorldObjectsInit stand-in above), so shot i's
+         * engine-fresh state must land at the SAME stream position
+         * (post-parse) before the first tick's other consumers. The
+         * anims reset above restored seeded=0 (the animsFresh snapshot
+         * predates the load-time spawn). */
+        sh1x_water_ripple_spawn(&sc.sh1x);
         Playback P;
         memset(&P, 0, sizeof(P));
         P.t = 0; P.speed = 1.0;
