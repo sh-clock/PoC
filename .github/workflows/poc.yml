@@ -126,6 +126,29 @@ jobs:
                     --shot t=1.0334,file=FAN_B.png
           python3 tools/tests/fan_anim_check.py shots/FAN_A.png shots/FAN_B.png 500
 
+      - name: Animation regression check — the LIVE path actually ticks (v38)
+        run: |
+          # v38: the TRUE root-cause regression. The shot-path check above
+          # passed for v33.13-v33.16 while RUN_SU0203.bat's interactive
+          # window showed a FROZEN fan: every prior proof ran the
+          # deterministic --shot fast-forward, which ticks the SH1X drivers
+          # inline — the realtime loops (Win32/SDL/X11/benchmark) called
+          # live_advance+render_frame WITHOUT any driver tick. This check
+          # runs the BENCHMARK path (the same live_advance call sequence
+          # as the window loops) with a FIXED camera at two --duration
+          # values: pre-v38 = 0.00% pixels changed (completely static),
+          # v38+ = ~10% (the fan + waterfall move). The --save-final
+          # frame carries the live session's accumulated anim state.
+          ./fog_poc --glb glbs/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --benchmark --duration 3 --save-final LIVE_A.png
+          ./fog_poc --glb glbs/SU0203.glb --camdat input/fan_camdat.json \
+                    --input input --envpair 2,2 \
+                    --cam 98.5 1.0 -141.0 100.0 1.6 -144.07 55 \
+                    --benchmark --duration 6 --save-final LIVE_B.png
+          python3 tools/tests/fan_anim_check.py LIVE_A.png LIVE_B.png 500
+
       - name: Smoke test — engine renders a PNG headlessly
         run: |
           # --shot t=0 renders one deterministic frame (320x224) to
