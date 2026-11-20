@@ -1389,20 +1389,27 @@ typedef struct {
 /* Fs_QueuePostLoadTim: TV1 pixels (832..863, 256..511) CLUT rows 0..2; */
 /* TV2 pixels (800..863, 0..255) CLUT rows 5..6; TV3 pixels             */
 /* (768..831, 384..511) CLUT rows 10..11 — the CLUT bank at x 448.      */
-/* Sampling is SwanStation's Palette8Bit path VERBATIM (gpu_sw_backend.  */
-/* cpp ShadePixel): texel(u,v) -> halfword(tpX + u/2, tpY + v) -> the    */
-/* byte -> palette VRAM (448 + idx, clutRow). The palette STRIP rows     */
-/* 0..11 span x 448..703: entry 0..15 = the TV's own CLUT row;          */
-/* 16..255 = the engine's other VRAM (the room's streamed texture slots */
-/* at tpages 8..10 x 512..703, map.c:152-167 Texture_Init slots, plus    */
-/* the tpage-7 region) — the ripper emits the reconstructed strip from   */
-/* the room's own first three TIMs (the runtime LRU stream content      */
-/* VARIES in-game; the approximation is documented in the EXTRAs src).  */
+/* Sampling is SwanStation's Palette4Bit path VERBATIM (gpu_sw_backend.  */
+/* cpp ShadePixel): texel(u,v) -> halfword(tpX + u/4, tpY + v) -> the    */
+/* nibble -> palette VRAM (448 + idx, clutRow). The engine draws the     */
+/* paint quads 4bpp: tpage (field_0 & 0x1F) | 0x20 leaves mode bits      */
+/* 7-8 = 0 (the 0x20 is ABR-1 additive, INERT — func_800D88C8 never      */
+/* setSemiTrans's the paint prims, they composite opaque; 8bpp would     */
+/* be 0x80), and the TV TIMs are 4bpp files (flag 0x08, 16-entry         */
+/* CLUTs). The palette STRIP rows 0..11 span x 448..703: entry 0..15 =   */
+/* the TV's own CLUT row; 16..255 = DEAD DATA under 4bpp (the nibble     */
+/* idx <= 15 -> VRAM x 448..463 only; the room's streamed texture slots  */
+/* at tpages 8..10 x 512..703, map.c:152-167, are kept for GLB compat —  */
+/* the ripper emits the reconstructed strip from the room's own first    */
+/* three TIMs; the runtime LRU stream content VARIES in-game; the        */
+/* approximation is documented in the EXTRAs src).                      */
 /* ==================================================================== */
 #define TV_SCREENS 10
 #define TV_STYLES  16
 typedef struct {
-    int tp;                 /* tpage bits (field_0 & 0x1F; |0x20 = 8bpp) */
+    int tp;                 /* tpage bits (field_0 & 0x1F; |0x20 = ABR-1 */
+                            /* additive, INERT (prims opaque); mode bits */
+                            /* 7-8 = 0 -> 4bpp (8bpp would be 0x80)      */
     int clutWord;           /* the RAW clut id (field_2): x=(w&0x3F)<<4=448, row=w>>6 */
     int u0, v0;             /* field_4 / field_5 (the UV window base)   */
     int du, dv;             /* field_6 / field_7 (the window size)      */
@@ -1460,9 +1467,9 @@ static const unsigned char *sh_tvpaint_plane(TvPaint *tvp, int st) {
     for (int v = 0; v < 256; v++) {
         int y = by + v;
         for (int u = 0; u < 256; u++) {
-            int x = bx + (u >> 1);
+            int x = bx + (u >> 2);
             unsigned short hw = sh_tvpaint_vram(x, y);
-            int idx = (hw >> ((u & 1) * 8)) & 0xFF;
+            int idx = (hw >> ((u & 3) * 4)) & 0xF;
             unsigned short c15 = tvp->strip[row][idx];
             unsigned char *px = p + ((size_t)v * 256 + u) * 4;
             if (c15 == 0) {           /* the 0x0000 texel hole (engine)   */
