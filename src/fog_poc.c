@@ -16005,7 +16005,16 @@ int main(int argc, char **argv) {
             const char *cm = strchr(argv[i], ',');
             if (cm) timPalette = atoi(cm + 1);
         }
-        else if (!strcmp(a, "--t") && i + 1 < argc) tStart = atof(argv[++i]);
+        else if (!strcmp(a, "--t") && i + 1 < argc) {
+            tStart = atof(argv[++i]);
+            /* v40 audit (E-F1): NaN/Inf --t poisoned the session clock
+             * (UBSAN signed-overflow cascade in the Q12 math; --t nan
+             * hangs the realtime window — V-c repro). Reject like
+             * --window-size does. */
+            if (!isfinite(tStart)) {
+                fprintf(stderr, "bad --t (not a finite number)\n"); return 1;
+            }
+        }
         else if (!strcmp(a, "--cam") && i + 7 < argc) {
             ovr.useFixed = 1;
             ovr.eye.x = (float)atof(argv[++i]); ovr.eye.y = (float)atof(argv[++i]);
@@ -16013,6 +16022,17 @@ int main(int argc, char **argv) {
             ovr.target.x = (float)atof(argv[++i]); ovr.target.y = (float)atof(argv[++i]);
             ovr.target.z = (float)atof(argv[++i]);
             if (i + 1 < argc && (isdigit((unsigned char)argv[i + 1][0]) || argv[i + 1][0] == '.')) ovr.fovDeg = (float)atof(argv[++i]);
+            /* v40 audit (E-F1): NaN/Inf coordinates cast to int are UB
+             * (NaN->INT_MIN feeding the Q12 pipeline — 8 UBSAN reports,
+             * the flat 730-byte frame presented as a valid render).
+             * Reject non-finite camera args with a clean error. */
+            if (!isfinite(ovr.eye.x) || !isfinite(ovr.eye.y) ||
+                !isfinite(ovr.eye.z) || !isfinite(ovr.target.x) ||
+                !isfinite(ovr.target.y) || !isfinite(ovr.target.z) ||
+                !isfinite(ovr.fovDeg)) {
+                fprintf(stderr, "bad --cam (all values must be finite)\n");
+                return 1;
+            }
         }
         else if (!strcmp(a, "--shot") && i + 1 < argc) {
             /* --shot t=12.5,file=name.png */
@@ -16022,6 +16042,10 @@ int main(int argc, char **argv) {
             const char *c2 = strstr(s, "file=");
             if (c1) tt = atof(c1 + 2);
             if (c2) snprintf(fn, sizeof(fn), "%s", c2 + 5);
+            if (c1 && !isfinite(tt)) {   /* v40 audit (E-F1) */
+                fprintf(stderr, "bad --shot t= (not a finite number)\n");
+                return 1;
+            }
             if (!fn[0]) snprintf(fn, sizeof(fn), "shot_%08.2f.png", tt);
             if (nShots < 64) { shots[nShots].t = tt; strcpy(shots[nShots].file, fn); nShots++; }
         }
