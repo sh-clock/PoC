@@ -2592,7 +2592,16 @@ class TimFile:
         rep = lambda v: ((v << 3) | (v >> 2)).astype(np.uint8)
         rgb = np.stack([rep(r5), rep(g5), rep(b5)], axis=-1)   # h w 3
         stp_bit = (c & 0x8000) != 0
-        black = (c & 0x7FFF) == 0
+        # v40 audit (D-F1): opaque-branch transparency is EXACT 0x0000 only.
+        # The old `(c & 0x7FFF) == 0` also caught 0x8000 (STP-set black) —
+        # the docstring ("stp=0: color==0x0000 -> alpha 0; else 255") and
+        # the hardware disagree: SwanStation's sampler discards a texel
+        # only when `texture_color.bits == 0` (gpu_sw_backend.cpp:124,
+        # the FULL 16 bits) — 0x8000 is an OPAQUE BLACK texel. Measured on
+        # the shipped corpus: 5,103 of 40,927 texture packs (12.5%) in 22
+        # of 44 rooms carry the 0x8000 texel inside their UV window; 298
+        # opaque-only packs shipped as alphaMode BLEND purely from this.
+        black = (c == 0)
         alpha = np.full((h, w), 255, dtype=np.uint8)
         alpha[black] = 0
         if stp:
