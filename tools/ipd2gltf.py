@@ -637,7 +637,17 @@ def _tv_paint_extras(room, resolver=None, report=None):
                         f"{tname} not resolved/8bpp (its slot emitted as 0)")
                 continue
             _cl, prows, iw, ih = parts
-            base = 48 + si * 64            # strip x 512 + si*64
+            # v40 audit (D-F6): the strip column = VRAM x - 448 (the
+            # paint CLUT base, fs_queue.c:643-682 clutX=448 D_800DB91C).
+            # fullPage slot i uploads at VRAM x 512 + 64*i (map.c:153-166
+            # tPage[1] = 8+i -> fs_queue.c:657 x = u + ((tPage[1]&0xF)<<6))
+            # => strip column 64 + 64*si, which is what the comment always
+            # claimed ("strip x 512 + si*64"). The old `48 + si*64` put
+            # slot 0 at VRAM 496 (16 into the stale region before the
+            # first slot), shifted every slot 16 left, left columns
+            # 240-255 zero, and polluted 48-63 into the non-slot region —
+            # measured on the shipped SPU0401.glb (slot data at 48-239).
+            base = 64 + si * 64
             for r in range(min(12, len(prows))):
                 hw = prows[r]
                 for c in range(min(64, len(hw), 256 - base)):
