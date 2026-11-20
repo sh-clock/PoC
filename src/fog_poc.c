@@ -1448,6 +1448,18 @@ typedef struct {
     int hasMapLink;
     Sh1xPropAnim anims[64];          /* v26.2: full catalog (see ripper) */
     int nAnims;
+    /* ---- v38: the live-path driver tick discipline ----
+     * v26.2's sh1x_anims_sync derived dt from the camtrack PHASE via a
+     * FUNCTION-STATIC lastT. Two defects: (1) the realtime window /
+     * benchmark loops never called it AT ALL (only --shot/--r2shot did) —
+     * RUN_SU0203.bat's 'no fan spin'; (2) the phase WRAPS at the cycle
+     * boundary and restarts/scrubs jump it, so phase-derived dt went
+     * negative (one held tick per wrap — a 33 ms anim hitch each cycle).
+     * The dt now keys on the SESSION clock (monotonic — the engine's own
+     * g_DeltaTime game counter analog, never wraps) stored per-Scene, and
+     * the R-restart restores this engine-fresh snapshot. */
+    double animsLastSessionT;
+    Sh1xPropAnim animsFresh[64];   /* engine-fresh (restart restore point) */
     float userLightOffset[3];       /* Game_FlashlightAttribsSet local      */
     float userLightRot[3];          /* degrees (pitch, yaw, roll)           */
     int hasUserLight;
@@ -2102,6 +2114,12 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
             sx->userLightRot[2] = (float)jat(lr, 2)->num;
         }
     }
+    /* v38: the engine-fresh driver snapshot (the R-restart restore point)
+     * + the session-tick clock zero — taken AFTER every parse-time live
+     * state init (the dampedSwing demo seeds, the tv/rngWalk zero init). */
+    sx->animsLastSessionT = 0.0;
+    memcpy(sx->animsFresh, sx->anims,
+           sizeof(Sh1xPropAnim) * (size_t)sx->nAnims);
 }
 
 typedef struct {
@@ -8833,11 +8851,20 @@ static void sh1x_anim_apply(Scene *sc, DrawItem *it, const Sh1xPropAnim *a) {
  * COPY of the pre-anim matrix each frame, not cumulatively. */
 static mat4 *g_animBase = NULL;      /* snapshot of pre-anim item matrices  */
 static int   g_animBaseN = 0;
+static int   g_animBoundFor = -1;   /* v38-audit-A1: was a fn-local static */
+/* v38-audit-A1: restart must re-run the bind-time seeding. Driver 9's
+ * (gravityScatter) per-instance live state (liveVy/liveVz/scatter rolls)
+ * is seeded INSIDE sh1x_anims_bind — which ran once per scene — and the
+ * animsFresh snapshot predates the first bind, so a reset WITHOUT this
+ * invalidation would leave driver 9 reading zero live state (the beans
+ * teleport to the room origin after R). The bind is deterministic — a
+ * re-run re-derives the same item bindings and re-seeds driver 9. */
+static void sh1x_anims_bind_invalidate(void) { g_animBoundFor = -1; }
 static void sh1x_anims_draw_apply(Scene *sc) {
-    static int boundFor = -1;         /* re-bind if the scene changed      */
     if (!sc || !sc->sh1x.nAnims) return;
-    if (boundFor != (int)(size_t)(void *)sc || g_animBaseN != sc->itemCount) {
-        boundFor = (int)(size_t)(void *)sc;
+    if (g_animBoundFor != (int)(size_t)(void *)sc ||
+        g_animBaseN != sc->itemCount) {
+        g_animBoundFor = (int)(size_t)(void *)sc;
         sh1x_anims_bind(sc);
     }
     if (g_animBaseN != sc->itemCount) {
@@ -9835,15 +9862,28 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
 }
 
 /* v26.2: per-frame hook — called from the 30Hz env tick discipline (the
- * engine's Map_WorldObjectsUpdate runs on the same 30Hz game frames). */
-static void sh1x_anims_sync(Sh1x *sx, double t) {
+ * engine's Map_WorldObjectsUpdate runs on the same 30Hz game frames).
+ * v38: dt derives from the SESSION clock (monotonic, never wraps — the
+ * camtrack PHASE wraps at the cycle boundary and scrub/restart jump it;
+ * the old function-static phase derivation held one tick per wrap) and
+ * the clock is per-Scene, not function-static. */
+static void sh1x_anims_sync(Sh1x *sx, double sessionT) {
     if (!sx || sx->nAnims <= 0) return;
-    static double lastT = -1e9;
-    double dt = (lastT < -1e8) ? 0.0 : (t - lastT);
-    if (dt < 0) dt = 0;                 /* scrub/restart: hold (monotonic) */
-    lastT = t;
+    double dt = sessionT - sx->animsLastSessionT;
+    if (dt < 0) dt = 0;                 /* restart: fresh state, 0 dt re-prime */
     if (dt > 0.1) dt = 0.1;             /* clamp like the env tick */
+    sx->animsLastSessionT = sessionT;
     sh1x_anims_tick(sx, dt);
+}
+
+/* v38: R restart — restore the engine-fresh driver state (the engine
+ * re-enters the room's WorldObjectsInit fresh; the pre-v38 live state
+ * carried the whole previous session into the 'restarted' one). */
+static void sh1x_anims_reset(Sh1x *sx) {
+    if (!sx || sx->nAnims <= 0) return;
+    memcpy(sx->anims, sx->animsFresh,
+           sizeof(Sh1xPropAnim) * (size_t)sx->nAnims);
+    sx->animsLastSessionT = 0.0;
 }
 
 /* v37 (W1-2/W1-3/W1-5/W1-15): the WATER GLINT — func_8008E794 VERBATIM
@@ -12910,6 +12950,7 @@ typedef struct {
     int hudOn;               /* on-screen HUD (H toggles; --no-hud off)  */
     R2View r2;               /* v23: the engine SELF_VIEW (R2 view)      */
     int nativeHud;           /* v23: compact 40-column layout at native  */
+    int animsPrimed;         /* v38: the boot-frame SH1X gate-state call */
 } LiveApp;
 
 typedef enum {
@@ -13034,6 +13075,17 @@ static CamPose live_advance(LiveApp *A, double dt) {
         }
         A->R.snow = A->snow.enabled ? &A->snow : NULL;
         sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
+        /* v38 FIX (the RUN_SU0203.bat 'no fan spin' root cause): the
+         * realtime window / benchmark loops render_frame()d directly and
+         * NEVER ticked the SH1X propAnim drivers / water FX — only the
+         * --shot/--r2shot deterministic paths did (the static-cam proofs
+         * that 'verified' v33 animations all ran the shot path). The
+         * engine's own discipline (one Map_WorldObjectsUpdate + the
+         * LensFlare/water pass per game tick) is now mirrored per FIRED
+         * tick, in the same order as the shot path's fast-forward. */
+        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT);
+        fx_water_scroll_sync(&A->R.sc->sh1x, &A->env, &cp); /* v34: scroll */
+        sh1x_water_ripple_tick((Sh1x *)&A->R.sc->sh1x, &A->env, &cp); /* v37 */
     }
     /* between ticks (and while paused): hold the tick state — the engine
      * renders nothing in between. The env sync still runs each frame for
@@ -13045,6 +13097,19 @@ static CamPose live_advance(LiveApp *A, double dt) {
         cp = r2view_pose(&A->r2, &cp);
     A->R.snow = A->snow.enabled ? &A->snow : NULL;
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
+    /* v38: the boot-frame pose call (the shot path's post-loop sync): the
+     * very first presented frame owes < 1/30 s to the tick grid, so no
+     * tick has fired yet — compute the drivers' GATE state once (dt=0,
+     * state holds at the parse-fresh pose) so event-gated drivers are
+     * already hidden on frame 1. (v38-audit-A2: the WATER pair is NOT
+     * called here — fx_water_scroll_sync advances the D_800AFDAC counter
+     * and sh1x_water_ripple_tick draws the shared RNG, both PER-TICK-only
+     * systems with no gate state to prime; calling them here desynced the
+     * live water/RNG streams by one step vs the shot path.) */
+    if (!A->animsPrimed) {
+        A->animsPrimed = 1;
+        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT);
+    }
     return cp;
 }
 
@@ -13058,7 +13123,7 @@ static void live_render(LiveApp *A) {
         snow_sync_live(&A->snow, A->play.t, cp.pos, cp.forward,
                        A->track, A->ovr.useFixed ? &A->ovr : NULL);
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
-    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.t);
+    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT); /* v38: session clock */
     fx_water_scroll_sync(&A->R.sc->sh1x, &A->env, &cp); /* v34: scroll per tick */
     sh1x_water_ripple_tick((Sh1x *)&A->R.sc->sh1x, &A->env, &cp); /* v37: the ripple walk per tick */
     render_frame(&A->fb, &A->R, &cp);
@@ -13578,6 +13643,9 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         A->tickPending = 0;           /* v20: restart the tick grid too      */
         snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
         sh_env_reset(&A->env, 0.0);      /* restart the env simulation    */
+        sh1x_anims_reset((Sh1x *)&A->R.sc->sh1x); /* v38: drivers fresh    */
+        sh1x_anims_bind_invalidate();      /* v38-audit-A1: re-seed drvr 9 */
+        A->animsPrimed = 0;               /* v38: re-prime the gate state */
         break;
     case K_PLUS:  if (A->play.speed < 8.0)    A->play.speed *= 2.0; break;
     case K_MINUS: if (A->play.speed > 0.125)  A->play.speed *= 0.5; break;
@@ -14154,7 +14222,22 @@ static int run_window_sdl(LiveApp *A, int winW, int winH) {
     int r2testN = 0;               /* its own frame counter (`frames` is
                                      * the 0.25s stat-window counter that
                                      * resets before reaching 10)         */
+    /* v38 test facility (FOGPOC_RESTARTTEST=1): frame 60 fires the REAL
+     * live_action(K_R) restart path (the same code the window key events
+     * take) — deterministic integration test of the v38 SH1X driver-state
+     * reset (R must return the propAnims to engine-fresh, not carry the
+     * previous session's angles over). Pair with FOGPOC_HUDSNAP for the
+     * before/after frames; no engine math touched.                        */
+    int rtTest = getenv("FOGPOC_RESTARTTEST") ? 1 : 0;
+    int rtFired = 0;
     while (!quit) {
+        if (rtTest && !rtFired && r2testN == 60) {
+            rtFired = 1;
+            double before = A->play.sessionT;
+            live_action(A, K_R, 1);
+            printf("[restarttest] frame 60: K_R fired (sessionT was "
+                   "%.3f, now %.3f)\n", before, A->play.sessionT);
+        }
         if (r2test) {
             if (r2testN == 10 && !r2testV) {
                 r2testV = 1; live_action(A, K_VIEW, 1);
@@ -14234,7 +14317,7 @@ static int run_window_sdl(LiveApp *A, int winW, int winH) {
         live_pace(t0, A->maxFps > 0 ? 1.0 / A->maxFps : 0.0);
         double t1 = now_sec();
         frames++; statT += t1 - t0;
-        if (r2test) r2testN++;
+        if (r2test || rtTest) r2testN++;
         if (statT >= 0.25) {
             A->play.fps = (double)frames / statT;
             frames = 0; statT = 0;
@@ -15746,6 +15829,9 @@ int main(int argc, char **argv) {
     A.argb = (uint32_t *)malloc((size_t)w * h * 4);
     A.play.t = tStart; A.play.speed = 1.0;
     A.play.sessionT = tStart;        /* v10: session clock starts at --t too */
+    sc.sh1x.animsLastSessionT = tStart; /* v38-audit-A3: the --t boot prime
+                                          * must be dt=0 (fresh pose), not a
+                                          * clamped tStart jump */
     turn_init(&A.play.turn);
     A.duration = duration; A.maxFps = maxFps;
     snprintf(A.saveFinal, sizeof(A.saveFinal), "%s", saveFinal);
@@ -15813,7 +15899,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
+            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             tSim += tickDt;
@@ -15826,7 +15912,7 @@ int main(int argc, char **argv) {
         }
         if (Vr.active || Vr.returning) cp = r2view_pose(&Vr, &cp);
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);       /* v26.3: driver tick      */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
         Frame fb2; frame_alloc(&fb2, w, h);
         render_frame(&fb2, &R, &cp);
         /* THE RESTRICTION PROOF (all values from the verbatim pipeline) */
@@ -15891,6 +15977,26 @@ int main(int argc, char **argv) {
      * bit-identical to the benchmark path and the live window           */
     Frame fb; frame_alloc(&fb, w, h);
     for (int i = 0; i < nShots; i++) {
+        /* v38-audit-A4: per-shot engine-fresh state. The loop reuses sc
+         * across shots; the anims (and the D_800AFDAC water counter)
+         * previously carried shot i-1's state into shot i, so multi-shot
+         * runs rendered ACCUMULATED anim time (shot 2 at t=6 showed ~8 s
+         * of spin). Each shot now starts exactly as a fresh process
+         * would. (Single-shot goldens: shot 0's state was already fresh —
+         * byte-identical.) (R is declared below in this loop in THIS
+         * engine's ordering; the scene lives in sc — what R.sc aliases.) */
+        sh1x_anims_reset(&sc.sh1x);
+        /* the per-shot GLOBALS the anim/water systems carry in-file: the
+         * propAnim RNG stream (spinRng/waterfall/rattle draws), the
+         * D_800AFDAC water counter, the lazy water-tile composite gate,
+         * the belt-scroll accumulator and the TV-flicker pad — so shot i
+         * is bit-identical to the same `--shot t=T` run in a fresh
+         * process (single-shot runs: all already at their boot values). */
+        g_propRngSeed = 1u;
+        g_flaresys.counter = 0;
+        g_waterTileEverUpdated = 0;
+        g_sh1xBeltScroll = 0;
+        g_tvpaint_pad = 0;
         Playback P;
         memset(&P, 0, sizeof(P));
         P.t = 0; P.speed = 1.0;
@@ -15949,7 +16055,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);   /* v26.3: driver tick      */
+            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             tSim += tickDt;
@@ -15965,7 +16071,7 @@ int main(int argc, char **argv) {
          * also covers the phase wrap/edge cases where the pose should be
          * re-read from the current phase rather than the stepped one      */
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, P.t);       /* v26.3: driver tick      */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
         render_frame(&fb, &R, &cp);
         char out[1024];
         snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);

@@ -2351,3 +2351,98 @@ honestly when a commandment cannot be met (see 4: the water brightness gap).
   yet rendered by any player (the school rooms in the corpus do carry the
   envEffects EXTRAs; the floor-water modulate pass is the missing piece).
 
+
+---
+
+## Session 38 (2026-11-20) — THE RUN_SU0203.bat 'no fan spin' TRUE root cause + the live-path driver-tick discipline (v38)
+
+The user retested the PoC via RUN_SU0203.bat and the fan STILL did not spin,
+despite session-28's "VERIFIED the fan SPINNING" claim. Root cause of the
+false positive: every prior animation proof ran the DETERMINISTIC paths
+(--shot / --r2shot / instrumented static-cam A/B) — those paths tick the SH1X
+propAnim drivers inline per fast-forward tick. The REALTIME loops (Win32
+run_window_win32, SDL, X11, --benchmark, and the wallpaper app's Android
+surface loop) call `live_advance(A, dt)` + `render_frame` directly and NEVER
+called `sh1x_anims_sync` / `fx_water_scroll_sync` / `sh1x_water_ripple_tick`
+AT ALL — the drivers were frozen at their parse-fresh pose in every
+interactive session. Repro (pre-fix, fixed camera): the benchmark path at
+t=3 vs t=6 = **0.00% pixels changed** (a completely static scene); the
+--shot path at t=2.0 vs 2.5 = 8.69%.
+
+### The v38 fix (verbatim engine discipline)
+- `live_advance` now ticks the trio per FIRED 30 Hz tick (the same order as
+  the shot path's fast-forward: `sh1x_anims_sync` -> `fx_water_scroll_sync`
+  -> `sh1x_water_ripple_tick`), plus a one-time boot-frame "prime"
+  (`animsPrimed`) that computes the drivers' GATE state (dt=0) so
+  event-gated drivers are already hidden on frame 1 — the shot path's
+  post-loop call, applied to the live boot frame.
+- `sh1x_anims_sync` derives dt from the SESSION clock (monotonic, never
+  wraps — the engine's g_DeltaTime game-counter analog) stored per-Scene
+  (`Sh1x.animsLastSessionT`), NOT from the camtrack phase via a
+  function-static (the phase wraps at the cycle boundary and scrubs/restart
+  jump it -> one held tick per wrap, a 33 ms anim hitch each cycle).
+- `Sh1x.animsFresh[64]`: the engine-fresh snapshot taken at the end of
+  `sh1x_load`; the R-restart restores it (`sh1x_anims_reset`) — the engine
+  re-enters the room's WorldObjectsInit fresh instead of carrying the
+  previous session's angles.
+- The 4 shot/r2shot call sites now pass the session clock (in-loop:
+  pre-increment tSim; post-loop: tSim - tickDt = the last synced value, a
+  hold) — the OLD dt sequence [0, tickDt x (N-1)] + post-loop hold is
+  reproduced EXACTLY (goldens byte-identical).
+- New `FOGPOC_RESTARTTEST=1` SDL-loop test facility (the FOGPOC_R2TEST
+  precedent): fires the REAL `live_action(K_R)` path at frame 60.
+
+### The audit fleet's follow-ups (all applied)
+- **A1 (MAJOR)**: R-restart left driver 9 (gravityScatter, ER01FE) reading
+  ZERO live state — its per-instance liveVy/liveVz/scatter rolls are seeded
+  INSIDE `sh1x_anims_bind`, which ran once per scene (the static
+  `boundFor` guard), and the animsFresh snapshot predates the first bind ->
+  the beans teleported to the room origin after R. Fix: `boundFor` moved to
+  file scope + `sh1x_anims_bind_invalidate()` called from K_R (the bind is
+  deterministic — the re-run re-seeds driver 9).
+- **A2 (MINOR)**: the boot prime originally called the WATER pair too —
+  `fx_water_scroll_sync` advances the D_800AFDAC counter and the ripple
+  tick draws the shared RNG; both are per-tick-only systems with no gate
+  state to prime. Dropped from the prime (the live/shot water streams stay
+  in step).
+- **A3 (MINOR)**: `--t SECONDS` made the boot prime apply a clamped 0.1 s
+  anim jump. Fix: `sc.sh1x.animsLastSessionT = tStart` at live-app init ->
+  the prime is dt=0 (fresh pose) exactly like pre-v38.
+- **A4 (MINOR, pre-existing)**: multi-shot runs carried shot i-1's anims /
+  water counter / RNG stream into shot i (shot 2 at t=6 rendered ~8 s of
+  spin). Fix: per-shot engine-fresh state — `sh1x_anims_reset` +
+  g_propRngSeed/g_flaresys.counter/g_waterTileEverUpdated/g_sh1xBeltScroll/
+  g_tvpaint_pad resets. MULTI-SHOT == SOLO bit-identical now (verified md5).
+- (Pre-existing latent, filed NOT fixed — see audit INFO: `rot0PerInstN`/
+  `instBase` are zeroed AFTER their parse in sh1x_load — dead v36 code, no
+  shipped GLB authors them. Backlog.)
+
+### The verification battery (ALL PASS)
+- The 3 self-test goldens (SU0203 t=2.0 / THRF9FD t=10.5 / HP0003 t=6.0):
+  **byte-identical** before/after (md5) — the deterministic paths unchanged.
+- The TRUE SDL2 window loop under Xvfb (the RUN_SU0203.bat sequence):
+  t=3 vs t=6 = **10.08% pixels changed** — the fan spins. VLM-verified on
+  the frame pair: "FAN_MOVED: yes — blade configuration differs". Mid-session
+  HUD frame 100 vs final: 29.24% (the animation runs throughout).
+- The user's OWN camdat (the 3-map file): APUFFFE with its fully STATIC
+  track = 12.38% pixel change t=3 vs t=6 (the ferris + rides move with NO
+  camera motion possible — was 0% pre-fix); APU00FF (slow pan) = 76.19%.
+  VLM on the APUFFFE pair: "RIDES_MOVED yes — the gondola/cabin positions
+  are clearly in different orientations".
+- The restart test: [restarttest] frame 60 K_R fired (sessionT 1.967->0);
+  with-restart vs without-restart at the same frame = 7.75% (the drivers
+  returned to fresh state).
+- Multi-shot determinism: 2-shot run's t=6 frame == solo t=6 md5 (and
+  t=2 == solo t=2).
+- The wallpaper engine (the same fog_poc.c superset): the identical v38
+  port applied + audit-A's follow-ups mirrored (A1 bind invalidate, A2
+  prime, A3 --t, A4 per-shot resets) + the 4 shot-path call sites converted
+  to the session clock (audit-B's parity miss) + `pthread_attr_setstacksize
+  (4 MB)` for the engine thread (the ~300 KB stack Scene + call depth vs
+  bionic's ~1 MB default). Desktop gcc syntax-clean; the Android CI build
+  is the compile gate.
+
+### The fan window-loop GIF proof
+`SU0203_fan_windowloop_v38.gif` — 13 consecutive captured window-loop
+frames (FOGPOC_HUDSNAP k, fixed cam): the fan spinning in the REAL
+interactive loop, not the deterministic path.
