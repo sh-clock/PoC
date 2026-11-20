@@ -6275,10 +6275,16 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
         room_root_node = builder.json["nodes"][report["map_parent_node"]]
         room_root_node["extras"] = room_root_node.get("extras") or {}
         try:
+            # v40 audit (D-F4): whole-map mode crashed with NameError —
+            # this line referenced `map_rooms`, a main() LOCAL (verified:
+            # `--whole-map THR` on the test corpus = "ERROR ... name
+            # 'map_rooms' is not defined", NO map GLB ever written). Use
+            # the known_rooms PARAMETER (main() passes input_room_names —
+            # every room of this conversion; _room_maplink matches
+            # same-tag neighbors only, so the superset is safe and
+            # identical to the per-room mode's semantics).
             room_root_node["extras"]["SH1X"] = build_sh1x(
-                room, resolver, report,
-                known_rooms={r.name for r in
-                             map_rooms.get(room_prefix(room.name), ())})
+                room, resolver, report, known_rooms=known_rooms)
         except Exception as e:
             report["problems"].append(f"SH1X emission failed: {e}")
             raise
