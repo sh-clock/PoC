@@ -10488,15 +10488,31 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             scrLPos[1] = (int)(vy * invd);
             scrLPos[2] = (int)(d * 256.0f);          /* Q8-ish depth       */
             /* scr_l_ang_xy/z: angle between the eye->light ray and the
-             * light direction (lighting.c:203-238). The PoC light rides
-             * the camera (direction == view forward), so the angle is
-             * derived from the projected offset of the light DIRECTION
-             * endpoint: dir_end = pos + dir. Engine computes it in the
-             * light's own plane via OuterProduct; the PoC has the SAME
-             * vectors in view space, so the same math applies.         */
-            float dxv = (float)L->dir[0] * (1.0f / 4096.0f);
-            float dyv = (float)L->dir[1] * (1.0f / 4096.0f);
-            float dzv = (float)L->dir[2] * (1.0f / 4096.0f);
+             * light direction (lighting.c:203-238). V41 C-1: the ENGINE
+             * rotates the WORLD-space light DIRECTION into VIEW space
+             * FIRST — WorldEnvRender_LightScreenInfoGet's ApplyRotMatrix
+             * (lighting.c:228) applies the same world->view rotation it
+             * just used for the position (RotTrans, lighting.c:226;
+             * Vw_CoordToViewSpaceMatrix :223) — and only then feeds BOTH
+             * view-space vectors to WorldEnvRender_LightScreenAngleGet
+             * (:230). The old code fed the raw L->dir (stored WORLD-space
+             * by sh_env_update_pose for every mode) into view-space math:
+             * a mixed-frame angle that wandered with camera pose (the
+             * engine-true value is CONSTANT for a camera-mounted light —
+             * 82.01deg for the default anchor/beam, 27.1deg for the
+             * sewer/TV ahead-light; the mixed value swung 77.7..89.1deg /
+             * 27..175deg with yaw, wobbling the flare rate, the streak
+             * angles and the glint brightness). Rotate L->dir by the view
+             * rotation ROWS — the same rows that transform the position
+             * above, WITHOUT the translation (a direction has none).
+             * Mode 1's world-fixed dir needs the same rotation (the
+             * engine ApplyRotMatrix's it too).                           */
+            float dwx = (float)L->dir[0] * (1.0f / 4096.0f);
+            float dwy = (float)L->dir[1] * (1.0f / 4096.0f);
+            float dwz = (float)L->dir[2] * (1.0f / 4096.0f);
+            float dxv = view.m[0] * dwx + view.m[4] * dwy + view.m[8] * dwz;
+            float dyv = view.m[1] * dwx + view.m[5] * dwy + view.m[9] * dwz;
+            float dzv = view.m[2] * dwx + view.m[6] * dwy + view.m[10] * dwz;
             float ex = vx + dxv, ey = vy + dyv, ez = vz + dzv;
             float dex = ex - vx, dey = ey - vy, dez = ez - vz;
             /* normalize both view-space vectors                        */
