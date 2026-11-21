@@ -11607,17 +11607,35 @@ static unsigned short sh_wspr_texel(int clutRow, int u, int v) {
     return g_waterTexClut[clutRow & 1][g_waterTexIdx[v][u]];
 }
 
-/* v39: the WATER-sheet FT4 blit — affine UV over the 128x128 sheet, a
- * flat prim color (the setRGB0 modulation), TPAGE-45 ABR-1 ADDITIVE
- * (B5+F5 clamp 31). Corner order = the POLY_FT4's (u0,v0)(u1,v1)
- * (u2,v2)(u3,v3): u spans corner0->corner1, v spans corner0->corner2.
- * depthM = the prim's OWN projected depth — the engine's established
- * water-family painter gate (v37 W1-5; the game's own OT bucket bias
- * (z+0x100)>>3, water.c:439, is documented at the call sites). */
-static void fx_blit_wsheet_ft4(Frame *fb, const int sx[4], const int sy[4],
-                               int clutRow, int u0, int v0, int u1, int v1,
-                               int primR, int primG, int primB,
-                               float depthM) {
+/* v43 (E-15-1): the WATER-sheet QUAD rasterizer — the GPU's own quad
+ * split. swanstation rasterizes a POLY_FT4/GT4 as the two triangles
+ * (v0,v1,v2)+(v2,v1,v3), the shared edge v1-v2 (gpu_sw_backend.cpp:37-40
+ * DrawPolygon — (v0,v1,v2) then (v2,v1,v3)), so ALL FOUR projected
+ * corners shape coverage: the engine's water prims set x0..x3 from four
+ * INDEPENDENT GTE projections (the droplets' rtpt + rtps with x3 stored
+ * at water.c:421, corners projected :395-402; the strips' setXY0-3Fast of
+ * field_13C[k][0..1] / [k+1][0..1], water.c:679-682), and a stream row
+ * viewed along its flow is a perspective TRAPEZOID, not a parallelogram.
+ * The v39/v41 solve P = P0 + a*(P1-P0) + b*(P2-P0) with a,b in
+ * [-0.01,1.01] FABRICATED corner 3 at P1+P2-P0 — the far edge ran ~2 GTE
+ * px past the true quad (a spurious additive band outside the stream +
+ * the shared row double-blended where the GPU's walk draws it once; the
+ * 1.96 GTE px corner-3 error on the SUFFFE map1_s02 stream, V43 E-15-1).
+ * Coverage = the 5e9489d fx_blit_sprite_quad form: the two tsel
+ * triangles, the three edge functions AT the sample center, the
+ * inclusive same-sign test, first hit wins the shared edge (no
+ * double-paint on v1-v2). UVs and Gouraud are PER-TRIANGLE affine — the
+ * PS1 interpolates u/v and the color linearly within each triangle
+ * (swanstation sets up each triangle's own u/v/color DDAs), with the
+ * quad's corner UVs cu={u0,u1,u0,u1}, cv={v0,v0,v1,v1} = water.c's
+ * setUV corner map (u spans corner0->1, v spans corner0->2, :423-433 /
+ * 674-685) and the corner colors riding each triangle's own 3 vertices
+ * (setRGB0-3, :688-691). For a true screen parallelogram corner 3 sits
+ * exactly at P1+P2-P0 and the split reduces to the old solve's map.  */
+static void fx_blit_wsheet_q4(Frame *fb, const int sx[4], const int sy[4],
+                              int clutRow, int u0, int v0, int u1, int v1,
+                              const int cr[4], const int cg[4],
+                              const int cb[4], float depthM) {
     int mnx = sx[0], mxx = sx[0], mny = sy[0], mxy = sy[0];
     for (int i = 1; i < 4; i++) {
         if (sx[i] < mnx) mnx = sx[i];
@@ -11630,106 +11648,85 @@ static void fx_blit_wsheet_ft4(Frame *fb, const int sx[4], const int sy[4],
     if (mny < 0) mny = 0;
     if (mxx >= (int)fb->w) mxx = (int)fb->w - 1;
     if (mxy >= (int)fb->h) mxy = (int)fb->h - 1;
-    /* the affine UV solve for ROTATED quads (the stream quads' flow
-     * axis can be any heading): the parametric (a, b) in the
-     * parallelogram P = P0 + a*(P1-P0) + b*(P2-P0) — the PS1's own
-     * screen-space linear interpolation (affine, no perspective div). */
-    double ax1 = (double)sx[1] - sx[0], ay1 = (double)sy[1] - sy[0];
-    double ax2 = (double)sx[2] - sx[0], ay2 = (double)sy[2] - sy[0];
-    double det = ax1 * ay2 - ax2 * ay1;
-    if (fabs(det) < 1e-9) return;            /* degenerate quad          */
-    double ia =  ay2 / det, ib = -ax2 / det; /* inv [[ax1 ax2][ay1 ay2]] */
-    double ic = -ay1 / det, id2 =  ax1 / det;
+    /* the corner UVs (water.c's setUV4 corner map): u spans corner0->1,
+     * v spans corner0->2; corners 1/3 and 2/3 complete the grid.       */
+    const int cu[4] = { u0, u1, u0, u1 };
+    const int cv[4] = { v0, v0, v1, v1 };
+    /* the two GPU triangles: tsel 0 = (v0,v1,v2), tsel 1 = (v2,v1,v3).
+     * Per triangle: the parametric solve (a, b) in P = A + a*(B-A) +
+     * b*(C-A) — the SAME inverse-edge solve the parallelogram form used
+     * (for tsel 0, A=v0/B=v1/C=v2 is literally the old corner basis),
+     * so each channel interpolates as chan(A) + (chan(B)-chan(A))*a +
+     * (chan(C)-chan(A))*b.                                              */
+    int triOK[2];
+    int tAi[2], tCi[2];
+    double tAx[2], tAy[2];
+    double tIa[2], tIb[2], tIc[2], tId[2];
+    for (int t = 0; t < 2; t++) {
+        const int ai = (t == 0) ? 0 : 2;
+        const int ci = (t == 0) ? 2 : 3;   /* B is corner 1 in both     */
+        tAi[t] = ai; tCi[t] = ci;
+        tAx[t] = (double)sx[ai]; tAy[t] = (double)sy[ai];
+        double e1x = (double)sx[1] - sx[ai], e1y = (double)sy[1] - sy[ai];
+        double e2x = (double)sx[ci] - sx[ai], e2y = (double)sy[ci] - sy[ai];
+        double det = e1x * e2y - e2x * e1y;
+        triOK[t] = (fabs(det) >= 1e-9);    /* a degenerate triangle
+                                              rasterizes to nothing     */
+        if (!triOK[t]) continue;
+        tIa[t] =  e2y / det; tIb[t] = -e2x / det;
+        tIc[t] = -e1y / det; tId[t] =  e1x / det;
+    }
+    if (!triOK[0] && !triOK[1]) return;    /* fully degenerate quad     */
     for (int py = mny; py <= mxy; py++) {
         for (int px = mnx; px <= mxx; px++) {
-            double rx = px + 0.5 - sx[0], ry = py + 0.5 - sy[0];
-            double a = ia * rx + ib * ry;    /* along the u axis (0->1)  */
-            double b = ic * rx + id2 * ry;   /* along the v axis (0->1)  */
-            if (a < -0.01 || a > 1.01 || b < -0.01 || b > 1.01) continue;
-            int u = u0 + (int)((u1 - u0) * a);
-            int v = v0 + (int)((v1 - v0) * b);
+            double ax = px + 0.5, ay = py + 0.5;
+            /* point-in-quad over the two triangles — the fx_blit_sprite_
+             * quad convention (v41-ENGFX 5e9489d): the three edge
+             * functions at the sample point, all three same sign (or
+             * zero) = inside; the first containing triangle wins the
+             * shared v1-v2 edge, so it paints exactly once.            */
+            int t = -1;
+            for (int ts = 0; ts < 2; ts++) {
+                if (!triOK[ts]) continue;
+                const double axv = tAx[ts], ayv = tAy[ts];
+                const double bx = (double)sx[1], by = (double)sy[1];
+                const double cx = (double)sx[tCi[ts]], cy = (double)sy[tCi[ts]];
+                double e0 = (cx - bx) * (ay - by) - (cy - by) * (ax - bx);
+                double e1 = (axv - cx) * (ay - cy) - (ayv - cy) * (ax - cx);
+                double e2 = (bx - axv) * (ay - ayv) - (by - ayv) * (ax - axv);
+                int neg = (e0 < 0) || (e1 < 0) || (e2 < 0);
+                int pos = (e0 > 0) || (e1 > 0) || (e2 > 0);
+                if (!(neg && pos)) { t = ts; break; }
+            }
+            if (t < 0) continue;
+            /* the per-triangle affine UV + Gouraud (corner B = index 1) */
+            double rx = ax - tAx[t], ry = ay - tAy[t];
+            double a = tIa[t] * rx + tIb[t] * ry;   /* along A->B (u)   */
+            double b = tIc[t] * rx + tId[t] * ry;   /* along A->C (v)   */
+            const int ai = tAi[t], ci = tCi[t];
+            int u = (int)((double)cu[ai] +
+                    (double)(cu[1] - cu[ai]) * a +
+                    (double)(cu[ci] - cu[ai]) * b);
+            int v = (int)((double)cv[ai] +
+                    (double)(cv[1] - cv[ai]) * a +
+                    (double)(cv[ci] - cv[ai]) * b);
             if (u < 0 || u > 127 || v < 0 || v > 127) continue;
             size_t pi = (size_t)py * fb->w + px;
             if (depthM > 0.0f && fb->z && fb->z[pi] < depthM)
                 continue;
             unsigned short tc = sh_wspr_texel(clutRow, u, v);
             if ((tc & 0x7FFF) == 0) continue;   /* the PS1 0x0000 hole    */
-            int fr = ((int)(tc & 31u) * primR) >> 7;
-            int fg = (int)(((tc >> 5) & 31u) * primG) >> 7;
-            int fbv = (int)(((tc >> 10) & 31u) * primB) >> 7;
-            if (fr > 31) fr = 31;
-            if (fg > 31) fg = 31;
-            if (fbv > 31) fbv = 31;
-            uint8_t *p = fb->rgb + pi * 3;
-            int orr = (p[0] >> 3) + fr; if (orr > 31) orr = 31;
-            int ogg = (p[1] >> 3) + fg; if (ogg > 31) ogg = 31;
-            int obb = (p[2] >> 3) + fbv; if (obb > 31) obb = 31;
-            p[0] = (uint8_t)((orr << 3) | (orr >> 2));
-            p[1] = (uint8_t)((ogg << 3) | (ogg >> 2));
-            p[2] = (uint8_t)((obb << 3) | (obb >> 2));
-        }
-    }
-}
-
-/* v39: the WATER-sheet GT4 blit — per-corner GOURAUD colors (the strip
- * quads' setRGB0..3, water.c:688-691), additive, the same affine
- * discipline as the FT4 (the PS1 GTE raster is affine — no per-fragment
- * perspective division). The corner colors interpolate bilinearly over
- * the parallelogram spanned by corner0->1 (u) and corner0->2 (v). */
-static void fx_blit_wsheet_gt4(Frame *fb, const int sx[4], const int sy[4],
-                               int clutRow, int u0, int v0, int u1, int v1,
-                               const int cr[4], const int cg[4],
-                               const int cb[4], float depthM) {
-    int mnx = sx[0], mxx = sx[0], mny = sy[0], mxy = sy[0];
-    for (int i = 1; i < 4; i++) {
-        if (sx[i] < mnx) mnx = sx[i];
-        if (sx[i] > mxx) mxx = sx[i];
-        if (sy[i] < mny) mny = sy[i];
-        if (sy[i] > mxy) mxy = sy[i];
-    }
-    if (mxx < 0 || mnx >= (int)fb->w || mxy < 0 || mny >= (int)fb->h) return;
-    if (mnx < 0) mnx = 0;
-    if (mny < 0) mny = 0;
-    if (mxx >= (int)fb->w) mxx = (int)fb->w - 1;
-    if (mxy >= (int)fb->h) mxy = (int)fb->h - 1;
-    /* the affine solve for ROTATED quads — same as the FT4 (the PS1's
-     * screen-space linear interpolation; the Gouraud corners ride the
-     * same (a, b) parametric coords). */
-    double ax1 = (double)sx[1] - sx[0], ay1 = (double)sy[1] - sy[0];
-    double ax2 = (double)sx[2] - sx[0], ay2 = (double)sy[2] - sy[0];
-    double det = ax1 * ay2 - ax2 * ay1;
-    if (fabs(det) < 1e-9) return;            /* degenerate quad          */
-    double ia =  ay2 / det, ib = -ax2 / det;
-    double ic = -ay1 / det, id2 =  ax1 / det;
-    for (int py = mny; py <= mxy; py++) {
-        for (int px = mnx; px <= mxx; px++) {
-            double rx = px + 0.5 - sx[0], ry = py + 0.5 - sy[0];
-            double a = ia * rx + ib * ry;
-            double b = ic * rx + id2 * ry;
-            if (a < -0.01 || a > 1.01 || b < -0.01 || b > 1.01) continue;
-            int u = u0 + (int)((u1 - u0) * a);
-            int v = v0 + (int)((v1 - v0) * b);
-            if (u < 0 || u > 127 || v < 0 || v > 127) continue;
-            size_t pi = (size_t)py * fb->w + px;
-            if (depthM > 0.0f && fb->z && fb->z[pi] < depthM)
-                continue;
-            unsigned short tc = sh_wspr_texel(clutRow, u, v);
-            if ((tc & 0x7FFF) == 0) continue;   /* the PS1 0x0000 hole    */
-            /* the Gouraud corner modulation (0..255 corners)            */
-            double aac = a < 0 ? 0 : (a > 1 ? 1 : a);
-            double bbc = b < 0 ? 0 : (b > 1 ? 1 : b);
-            int pr = (int)((cr[0] * (1.0 - aac) * (1.0 - bbc) +
-                            cr[1] * aac * (1.0 - bbc) +
-                            cr[2] * (1.0 - aac) * bbc +
-                            cr[3] * aac * bbc) + 0.5);
-            int pg = (int)((cg[0] * (1.0 - aac) * (1.0 - bbc) +
-                            cg[1] * aac * (1.0 - bbc) +
-                            cg[2] * (1.0 - aac) * bbc +
-                            cg[3] * aac * bbc) + 0.5);
-            int pb = (int)((cb[0] * (1.0 - aac) * (1.0 - bbc) +
-                            cb[1] * aac * (1.0 - bbc) +
-                            cb[2] * (1.0 - aac) * bbc +
-                            cb[3] * aac * bbc) + 0.5);
+            /* the Gouraud corner modulation (0..255 corners) — the SAME
+             * (a, b) parametric interpolation as the UVs, per triangle  */
+            int pr = (int)((double)cr[ai] +
+                    (double)(cr[1] - cr[ai]) * a +
+                    (double)(cr[ci] - cr[ai]) * b + 0.5);
+            int pg = (int)((double)cg[ai] +
+                    (double)(cg[1] - cg[ai]) * a +
+                    (double)(cg[ci] - cg[ai]) * b + 0.5);
+            int pb = (int)((double)cb[ai] +
+                    (double)(cb[1] - cb[ai]) * a +
+                    (double)(cb[ci] - cb[ai]) * b + 0.5);
             int fr = ((int)(tc & 31u) * pr) >> 7;
             int fg = (int)(((tc >> 5) & 31u) * pg) >> 7;
             int fbv = (int)(((tc >> 10) & 31u) * pb) >> 7;
@@ -11745,6 +11742,42 @@ static void fx_blit_wsheet_gt4(Frame *fb, const int sx[4], const int sy[4],
             p[2] = (uint8_t)((obb << 3) | (obb >> 2));
         }
     }
+}
+
+/* v39: the WATER-sheet FT4 blit — affine UV over the 128x128 sheet, a
+ * flat prim color (the setRGB0 modulation), TPAGE-45 ABR-1 ADDITIVE
+ * (B5+F5 clamp 31). Corner order = the POLY_FT4's (u0,v0)(u1,v1)
+ * (u2,v2)(u3,v3): u spans corner0->corner1, v spans corner0->corner2.
+ * depthM = the prim's OWN projected depth — the engine's established
+ * water-family painter gate (v37 W1-5; the game's own OT bucket bias
+ * (z+0x100)>>3, water.c:439, is documented at the call sites).
+ * v43 (E-15-1): the flat color rides the q4 quad-triangle rasterizer
+ * (a constant corner set interpolates to itself on both triangles). */
+static void fx_blit_wsheet_ft4(Frame *fb, const int sx[4], const int sy[4],
+                               int clutRow, int u0, int v0, int u1, int v1,
+                               int primR, int primG, int primB,
+                               float depthM) {
+    const int cr[4] = { primR, primR, primR, primR };
+    const int cg[4] = { primG, primG, primG, primG };
+    const int cb[4] = { primB, primB, primB, primB };
+    fx_blit_wsheet_q4(fb, sx, sy, clutRow, u0, v0, u1, v1,
+                      cr, cg, cb, depthM);
+}
+
+/* v39: the WATER-sheet GT4 blit — per-corner GOURAUD colors (the strip
+ * quads' setRGB0..3, water.c:688-691), additive, the same affine
+ * discipline as the FT4 (the PS1 GTE raster is affine — no per-fragment
+ * perspective division). v43 (E-15-1): the corner colors interpolate
+ * PER TRIANGLE over the GPU's own (v0,v1,v2)+(v2,v1,v3) split (each
+ * triangle's color DDA is set up from its own 3 corners on hardware) —
+ * the old bilinear-over-parallelogram form also leaned on the fabricated
+ * corner-3 position. */
+static void fx_blit_wsheet_gt4(Frame *fb, const int sx[4], const int sy[4],
+                               int clutRow, int u0, int v0, int u1, int v1,
+                               const int cr[4], const int cg[4],
+                               const int cb[4], float depthM) {
+    fx_blit_wsheet_q4(fb, sx, sy, clutRow, u0, v0, u1, v1,
+                      cr, cg, cb, depthM);
 }
 
 /* v39: project one school-water world point with the MESH pipeline
