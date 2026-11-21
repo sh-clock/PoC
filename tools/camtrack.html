@@ -12579,7 +12579,10 @@ window.__camtrack = {
   setPipExpanded(big) { setPipExpanded(!!big); },
   get fogInfo() {
     const m = activeModel();
-    return { file: m ? m.file : null, fogon: m ? m.fogon === true : null, checkbox: $('#fog-check').checked };
+    /* B-16: #fog-check never existed (superseded by the World panel) —
+     * reading it threw TypeError; report null instead */
+    const fc = $('#fog-check');
+    return { file: m ? m.file : null, fogon: m ? m.fogon === true : null, checkbox: fc ? fc.checked : null };
   },
   setFogOn(on) {
     const m = activeModel();
@@ -12591,7 +12594,8 @@ window.__camtrack = {
   },
   get nightInfo() {
     const m = activeModel();
-    return { file: m ? m.file : null, nighton: m ? m.nighton === true : null, checkbox: $('#night-check').checked };
+    const nc = $('#night-check');               /* B-16: never existed — null */
+    return { file: m ? m.file : null, nighton: m ? m.nighton === true : null, checkbox: nc ? nc.checked : null };
   },
   setNightOn(on) {
     const m = activeModel();
@@ -12603,7 +12607,8 @@ window.__camtrack = {
   },
   get flashInfo() {
     const m = activeModel();
-    return { file: m ? m.file : null, flashlighton: m ? m.flashlighton === true : null, checkbox: $('#flash-check').checked };
+    const sc = $('#flash-check');               /* B-16: never existed — null */
+    return { file: m ? m.file : null, flashlighton: m ? m.flashlighton === true : null, checkbox: sc ? sc.checked : null };
   },
   setFlashOn(on) {
     const m = activeModel();
