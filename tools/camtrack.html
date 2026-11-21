@@ -1382,9 +1382,11 @@ const SHCore = (function () {
           const ry = Math.trunc(UL.rot[1] / 360 * 4096);
           const evy = -shMathSin(rx);              /* the engine's vy (y-down)   */
           const t = shMathCos(rx);
-          d0 = shR(t * shMathCos(ry), 12);         /* (int64)t*cos >> 12        */
-          d1 = -evy;
-          d2 = shR(t * shMathSin(ry), 12);
+          const evz = shR(t * shMathCos(ry), 12);  /* (int64)t*cos >> 12         */
+          const evx = shR(t * shMathSin(ry), 12);  /* (int64)t*sin >> 12         */
+          d0 = evx;                                /* B-10: sh_light_dir_from_rot */
+          d1 = -evy;                               /* (fog_poc.c:5187-5197): the  */
+          d2 = -evz;                               /* glTF dir (evx,-evy,-evz)    */
         } else {
           d0 = SH_LIGHT_DIR_CAM_Q12[0];
           d1 = SH_LIGHT_DIR_CAM_Q12[1];
