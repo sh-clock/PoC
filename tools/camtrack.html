@@ -4984,7 +4984,7 @@ const DOC_STRING =
   'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
-  'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
+  'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
   'USER PROGRAMMABLE LIGHT (v13.5, task 3): models[].light { on (boolean, the Game_TurnFlashlightOn boot toggle), follow "camera"|"world", pos[3] meters (world), rot[3] degrees (pitch,yaw,roll — the AIM; the verbatim default -15,0,0 = Harry\u2019s lightRotation; roll has no engine term), offset[3] meters (camera-local; the verbatim Game_FlashlightAttribsSet anchor -0.08,-0.28,0.12), ahead meters (forward along the beam) } — the 6-DOF light source that emulates Harry\u2019s flashlight: it moves in all the ways the camera can (a free world pose OR the camera-follow anchor), is disable-able (on=false + the runtime F key), NEVER fires in day modes (the verbatim lightMode-None + identical-pair auto-off gates — never a forced Spot), and has angle distinction (the authored aim drives func_8003F4DC\u2019s rot math in every consumer: the per-vertex MESH light, the lens-flare/water FX, the screen angles). Resolution: CLI --userlight/--userlightrot > camdat light > the GLB\u2019s unbiased userLight EXTRAs > the verbatim constants. ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
 
@@ -6597,12 +6597,15 @@ async function loadModelBase64(name, b64) {
  *    real/alt school, HP/HU = the real/alt hospital, ER = Nowhere.
  *
  * THE DERIVATION (the user's day/night population rules):
- *  - the TOWN family ({1,1} day streets; {6,3} SPU/DR night streets — the
- *    same streets by day and by night): dayEnv = 1, nightEnv = 6.
+ *  - the TOWN family ({1,1} day streets; a genuine day+night {6,3} street
+ *    map, i.e. THR/SPR revisited by night): dayEnv = 1, nightEnv = 6.
  *  - DAY-LIT interiors ({2,2}): dayEnv = 2, nightEnv = 7 (the interior's
  *    night look — no invented daylight beyond the authentic presets).
- *  - NIGHT-ONLY locations (APU amusement park, DRU/RSU/RSR): dayEnv =
- *    nightEnv = 6 — NEVER broad daylight (the Amusement-Park rule).
+ *  - NIGHT-ONLY locations (APU amusement park, DRU/RSU/RSR, and the
+ *    night/flooded street maps SPU/DR — the v41 fix: SPU = the NIGHT
+ *    central town, DR = the flooded streets, both night-only families;
+ *    the TOWN day+night family is THR/SPR): dayEnv = nightEnv = 6 —
+ *    NEVER broad daylight (the Amusement-Park rule).
  *  - DARK interiors ({7,4} — the school/hospital/Nowhere, nightmare-only):
  *    dayEnv = nightEnv = 7 (preset 4 remains the flashlight-ON blend the
  *    players toggle; no invented day look for a night-only scene).
@@ -6626,7 +6629,15 @@ function sh1xEnvDefaults(env) {
   if (p0 === 1 && p1 === 1) { dayEnv = 1; nightEnv = 6; }
   else if (p0 === 2 && p1 === 2) { dayEnv = 2; nightEnv = 7; }
   else if (p0 === 6 && p1 === 3) {
-    if (tag === 'APU' || tag === 'DRU' || tag === 'RSU' || tag === 'RSR') {
+    /* v41 fix (CT-IMPL fix 1): SPU (the night central town) and DR (the
+     * flooded streets) join the night-only family — BOTH day/night fields
+     * carry the night pair (dayEnv=nightEnv=6), exactly like APU/DRU/RSU/RSR.
+     * The town day+night family (a genuine {6,3} day-with-night map, e.g.
+     * THR/SPR street maps re-visited at night) keeps day 1 / night 6.
+     * The user's rule: day+night scenes populate both; night-only scenes
+     * populate BOTH with the night value. */
+    if (tag === 'APU' || tag === 'DRU' || tag === 'RSU' || tag === 'RSR' ||
+        tag === 'SPU' || tag === 'DR') {
       dayEnv = 6; nightEnv = 6;               /* night-only locations       */
     } else { dayEnv = 1; nightEnv = 6; }      /* the town: day + night      */
   }
