@@ -1172,6 +1172,13 @@ typedef struct {
                                  animInst (rip emission order)             */
     int cutsceneOnly;          /* v27.2: node extras cutsceneOnly — hidden at
                                  engine-fresh (map7_s02 beans)             */
+    int nbMerged;              /* v43 (E-03-1): item merged from a mapLink
+                                 neighbor GLB — its billboard anchors must
+                                 NOT inherit the MAIN room's buffer verdict
+                                 (engine: a neighbor chunk's billboards ride
+                                 the NEIGHBOR's own chunk windows, map.c:
+                                 1387-1446; the merged items ride the legacy
+                                 always-drawn path per the merge contract)  */
 } DrawItem;
 
 typedef struct {
@@ -2689,6 +2696,7 @@ static void glb_walk_node(Glb *g, const JValue *nodes, int nodeIdx, mat4 parent,
             item.animIdx = -1;   /* v26.3: bound in sh1x_anims_bind */
             item.posedInst = nodePosedInst;   /* v27.2                  */
             item.cutsceneOnly = nodeCutsceneOnly; /* v27.2               */
+            item.nbMerged = 0;   /* v43 (E-03-1): native item, not merged   */
             item.vbase = (int)(sb->n / 8);
             item.ibase = (int)sb->in;
             for (int i = 0; i < pos.count; i++) {
@@ -2967,6 +2975,13 @@ static int scene_merge(Scene *dst, Scene *src) {
         it.addSeq = dst->itemCount + i;
         it.animIdx = -1;        /* neighbors render static (documented)    */
         it.animInst = 0;
+        it.nbMerged = 1;        /* v43 (E-03-1): merged neighbor item —
+                                  do not resolve its billboard buffer
+                                  against the MAIN room's subcell windows
+                                  (map.c:1387-1446: a neighbor chunk's
+                                  billboards follow the NEIGHBOR's own
+                                  chunk; always-drawn is the merge block's
+                                  documented contract, see 2912-2914)     */
         dst->item[dst->itemCount + i] = it;
     }
     dst->texCount += src->texCount;
@@ -13460,7 +13475,14 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
              * inside the same modelOrder range + visibility check
              * (map.c:1424-1446). */
             int parentBuf = it->buffer;
-            if (parentBuf < 0 && it->isBillboard &&
+            /* v43 (E-03-1): a MERGED neighbor's BILLBOARDS_g{g}_{j} anchor
+             * must NOT inherit the MAIN room's buffer g verdict — g restarts
+             * at 0 per room (ipd2gltf.py:6423-6424), so the atoi resolves a
+             * NEIGHBOR group against the MAIN map's subcell table + camera
+             * (the trees pop with the main camera; g >= main nBuffers drops
+             * outright). Merged anchors keep parentBuf -1 -> the always-drawn
+             * branch below (the merge block's own contract).                */
+            if (parentBuf < 0 && !it->nbMerged && it->isBillboard &&
                 strncmp(it->name, "BILLBOARDS_g", 12) == 0)
                 parentBuf = atoi(it->name + 12);
             if (parentBuf < 0) {
