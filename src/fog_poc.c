@@ -11410,15 +11410,32 @@ static void fx_blit_water_quad(Frame *fb, const int sx[4], const int sy[4],
     for (int py = mny; py <= mxy; py++) {
         for (int px = mnx; px <= mxx; px++) {
             double ax = px + 0.5, ay = py + 0.5;
+            /* V42 A-1: point-in-quad via two triangle tests — the
+             * fx_blit_sprite_quad edge-function convention (5e9489d; the
+             * swanstation quad split gpu_sw_backend.cpp:36-38 = (v0,v1,v2)
+             * + (v2,v1,v3)). The old d1/d2/d3 were cross products where
+             * d2/d3 are winding CONSTANTS (evaluated at triangle vertices,
+             * not at the sample) and only d1 tracked the sample —
+             * !(neg&&pos) then accepted only the OUTSIDE strip past edge
+             * V0->V1, so the ripple mesh quads/sprites painted mirrored
+             * garbage strips (or nothing when u0=v0=0 killed the strips).
+             * The GPU-correct test: the three edge functions AT the sample
+             * point, all three same sign = inside. UV solve + blend are
+             * unchanged (the A-6 parallelogram solve is correct).        */
             int inside = 0;
             for (int t = 0; t < 2 && !inside; t++) {
-                double bx = sx[1 + t], by = sy[1 + t];
-                double cx = sx[2 + t], cy = sy[2 + t];
-                double d1 = (bx - ax) * (sy[0] - ay) - (sx[0] - ax) * (by - ay);
-                double d2 = (cx - bx) * (sy[0 + t] - by) - (sx[0 + t] - bx) * (cy - by);
-                double d3 = (sx[0] - cx) * (sy[1 + t] - cy) - (sx[1 + t] - cx) * (sy[0] - cy);
-                int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                const int ai = (t == 0) ? 0 : 2;
+                const int ci = (t == 0) ? 2 : 3;
+                double axv = sx[ai], ayv = sy[ai];
+                double bx = sx[1], by = sy[1];
+                double cx = sx[ci], cy = sy[ci];
+                /* edge functions at (ax,ay) for triangle (A,B,C) — the
+                 * same three forms as fx_blit_sprite_quad's e0/e1/e2     */
+                double e0 = (cx - bx) * (ay - by) - (cy - by) * (ax - bx);
+                double e1 = (axv - cx) * (ay - cy) - (ayv - cy) * (ax - cx);
+                double e2 = (bx - axv) * (ay - ayv) - (by - ayv) * (ax - axv);
+                int neg = (e0 < 0) || (e1 < 0) || (e2 < 0);
+                int pos = (e0 > 0) || (e1 > 0) || (e2 > 0);
                 if (!(neg && pos)) inside = 1;
             }
             if (!inside) continue;
