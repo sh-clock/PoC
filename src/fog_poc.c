@@ -7892,10 +7892,18 @@ static int fx_flare_target_rate(int light_eff_pow, int scr_z, int scr_ang_z) {
 static void fx_blit_sprite_quad(
     Frame *fb, int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3,
     const unsigned char *idx_plane, int sw, int sh,
-    const unsigned short clut[16], int primR, int primG, int primB) {
+    const unsigned short clut[16], int primR, int primG, int primB,
+    float zGate) {
     /* rasterize the (possibly rotated) sprite quad: affine UV via edge
      * walk — same approach as raster_tri but on the sprite plane, in
-     * PoC pixels (engine px scale fb->w/320). */
+     * PoC pixels (engine px scale fb->w/320).
+     * V42 C-2 re-land: zGate > 0 = the engine's occluded-branch OT
+     * placement (lens_flare.c:338-349/364-375) — the quad is depth-
+     * gated: a pixel covered by NEARER opaque geometry (fb->z < zGate)
+     * is skipped, the fx_blit_gouraud_tri depthM convention (the
+     * bucket's FAR edge — same-bucket geometry AddPrim'd before the
+     * quad draws after it and covers it). zGate <= 0 = front_ot
+     * (ungated — painted over everything). */
     int minX = x0, maxX = x0, minY = y0, maxY = y0;
     int xs[4] = { x0, x1, x2, x3 }, ys[4] = { y0, y1, y2, y3 };
     for (int i = 1; i < 4; i++) {
@@ -7968,6 +7976,8 @@ static void fx_blit_sprite_quad(
             int fg = (t5g * primG) >> 7; if (fg > 31) fg = 31;
             int fbv = (t5b * primB) >> 7; if (fbv > 31) fbv = 31;
             size_t pi = (size_t)py * fb->w + px;
+            if (zGate > 0.0f && fb->z && fb->z[pi] < zGate)
+                continue;              /* V42 C-2: occluded branch */
             uint8_t *bp = fb->rgb + pi * 3;
             /* SemiTrans: same additive rule as the verified snow path   */
             int or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
@@ -11010,6 +11020,30 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
     #define FX_TO_PX(v) ((int)((v) * scale) + (int)(fb->w / 2))
     #define FX_TO_PY(v) ((int)((v) * scale) + (int)(fb->h / 2))
 
+    /* V42 C-2 re-land: the engine's occluded-branch OT placement for
+     * core quads 1-2 (lens_flare.c:338-349 / 364-375, VERBATIM):
+     *   center_visible            -> AddPrim(front_ot)   (over everything)
+     *   occluded, ang_z > 90deg   -> AddPrim(depth_ot)   (the LIGHT'S
+     *                                OWN bucket org[vz>>3])
+     *   occluded, ang_z <= 90deg  -> AddPrim(depth_ot+7) (7 buckets
+     *                                FARTHER = 56 Q8 = +0.21875 m)
+     * The PoC depth gate is the bucket's FAR edge (the fx_blit_gouraud_tri
+     * depthM convention): same-bucket geometry AddPrim'd before the quad
+     * (all world geometry precedes the flare pass) draws after it and
+     * covers it — the C-3 far-edge rule. Quad 3 and the ghosts/streaks
+     * stay front_ot (the engine adds them unconditionally,
+     * lens_flare.c:396-399/440-487). scrLPos[2] is fresh this frame
+     * (the sprite section runs only with syncDrawExecF set under Gate 2
+     * vz > 112 Q8), so lb >= 14 always. */
+    float flareGate = -1.0f;               /* visible: paint in front  */
+    if (!visF) {
+        int lb = g_flaresys.scrLPos[2] >> 3;   /* the light's OT bucket */
+        if (angZ > fx_q12_angle(90.0f))
+            flareGate = (float)((lb + 1) * 8) * (1.0f / 256.0f);
+        else
+            flareGate = (float)((lb + 8) * 8) * (1.0f / 256.0f);
+    }
+
     /* core quad 1 (lens_flare.c:326-336): grey ((rate+3)>>2)*40, half-
      * size ((rate+3)>>2)*30, offset hensin*5; UV 0..63 clut+6          */
     {
@@ -11023,7 +11057,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
             FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
             (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-            prim, prim, prim);
+            prim, prim, prim, flareGate);
     }
     /* core quad 2: fixed color 0x10, half-size 11 (lens_flare.c:338-365) */
     fx_blit_sprite_quad(fb,
@@ -11032,7 +11066,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
         FX_TO_PX(scrX - 11), FX_TO_PY(scrY + 11),
         FX_TO_PX(scrX + 11), FX_TO_PY(scrY + 11),
         (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-        0x10, 0x10, 0x10);
+        0x10, 0x10, 0x10, flareGate);
     /* core quad 3 (lens_flare.c:367-396): grey min(rate*2,1)*48, offset
      * hensin*9/2? engine FP_MULTIPLY(hensin, 9, Q12_SHIFT-1) = h*9/2   */
     {
@@ -11047,7 +11081,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
             FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
             (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-            prim, prim, prim);
+            prim, prim, prim, 0.0f);
     }
 
     if (nowRate != 0) {
@@ -11088,7 +11122,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             fx_blit_sprite_quad(fb, cxp[0], cyp[0], cxp[1], cyp[1],
                                 cxp[2], cyp[2], cxp[3], cyp[3],
                                 (const unsigned char *)kFlareStreak, 32, 32,
-                                kFlareClutStreak, prim, prim, prim);
+                                kFlareClutStreak, prim, prim, prim, 0.0f);
         }
 
         /* ghost 1 (lens_flare.c:447-459): RGB Q12_MULT(now,32/48/32) —
@@ -11105,7 +11139,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(px + half), FX_TO_PY(py + half),
                 (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
                 fx_q12_mul(nowRate, 32), fx_q12_mul(nowRate, 48),
-                fx_q12_mul(nowRate, 32));
+                fx_q12_mul(nowRate, 32), 0.0f);
         }
         /* ghost 2 (lens_flare.c:462-475): RGB ((u32)now*7)>>9,
          * ((u32)now*19)>>11, Q12_MULT(now,24) — M1: the v30 blue had the
@@ -11125,7 +11159,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(px - half), FX_TO_PY(py + half),
                 FX_TO_PX(px + half), FX_TO_PY(py + half),
                 (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
-                r, g, b);
+                r, g, b, 0.0f);
         }
         /* ghost 3 (lens_flare.c:477-487): RGB (u32)now>>6,
          * Q12_MULT(now,24), ((u32)now*47)>>11 — M1: the v30 green had
@@ -11141,10 +11175,9 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(scrX - 10), FX_TO_PY(scrY + 10),
                 FX_TO_PX(scrX + 10), FX_TO_PY(scrY + 10),
                 (const unsigned char *)kFlareGhost3, 64, 64, kFlareClutCore,
-                r, g, b);
+                r, g, b, 0.0f);
         }
     }
-    (void)visF;
     #undef FX_TO_PX
     #undef FX_TO_PY
 }
