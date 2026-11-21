@@ -11130,8 +11130,12 @@ window.addEventListener('keydown', e => {
       /* v41 audit (B-9): Shift+F is SHUI's flashlight toggle (the engine
        * shortcut, camtrack.html:4219 — registered later, fires second);
        * the unguarded frameModel made one keypress BOTH reframe the orbit
-       * camera AND toggle the flashlight. Plain F keeps frame-model. */
-      if (!e.shiftKey) frameModel();
+       * camera AND toggle the flashlight. Plain F keeps frame-model.
+       * v41-ENGFX bug 4: Ctrl/Cmd+F is the BROWSER FIND shortcut — the
+       * frame-model handler must not fire on it (mirror of the B-9 Shift
+       * guard; plain F keeps frame-model, Ctrl/Cmd+F falls through to
+       * the browser). */
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) frameModel();
       break;
     case 'g': $('#btn-grid').click(); break;
     case 'l': $('#btn-paths').click(); break;      /* paths overlay (was P — P is Pointer now) */
