@@ -245,6 +245,7 @@ if [ "$LINUX_BIN" != "NONE" ] && [ -f "$LINUX_BIN" ]; then
     ( cd "$TMP" && zip -q -r "$OUT/sh1x-poc-$TAG-linux.zip" \
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
         RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh RUN_DRU0100.sh RUN_SPU0401.sh \
+        RUN_ANIMS.sh ANIMS.md glbs_anim \
         fog_poc input )
 fi
 rm -f "$TMP/RUN_THR.sh" "$TMP/RUN_HP0003.sh" "$TMP/RUN_SU0203.sh" \
@@ -309,6 +310,7 @@ EOF
         README.txt TESTING.md ACKNOWLEDGEMENTS.md TOOLS.md \
         RUN_THR.bat RUN_HP0003.bat RUN_SU0203.bat RUN_DRU0100.bat RUN_SPU0401.bat \
         RUN_THR.sh RUN_HP0003.sh RUN_SU0203.sh RUN_DRU0100.sh RUN_SPU0401.sh \
+        RUN_ANIMS.bat RUN_ANIMS.sh ANIMS.md glbs_anim \
         fog_poc.exe input )
 fi
 
