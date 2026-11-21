@@ -11053,9 +11053,11 @@ try {
   tvOn = new URLSearchParams(location.search).get('tv') !== '0';
 } catch (e) { /* file:// or such — keep on */ }
 
-let tvQuads = 0;                       /* the last frame's quad count (13 max) */
-const TV_MAX_QUADS = 13;                /* 9 small POLY_FT4s + the big screen's 4 sub-quads */
-let tvSlotMeshes = [];                  /* the 13 quad slots (mesh + material each) */
+let tvQuads = 0;                       /* the last frame's quad count (24 max) */
+const TV_MAX_QUADS = 24;                /* B-17: fog_poc.c:13076 TvQuad tvq[24] + maxTvq=24
+                                           (13 dropped the 2nd big screen's sub-quads:
+                                           9 small + 2 big x 4 sub-quads = 17 > 13) */
+let tvSlotMeshes = [];                  /* the 24 quad slots (mesh + material each) */
 const _tvPlaneTex = new WeakMap();      /* tv table -> Map(st -> DataTexture): per-room planes (the strip is the room's own) */
 let _tvMvp = null;                      /* the scratch mat4 (created with the meshes) */
 
