@@ -3462,7 +3462,13 @@ static int camdat_load(Camdat *cd, const char *path, const char *glbName) {
         if (env && env->type == JV_OBJ) {
             cd->hasEnv = 1;
             const JValue *pair = jarr(env, "pair");
-            if (pair && pair->count >= 2 &&
+            /* v43 (audit E-04-1): camtrack.html sanitizeEnv is STRICT
+             * length===2 (camtrack.html:6044-6045: Array.isArray(raw.pair)
+             * && raw.pair.length === 2) — a 3+-element pair is DROPPED
+             * (falls back to the consumer default) by the editor; the old
+             * >= 2 KEPT the first two and the two sides booted different
+             * env presets for the same hand-edited file. */
+            if (pair && pair->count == 2 &&
                 jat(pair, 0) && jat(pair, 0)->type == JV_NUM &&
                 jat(pair, 1) && jat(pair, 1)->type == JV_NUM) {
                 int p0 = (int)jat(pair, 0)->num;
