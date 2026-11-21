@@ -103,8 +103,9 @@ def build_ipd(sh):
     cy_off = struct.unpack_from("<I", block, 24)[0]
     for i, y in enumerate(coll["cylinders"]):
         o = cy_off + 10 * i
+        # decomp ipd.h:71-77: triggerFlagIdx = word0 bits 8-11 (v43 RIP2-2)
         u16v = (y["floorType"] & 0x1F) | ((y["disableHeight"] & 7) << 5) | \
-               ((y["triggerFlagIdx"] & 0xF) << 12)
+               ((y["triggerFlagIdx"] & 0xF) << 8)
         struct.pack_into("<H", block, o, u16v)
         struct.pack_into("<3h", block, o + 2, *y["offset"])
         struct.pack_into("<h", block, o + 8, y["radius"])
