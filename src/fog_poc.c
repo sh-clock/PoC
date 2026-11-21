@@ -15310,18 +15310,26 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
          * every post-restart tick (91 vs a fresh boot's 87 at t=3 on
          * DRU0100) — the RESTARTTEST restart-final vs fresh md5 mismatch
          * GATE-A probed. Mirror the boot exactly: the fade back at its
-         * boot value 0 + the identity-pose dt=0 prime (ticksDone=1, no
-         * ramp). NOTE: the engine has no R key — the PoC's R models the
-         * v38/v41-E2/E3 restart == fresh-session contract, NOT a decomp
-         * room-reload of the (persistent-game-state) flashlight; the env's
-         * user choices (pair/night/flashlight on-off) still survive R —
-         * only the boot-time RAMP re-runs.                              */
+         * boot value 0 + the identity-pose dt=0 prime. v43 (E-07-1): the
+         * engine's dt=0 frames are NOT 30Hz grid slots (the room-load
+         * frames sit outside the Gameplay cadence — game_sys_states.c:121
+         * forces dt=0 BEFORE the world-scene block; every Gameplay frame
+         * runs WorldEnv_Update + the weather particles on the SAME frame,
+         * :167/:171), so the prime no longer consumes slot 1 — both the
+         * boot and this restart un-prime ticksDone, and restart == fresh
+         * still holds since the two sites change together. NOTE: the
+         * engine has no R key — the PoC's R models the v38/v41-E2/E3
+         * restart == fresh-session contract, NOT a decomp room-reload of
+         * the (persistent-game-state) flashlight; the env's user choices
+         * (pair/night/flashlight on-off) still survive R — only the
+         * boot-time RAMP re-runs.                                      */
         A->env.flashlightIntensity = 0;
         sh_env_reset(&A->env, 0.0);      /* restart the env simulation    */
         {
             Quat q0 = quat_id();
             v3 p0 = { 0.0f, 0.0f, 0.0f };
             sh_env_tick(&A->env, 0, p0, q0);   /* the boot dt=0 prime */
+            A->env.ticksDone = 0;   /* the engine's dt=0 frames are not 30Hz grid slots */
         }
         sh1x_anims_reset((Sh1x *)&A->R.sc->sh1x); /* v38: drivers fresh    */
         sh1x_anims_bind_invalidate();      /* v38-audit-A1: re-seed drvr 9 */
@@ -17723,6 +17731,16 @@ int main(int argc, char **argv) {
         Quat q0 = quat_id();
         v3 p0 = {0, 0, 0};
         sh_env_tick(&A.env, 0, p0, q0);
+        /* v43 (E-07-1): the engine's dt=0 frames are NOT 30Hz grid slots
+         * (game_sys_states.c:121 forces g_DeltaTime=0 on the non-Gameplay
+         * load/cutscene frames; every Gameplay frame pairs one dt=136
+         * WorldEnv_Update with one particle update, game_sys_states.c:167,
+         * 171). Keep the prime's dt=0 side effects but stop it consuming
+         * slot 1: the first dt=136 env tick fires at t=1/30 exactly like
+         * the snow grid and the shot paths. The t=0 light pose comes from
+         * sh_env_sync_live's ticksDone==0 boot-frame call with the REAL
+         * camera.                                                          */
+        A.env.ticksDone = 0;
     }
     printf("engine env: pair {%d,%d}%s%s\n"
            "  fogColor=(%d,%d,%d) fogDistance=%.1fm tintEff=(%d,%d,%d) wLI=%.2f\n"
