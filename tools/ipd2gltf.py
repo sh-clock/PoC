@@ -6853,30 +6853,69 @@ def room_prefix(stem):
 MAP_BOUNDARY_CONTACT_TOL_M = 1.0
 
 
+def _gltf_node_local_matrix(nd):
+    """One glTF node's local 4x4 (column-major storage -> row-major math),
+    the same composition validate_glb's _vl_node_local performs."""
+    if "matrix" in nd:
+        return np.array(nd["matrix"], dtype=np.float64).reshape(4, 4).T
+    tr = nd.get("translation", [0, 0, 0])
+    qv = nd.get("rotation", [0, 0, 0, 1])
+    sc = nd.get("scale", [1, 1, 1])
+    x, y, z, w = qv
+    rm = np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]],
+        dtype=np.float64)
+    for c in range(3):
+        rm[:, c] *= sc[c]
+    M = np.eye(4)
+    M[:3, :3] = rm
+    M[:3, 3] = tr
+    return M
+
+
 def map_room_aabb(builder, node_idx):
     """Union world AABB (glTF meters) and mesh/prim counts of a room's node
-    subtree.  All geometry nodes carry identity transforms (absolute
-    map-grid coordinates are baked into the vertices; marker nodes have
-    matrices but no mesh), so POSITION accessor min/max ARE world AABBs."""
+    subtree.  v43 (RIP-3-2): the subtree's node transforms are COMPOSED
+    before the union — propAnimPosed nodes carry the world position in the
+    node translation while their mesh vertices stay LOCAL (the fake
+    instance translation cancels the map offset), so raw POSITION accessor
+    min/max are NOT world AABBs for posed nodes (DRU0100 SITAI_NE: local
+    x in [-0.828, 0.754] with node translation x=75.0 — the old proof's
+    AABB was off by 40.8 m in x-lo).  Each accessor min/max box is pushed
+    through the node's composed world matrix (all 8 corners; the
+    validate_glb _vl_walk pattern) before unioning.  Baked geometry nodes
+    keep identity transforms, so their AABBs are unchanged."""
     nodes = builder.json["nodes"]
     lo = hi = None
     meshes = prims = 0
-    stack = [node_idx]
+    stack = [(node_idx, np.eye(4))]
     while stack:
-        n = nodes[stack.pop()]
+        ni, parent = stack.pop()
+        n = nodes[ni]
+        M = parent @ _gltf_node_local_matrix(n)
         if "mesh" in n:
             meshes += 1
             for prim in builder.json["meshes"][n["mesh"]]["primitives"]:
                 prims += 1
                 acc = builder.json["accessors"][prim["attributes"]["POSITION"]]
                 mn, mx = acc["min"], acc["max"]
-                if lo is None:
-                    lo, hi = list(mn), list(mx)
-                else:
-                    for k in range(3):
-                        lo[k] = min(lo[k], mn[k])
-                        hi[k] = max(hi[k], mx[k])
-        stack.extend(n.get("children", ()))
+                for cx in (mn[0], mx[0]):
+                    for cy in (mn[1], mx[1]):
+                        for cz in (mn[2], mx[2]):
+                            w = M[:3, :3] @ (cx, cy, cz) + M[:3, 3]
+                            if lo is None:
+                                lo, hi = [float(w[0]), float(w[1]),
+                                          float(w[2])], [float(w[0]),
+                                                         float(w[1]),
+                                                         float(w[2])]
+                            else:
+                                for k in range(3):
+                                    lo[k] = min(lo[k], float(w[k]))
+                                    hi[k] = max(hi[k], float(w[k]))
+        for ch in n.get("children", ()):
+            stack.append((ch, M))
     return lo, hi, meshes, prims
 
 
