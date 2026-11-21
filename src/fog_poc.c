@@ -9811,7 +9811,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
             const Sh1xPropAnim *a = &sx->anims[ai];
             fprintf(stderr, "ANIMDBG t=%.3f drv=%d obj=%s rawVy=%d rawVel=%d "
                     "cur=(%.3f,%.3f,%.3f) master=%d kick=%d gated=%d "
-                    "fl=(%d,%.0f,%d,%.0f)\n",
+                    "fl=(%d,%d,%d,%d)\n",
                     sx->animsLastSessionT, a->driver, a->object,
                     a->rawVy, a->rawVel, a->cur[0], a->cur[1], a->cur[2],
                     a->mvMaster, a->kickPhase, a->gated,
