@@ -3227,7 +3227,23 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
     if (t->fovDeg > 140) t->fovDeg = 140;
     t->loopMode = camdat_parse_loop(jstr(raw, "loopMode", NULL),
                                     camdat_loop_default(type));
-    t->lookMode = camdat_parse_look_typed(jstr(raw, "lookMode", NULL), type);
+    /* v43 (audit E-04-2): camtrack.html sanitizeTrack NEVER assigns
+     * lookMode for type 'fixed' (it is only assigned inside the other 7
+     * type branches, camtrack.html:6148/6168/6198/6222/6242/6259/6277;
+     * the fixed else-branch at 6288-6302 sets position/yaw/pitch/speeds/
+     * bounds only) — so updateTrackCam's `if (tr.lookMode === 'lazy')`
+     * (camtrack.html:6677) is undefined => false and the JS NEVER runs
+     * the lazy inner turn filter for fixed tracks. The old type-unaware
+     * parse accepted "lazy" for TRK_FIXED and :4316's
+     * `if (tr->lookMode == LOOK_LAZY)` then layered the lazy filter on
+     * top of the fixed yaw/pitch target. Force the typed default
+     * (LOOK_PATH — the same value camdat_parse_look_typed returns for
+     * an absent lookMode on fixed) for TRK_FIXED. lazyRateDegS stays
+     * parsed (its only consumer is the lazy filter, which can no longer
+     * run for fixed — behavior-neutral either way). */
+    t->lookMode = (type == TRK_FIXED)
+        ? LOOK_PATH
+        : camdat_parse_look_typed(jstr(raw, "lookMode", NULL), type);
     /* v21: lazyRateDegS — camtrack v9/v10 sanitizeTrack clamps to [1,720]
      * with default 25 (makeTrack's v9.1 default fix).                    */
     t->lazyRateDegS = (float)jnum(raw, "lazyRateDegS", 25.0);
