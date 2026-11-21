@@ -12017,6 +12017,7 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                 for (int mj = 0; mj < 4; mj++) {
                     int sxq[4], syq[4], vis = 1;
                     float dsum = 0.0f;
+                    float d0 = 0.0f;   /* v41 (A-4): corner [i][j]'s depth */
                     /* grid corners (engine coords -> glTF)             */
                     float wx[4] = { -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f,
                                     -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f };
@@ -12030,23 +12031,29 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                         float pz = view.m[2] * gx + view.m[6] * gy + view.m[10] * gz + view.m[14];
                         float d = -pz;
                         if (d <= 0.05f) { vis = 0; break; }
+                        if (k == 0) d0 = d;   /* sp78[i][j], the cull corner */
                         dsum += d;
                         float iv = 224.0f / d;      /* v40: NTSC 224 (gte_rtpt) */
                         sxq[k] = (int)(px * iv) + (int)(fb->w / 2);
                         syq[k] = (int)(py * iv) + (int)(fb->h / 2);
                     }
                     if (!vis) continue;
-                    /* v40 (audit B2): the engine's PER-QUAD culls
-                     * (map5_s00.c:203-211) the mesh loop was missing —
-                     * `if (sp78[i][j] <= 0 || (sp78[i][j] >> 3) >=
+                    /* v40 (audit B2) + v41 (A-4): the engine's PER-QUAD
+                     * culls (map5_s00.c:203-211) the mesh loop was missing
+                     * — `if (sp78[i][j] <= 0 || (sp78[i][j] >> 3) >=
                      * ORDERING_TABLE_SIZE) continue; if (ABS(sp10[i][j].vx)
                      * > 200 || ABS(sp10[i][j].vy) > 160) continue;` on the
                      * quad's FIRST projected corner (screen-centered px +
-                     * Q8 z, ORDERING_TABLE_SIZE = 2048, data.h:53).       */
+                     * Q8 z, ORDERING_TABLE_SIZE = 2048, data.h:53). v40
+                     * tested the 4-corner AVERAGE z here — the engine tests
+                     * sp78[i][j], the [i][j] corner's OWN Q8 z; the average
+                     * is only the OT-bucket value (line 232: (sp78[i][j]+
+                     * sp78[i+1][j]+sp78[i][j+1]+sp78[i+1][j+1])>>2 = the
+                     * blit's dsum*0.25 depth below).                       */
                     {
                         int m0x = sxq[0] - (int)(fb->w / 2);
                         int m0y = syq[0] - (int)(fb->h / 2);
-                        int mzQ8 = (int)(dsum * 0.25f * 256.0f);
+                        int mzQ8 = (int)(d0 * 256.0f);
                         if (mzQ8 <= 0 || (mzQ8 >> 3) >= 2048) continue;
                         if (m0x > 200 || m0x < -200 ||
                             m0y > 160 || m0y < -160) continue;
