@@ -11179,8 +11179,10 @@ function tvEmitQuad(k, wx, wy, wz, u0, u1, v0, v1, tex, vcol, depthM) {
   const uv = mesh.geometry.attributes.uv.array;
   const bkt = mesh.geometry.attributes.shTvb.array;
   /* corner order c0..c3: (u0,v0)(u1,v0)(u0,v1)(u1,v1) */
-  uv[0] = u0 / 256; uv[1] = v0;  uv[2] = u1 / 256; uv[3] = v0;
-  uv[4] = u0 / 256; uv[5] = v1;  uv[6] = u1 / 256; uv[7] = v1;
+  /* B-11: the C normalizes BOTH u and v (fog_poc.c:12610-12611 big-screen
+   * lattice + :12636-12637 small screen: o->u = gu/256.0f; o->v = gv/256.0f) */
+  uv[0] = u0 / 256; uv[1] = v0 / 256;  uv[2] = u1 / 256; uv[3] = v0 / 256;
+  uv[4] = u0 / 256; uv[5] = v1 / 256;  uv[6] = u1 / 256; uv[7] = v1 / 256;
   for (let c = 0; c < 4; c++) {
     pos[c * 3] = wx[c]; pos[c * 3 + 1] = wy[c]; pos[c * 3 + 2] = wz[c];
     bkt[c] = depthM;
