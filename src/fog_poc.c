@@ -7612,12 +7612,30 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
                 u = w0 * V0.u + w1 * V1.u + w2 * V2.u;
                 v = w0 * V0.v + w1 * V1.v + w2 * V2.v;
             }
-            int vr = (int)(w0 * V0.vcol[0] + w1 * V1.vcol[0] + w2 * V2.vcol[0] + 0.5f);
-            int vg = (int)(w0 * V0.vcol[1] + w1 * V1.vcol[1] + w2 * V2.vcol[1] + 0.5f);
-            int vb = (int)(w0 * V0.vcol[2] + w1 * V1.vcol[2] + w2 * V2.vcol[2] + 0.5f);
-            int orr = (int)(w0 * V0.ocol[0] + w1 * V1.ocol[0] + w2 * V2.ocol[0] + 0.5f);
-            int og = (int)(w0 * V0.ocol[1] + w1 * V1.ocol[1] + w2 * V2.ocol[1] + 0.5f);
-            int ob = (int)(w0 * V0.ocol[2] + w1 * V1.ocol[2] + w2 * V2.ocol[2] + 0.5f);
+            /* v43 E-10-3: the GPU gouraud DDA evaluates the color plane at
+             * the span's INTEGER position — gpu_sw_backend.cpp DrawSpan:
+             * x_ig_adjust = x_start; AddIDeltas_DX(ig, idl, x_ig_adjust);
+             * AddIDeltas_DY(ig, idl, y) (:366/384-385), initialized at the
+             * core vertex with the +2048 Q12 (+0.5-unit) rounding bias
+             * (:495-497 — the +0.5f below) and stepped per integer x
+             * (:389-391) — the SAME integer lattice the UV DDA below
+             * already evaluates at, NOT the pixel center (x+0.5, y+0.5).
+             * All six gouraud interpolations (vcol + the folded veil
+             * ocol) move to the integer-position weights; the +0.5f
+             * rounding bias stays (it is the GPU's own init bias).
+             * Coverage keeps the pixel-center test here; E-10-1's
+             * fill-rule fix lands the integer sample position for
+             * coverage and then shares these same weights.             */
+            float gx = (float)x, gy = (float)y;
+            float gw0 = ((x1 - gx) * (y2 - gy) - (x2 - gx) * (y1 - gy)) * inv;
+            float gw1 = ((x2 - gx) * (y0 - gy) - (x0 - gx) * (y2 - gy)) * inv;
+            float gw2 = 1.0f - gw0 - gw1;
+            int vr = (int)(gw0 * V0.vcol[0] + gw1 * V1.vcol[0] + gw2 * V2.vcol[0] + 0.5f);
+            int vg = (int)(gw0 * V0.vcol[1] + gw1 * V1.vcol[1] + gw2 * V2.vcol[1] + 0.5f);
+            int vb = (int)(gw0 * V0.vcol[2] + gw1 * V1.vcol[2] + gw2 * V2.vcol[2] + 0.5f);
+            int orr = (int)(gw0 * V0.ocol[0] + gw1 * V1.ocol[0] + gw2 * V2.ocol[0] + 0.5f);
+            int og = (int)(gw0 * V0.ocol[1] + gw1 * V1.ocol[1] + gw2 * V2.ocol[1] + 0.5f);
+            int ob = (int)(gw0 * V0.ocol[2] + gw1 * V1.ocol[2] + gw2 * V2.ocol[2] + 0.5f);
 
             const uint8_t *tp;
             if (ddaValid) {
