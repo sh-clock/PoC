@@ -17883,11 +17883,18 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+            /* v43 (E-19/20-1): the four per-tick calls now run AFTER the
+             * tSim advance — POST-advance, exactly like live_advance
+             * (playback_step bumps sessionT FIRST, then the anims/water
+             * read it; the frame drawn at the end of iteration k contains
+             * the state after the k-th update, game_main.c:193-199). The
+             * old PRE-increment pass left the shot anims one tick behind
+             * the camera on every --r2shot render.                          */
+            tSim += tickDt;
             sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             sh1x_waterfall_tick((Sh1x *)&R.sc->sh1x, &cp, tSim); /* v39 */
-            tSim += tickDt;
             haveCp = 1;
         }
         if (!haveCp) {
@@ -17897,7 +17904,7 @@ int main(int argc, char **argv) {
         }
         if (Vr.active || Vr.returning) cp = r2view_pose(&Vr, &cp);
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim); /* v43: hold at the final session time (the in-loop call is post-advance, live parity) */
         Frame fb2; frame_alloc(&fb2, w, h);
         render_frame(&fb2, &R, &cp);
         /* THE RESTRICTION PROOF (all values from the verbatim pipeline) */
@@ -18064,11 +18071,18 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
+            /* v43 (E-19/20-1): the four per-tick calls now run AFTER the
+             * tSim advance — POST-advance, exactly like live_advance
+             * (playback_step bumps sessionT FIRST, then the anims/water
+             * read it; the frame drawn at the end of iteration k contains
+             * the state after the k-th update, game_main.c:193-199). The
+             * old PRE-increment pass left the shot anims one tick behind
+             * the camera (k ticks of camera, k-1 of anims).               */
+            tSim += tickDt;
             sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             sh1x_waterfall_tick((Sh1x *)&R.sc->sh1x, &cp, tSim); /* v39 */
-            tSim += tickDt;
             haveCp = 1;
         }
         if (!haveCp)
@@ -18081,7 +18095,7 @@ int main(int argc, char **argv) {
          * also covers the phase wrap/edge cases where the pose should be
          * re-read from the current phase rather than the stepped one      */
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim); /* v43: hold at the final session time (the in-loop call is post-advance, live parity) */
         render_frame(&fb, &R, &cp);
         char out[1024];
         snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
