@@ -6157,6 +6157,9 @@ typedef struct {
     int       drawCase;        /* D_800C39A0 (map0_s00 field_16 = 1)     */
     int32_t   rainIntensity;   /* 800E32D0 (0..135000)                  */
     int32_t   rainGravity;     /* 800E32D4 (30, map0_s00)               */
+    int       sp64;            /* the splash growth-rate tier — snapshotted
+                               * at the HEAD of WeatherParticle_Update
+                               * (particle.c:839-854), i.e. PRE-ramp      */
     int       weatherTick;     /* 800DD598 transition counter           */
     int       snowTypeEnable;  /* 800DD592                              */
     int       snowEnable;      /* 800DFB6C                              */
@@ -6732,6 +6735,16 @@ static void sh_particle_draw_case_merge(Snow *S, int caseArg) {
                                     ((S->weatherBits >> 12) & 0x1110));
 }
 
+/* v43 (E-09-3): the sp64 splash-tier selection — WeatherParticle_Update
+ * snapshots it at its HEAD (particle.c:839-854): E32D0 < 27000 -> 3,
+ * < 135000 -> 4, else 5. The pass-1 intensity ramp (E32D0 += count,
+ * particle.c:1393-1394) runs LATER, inside the draw loop — so tick-N
+ * splash draws use the tier of E32D0 as it stood AFTER tick N-1's ramp. */
+static int snow_sp64_of(int32_t rainIntensity) {
+    return (rainIntensity < 27000) ? 3 :
+           (rainIntensity < 135000) ? 4 : 5;
+}
+
 /* Particle_EnvironmentSet — 1:1 (the runtime weather dispatcher).
  * arg0: 0 none / 1 snow / 2 snow+windFlag / 5 rain / 6 rain+windFlag
  * arg1: the draw case (127 = keep; 2 maps to 3 — the engine quirk).     */
@@ -6769,6 +6782,12 @@ static void particle_environment_set(Snow *S, int arg0, uint32_t arg1) {
     sh_particle_draw_case_merge(S, S->drawCase);
     S->weatherClass = var_s1;              /* 800E0CA8 */
     S->windFlag = var_s0;                  /* 800E0CAC */
+    /* v43 (E-09-3): sp64 follows the rain intensity this call just set
+     * (rain recipes 5/6 reset E32D0 to 135000 -> tier 5; everything else
+     * zeroes it -> tier 3), so a render between this reset and the first
+     * snow_tick draws the engine's tier (the next WeatherParticle_Update
+     * head would snapshot the same value).                              */
+    S->sp64 = snow_sp64_of(S->rainIntensity);
 }
 
 /* sharedFunc_800D0B18_0_s00 — 1:1 (the weather TARGET re-pack that starts
@@ -6809,6 +6828,10 @@ static int sh_particle_weather_target_set(Snow *S, int arg0) {
         case 2:
             S->rainEnable = 1;
             S->rainIntensity = 0;      /* 800E32D0 = 0 — ramps back up */
+            /* v43 (E-09-3): the tier of the reset intensity — the engine's
+             * first post-D0B18 draw uses sp64 = tier(0) = 3 (the next
+             * WeatherParticle_Update head snapshots the same value)      */
+            S->sp64 = snow_sp64_of(S->rainIntensity);
             break;
         default:
             break;
@@ -7092,6 +7115,13 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
     /* v8: the weather transition (Particle_SystemUpdate, BEFORE the
      * particle update — the sine cross-fade between the banks)           */
     sh_particle_weather_tick(S);
+
+    /* v43 (E-09-3): the sp64 snapshot at the head of WeatherParticle_Update
+     * (particle.c:839-854) — BEFORE the movement passes and BEFORE the
+     * pass-1 intensity ramp (1393-1394) — so tick-N splash draws use
+     * tier(E32D0 after tick N-1's ramp): the renderer reads S->sp64 and
+     * no longer re-derives the tier from the post-ramp intensity.        */
+    S->sp64 = snow_sp64_of(S->rainIntensity);
 
     /* g_Particle_Position = viewPos + horizontal-forward * 3m             */
     snow_box_origin(S, camPos, camFwd);
@@ -13121,9 +13151,11 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             } else if (p->type == 2 || p->type == 242) {
                 /* ---- landing splash (type 2/242, state 2..16) ---- */
                 if (p->state >= 17) continue;
-                /* sp64: the splash growth rate from the rain intensity */
-                int sp64 = (S->rainIntensity < 27000) ? 3 :
-                           (S->rainIntensity < 135000) ? 4 : 5;
+                /* sp64: the splash growth rate — the tier snapshotted at
+                 * the HEAD of snow_tick (engine particle.c:839-854,
+                 * PRE-ramp: tier of E32D0 after the previous tick's ramp,
+                 * 1393-1394 — not the current post-ramp intensity)       */
+                int sp64 = S->sp64;
                 int c = p->state << sp64;         /* the Q12 corner radius */
                 /* the 4 ground corners: (x-c,y,z-c) (x-c,y,z+c)
                  * (x+c,y,z-c) (x+c,y,z+c) — projected                    */
