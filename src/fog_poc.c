@@ -13513,14 +13513,17 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
              *   nclip(v0,v1,v2) <= 0  ->  test nclip(v3,v1,v2);
              *   nclip(v3,v1,v2) >= 0  ->  SKIP the quad.
              * The converter REVERSED the winding ("glTF CCW = the void
-             * side"), and emits GLB tris (v2,v1,v0)+(v2,v3,v1), so with
-             * A=idx[k](=v2), B=idx[k+1](=v1), C=idx[k+2](=v0), D=idx[k+4]
+             * side"); the v11 emission contract is GLB tris (v0,v2,v1)+
+             * (v2,v3,v1) (ipd2gltf.py — Z-order corners, shared edge v1-v2
+             * the diagonal), so the consumer's vi=(v0,v2,v1,v3) gives
+             * A=idx[k](=v0), B=idx[k+1](=v2), C=idx[k+2](=v1), D=idx[k+4]
              * (=v3):  nclip_e(v0,v1,v2) = -cross(B-A,C-A) and
-             * nclip_e(v3,v1,v2) = cross(D-A,B-A) (cyclic of the GLB tri2
-             * (v2,v3,v1)). The cull becomes: BOTH cross(B-A,C-A) >= 0 AND
-             * cross(D-A,B-A) >= 0 -> skip. (For the degenerate triangle
-             * v3==v2: D==A -> the second cross is 0 -> cull iff the first
-             * cross >= 0 — matching the plain front-face rule.)          */
+             * nclip_e(v3,v1,v2) = cross(C-D,B-D) (the engine anchors the
+             * second nclip at v3 via gte_ldsxy0(xy[v3])). The cull becomes:
+             * BOTH cross(B-A,C-A) >= 0 AND cross(C-D,B-D) >= 0 -> skip.
+             * (For the degenerate triangle pack v3:=v2: D==B -> the second
+             * cross is 0 -> cull iff the first cross >= 0 — matching the
+             * plain front-face rule.)                          */
             if (!bad && ams != 1) {
                 const RVert *VA = xv + it->vbase + vi[0];
                 const RVert *VB = xv + it->vbase + vi[1];
@@ -13532,8 +13535,12 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                                (VC->sx - VA->sx) * (VB->sy - VA->sy);
                     if (n1 >= 0.0f) {
                         const RVert *VD = xv + it->vbase + vi[3];
-                        float n2 = (VD->sx - VA->sx) * (VB->sy - VA->sy) -
-                                   (VB->sx - VA->sx) * (VD->sy - VA->sy);
+                        /* engine: gte_ldsxy0(xy[v3]) then nclip ->
+                         * NCLIP(v3,v1,v2) = cross(v1-v3, v2-v3), anchored
+                         * at v3 (=D). With the v11 emission
+                         * vi=(v0,v2,v1,v3): B=v2, C=v1, D=v3. */
+                        float n2 = (VC->sx - VD->sx) * (VB->sy - VD->sy) -
+                                   (VB->sx - VD->sx) * (VC->sy - VD->sy);
                         if (n2 >= 0.0f) bad = 1;   /* engine: quad skipped */
                     }
 
