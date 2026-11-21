@@ -12979,6 +12979,28 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
     int nFlake = 0;
     const Snow *S = R->snow;
     int snowScale = fb->w / 320; if (snowScale < 1) snowScale = 1;
+
+    /* ---- v43 (E-16-2): the TV paint quads (func_800D88C8) — collected
+     * FIRST, before the weather flakes and the mesh quads. The engine's
+     * add order is the map update's TV prims — game_sys_states.c:156-158
+     * runs g_MapOverlayHdr.func_44 (map4_s03/header.c:54 = func_800DA3E0
+     * -> func_800D7718 at map4_s03.c:1782 -> func_800D88C8's AddPrims)
+     * BEFORE the weather particle update (:171) and WorldGfx_Draw's mesh
+     * quads (:189). On an OT bucket tie the LIFO walk draws first-added
+     * LAST (on top), so the engine puts the TV paint OVER colliding
+     * flakes. The v36 form collected the flakes first (seq order flakes
+     * -> TV -> mesh), inverting the tie layering: a flake whose depth
+     * landed in the same 1/8-Q8 bucket as a screen's max corner showed
+     * as a bright blip ON the TV image — the engine hides it behind the
+     * opaque quad. Seq order is now TV -> flakes -> mesh.             */
+    TvQuad tvq[24];
+    int nTvq = 0;
+    if (R->dbgItem < 0) {
+        sh_tvpaint_collect(&sc->sh1x, &viewProj, &view, fb, R,
+                           post, &nPost, &seq, tvq, &nTvq, 24,
+                           nQuadMax + SNOW_COUNT_MAX + 1);
+    }
+
     if (S && S->enabled && R->dbgItem < 0) {
         for (int i = 0; i < S->addedCount && i < SNOW_COUNT_MAX; i++) {
             const SnowPart *p = &S->p[i];
@@ -13181,20 +13203,6 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             }
         }
         if (R->snowDump) fprintf(R->snowDump, "frame end nFlake=%d\n", nFlake);
-    }
-
-    /* ---- v36: the TV paint quads (func_800D88C8) — collected AFTER the
-     * weather flakes, BEFORE the mesh quads: the engine's add order is
-     * particles (game_sys_states.c:172) -> the map update's TV prims
-     * (func_800DA3E0 -> func_800D7718) -> WorldGfx_Draw's mesh quads
-     * (:189), so on an OT bucket tie the TV quads sit BETWEEN the flakes
-     * and the room geometry (LIFO: last-added draws first/below).     */
-    TvQuad tvq[24];
-    int nTvq = 0;
-    if (R->dbgItem < 0) {
-        sh_tvpaint_collect(&sc->sh1x, &viewProj, &view, fb, R,
-                           post, &nPost, &seq, tvq, &nTvq, 24,
-                           nQuadMax + SNOW_COUNT_MAX + 1);
     }
 
     /* ---- v14/v15: collect the QUADS (ALL materials) as per-quad OT entries --
