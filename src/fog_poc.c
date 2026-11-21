@@ -7900,18 +7900,33 @@ static void fx_blit_sprite_quad(
     double dv_dy = (double)(sh - 0) / (double)(y2 - y0 + 0.0001);
     for (int py = minY; py <= maxY; py++) {
         for (int px = minX; px <= maxX; px++) {
-            /* point-in-quad via two triangle tests (cheap, engine-ish) */
+            /* point-in-quad via two triangle tests — the fx_blit_gouraud_tri
+             * edge-function convention (v41-ENGFX bug 1). The old d1/d2/d3
+             * were cross products evaluated at the TRIANGLE VERTICES, not
+             * at the sample point: d1 = cross(B−A, V0−A) is NEGATIVE for
+             * every interior point while d2/d3 are the constant quad
+             * orientation, so !(neg&&pos) accepted only the outside strip
+             * past edge V0→V1 — which the UV bounds then discarded, and
+             * the axis-aligned core quads/ghosts painted 0 texels (GATE-C;
+             * the PoC flare had been streaks-only since v26). The GPU-
+             * correct test (swanstation gpu_sw_backend.cpp:36-38 rasterizes
+             * a quad as (v0,v1,v2)+(v2,v1,v3); the PoC's own caustic-ring
+             * inside-test does it right): the three edge functions AT the
+             * sample point, all three same sign = inside. tsel split, UV
+             * bounds and the blit body are unchanged.                     */
             double ax = px + 0.5, ay = py + 0.5;
             /* tri (x0,y0)(x1,y1)(x2,y2) then (x0,y0)(x2,y2)(x3,y3)      */
             int inside = 0;
             for (int tsel = 0; tsel < 2 && !inside; tsel++) {
                 double bx = xs[1 + tsel], by = ys[1 + tsel];
                 double cx = xs[2 + tsel], cy = ys[2 + tsel];
-                double d1 = (bx - ax) * (ys[0] - ay) - (xs[0] - ax) * (by - ay);
-                double d2 = (cx - bx) * (ys[0 + tsel] - by) - (xs[0 + tsel] - bx) * (cy - by);
-                double d3 = (xs[0] - cx) * (ys[1 + tsel] - cy) - (xs[1 + tsel] - cx) * (ys[0] - cy);
-                int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                /* edge functions at (ax,ay) for triangle (V0,B,C) — the
+                 * same three forms as fx_blit_gouraud_tri's e0/e1/e2    */
+                double e0 = (cx - bx) * (ay - by) - (cy - by) * (ax - bx);
+                double e1 = (xs[0] - cx) * (ay - cy) - (ys[0] - cy) * (ax - cx);
+                double e2 = (bx - xs[0]) * (ay - ys[0]) - (by - ys[0]) * (ax - xs[0]);
+                int neg = (e0 < 0) || (e1 < 0) || (e2 < 0);
+                int pos = (e0 > 0) || (e1 > 0) || (e2 > 0);
                 if (!(neg && pos)) inside = 1;
             }
             if (!inside) continue;
