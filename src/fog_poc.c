@@ -14998,6 +14998,10 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         g_waterTileEverUpdated = 0;       /* v41-E3: lazy tile gate       */
         g_sh1xBeltScroll = 0;             /* v41-E3: belt accumulator     */
         g_tvpaint_pad = 0;                /* v41-E3: TV flicker pad       */
+        g_flaresys.nowEffRate = 0;        /* v41-E2 mirror: the per-shot
+                                          * six-globals list also resets
+                                          * the flare easing accumulator
+                                          * (restart == fresh session) */
         /* v41 (audit A-3): the room-reload WorldObjectsInit — the engine
          * re-enters Map_WorldObjectsInit -> func_800CB0D8 on every map
          * load, so the restart re-runs the ripple spawn AFTER the fresh
