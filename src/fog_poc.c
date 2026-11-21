@@ -6550,9 +6550,13 @@ static void snow_rest_handler(Snow *S, SnowPart *p, int32_t deltaX, int32_t delt
     }
 }
 
-/* ---- Particle_MovementUpdate (case 0, type Snow) — 1:1 -------------- */
+/* ---- Particle_MovementUpdate (case 0, type Snow) — 1:1 --------------
+ * v43 (E-09-4): dtQ12 threads g_DeltaTime through the TIMESTEP_SCALE_30_FPS
+ * factors (engine particle.c:3218-3220 — every position component is
+ * TS30(dt, ·); at the 136 tick rate TS30(136, x) == x, the identity the
+ * old code hard-coded). */
 static void snow_movement_update(Snow *S, SnowPart *p, uint16_t *randv,
-                                 int32_t deltaX, int32_t deltaZ) {
+                                 int32_t deltaX, int32_t deltaZ, int dtQ12) {
     /* v12 VERBATIM (D3): the RNG drift block runs ONLY for
      * ParticleType_Snow (type 0). ParticleType_Unk1 (1) takes the
      * engine's separate vy ramp (Particle_MovementUpdate lines
@@ -6576,13 +6580,13 @@ static void snow_movement_update(Snow *S, SnowPart *p, uint16_t *randv,
         p->mv[1] = (int16_t)vy;
     }
 
-    /* pos += TS30((mv << 2) + wind + camDelta) — v12: the engine adds
+    /* pos += TS30(dt, (mv << 2) + wind + camDelta) — v12: the engine adds
      * g_Particle_SpeedX/Z here VERBATIM (v11 hardcoded 0 because the wind
      * machinery was unreachable; windy weather (D0B18 args 2-4/6-8) makes
      * it live — ramped by the wind block in snow_tick). */
-    p->pos[0] += ((int32_t)(p->mv[0] * 4) + S->windX + deltaX) * SNOW_TS30 / SNOW_TS30;
-    p->pos[1] += ((p->mv[1] >> 1) * 4);
-    p->pos[2] += ((int32_t)(p->mv[2] * 4) + S->windZ + deltaZ) * SNOW_TS30 / SNOW_TS30;
+    p->pos[0] += ((int32_t)(p->mv[0] * 4) + S->windX + deltaX) * dtQ12 / SNOW_TS30;
+    p->pos[1] += ((p->mv[1] >> 1) * 4) * dtQ12 / SNOW_TS30;
+    p->pos[2] += ((int32_t)(p->mv[2] * 4) + S->windZ + deltaZ) * dtQ12 / SNOW_TS30;
 
     int ax = p->pos[0] < 0 ? -p->pos[0] : p->pos[0];
     int az = p->pos[2] < 0 ? -p->pos[2] : p->pos[2];
@@ -6664,16 +6668,18 @@ static void rain_spawn_movement_apply(Snow *S, SnowPart *p, int dt) {
 /* Particle_MovementUpdate case 1 (RAIN steady state) — 1:1.
  * delta from g_ParticleVectors1.viewPosition (the PREVIOUS tick's view
  * position) — the PoC tracks prevViewX/Z (updated at the end of each
- * SystemUpdate, like g_ParticleVectors1 = g_ParticleVectors0).           */
+ * SystemUpdate, like g_ParticleVectors1 = g_ParticleVectors0).
+ * v43 (E-09-4): dtQ12 threads g_DeltaTime through the TS30 factors
+ * (engine particle.c:3281-3289 — vx/vy/vz all TS30(dt, ·)).           */
 static void rain_movement_update(Snow *S, SnowPart *p, uint16_t *randv,
-                                 int32_t deltaX, int32_t deltaZ) {
+                                 int32_t deltaX, int32_t deltaZ, int dtQ12) {
     p->pos1[0] = p->pos[0];
     p->pos1[2] = p->pos[2];
     p->pos1[1] = p->pos[1] - p->mv[1];
-    p->pos[0] += S->windX + deltaX;
+    p->pos[0] += (S->windX + deltaX) * dtQ12 / SNOW_TS30;
     p->mv[1] = (int16_t)(p->mv[1] + S->rainGravity);
-    p->pos[1] += p->mv[1] << 2;
-    p->pos[2] += S->windZ + deltaZ;
+    p->pos[1] += (p->mv[1] << 2) * dtQ12 / SNOW_TS30;
+    p->pos[2] += (S->windZ + deltaZ) * dtQ12 / SNOW_TS30;
     if (S->camMoved) {
         p->pos1[0] = p->pos[0];
         p->pos1[2] = p->pos[2];
@@ -7088,7 +7094,7 @@ static void snow_box_origin(Snow *S, v3 camPos, v3 camFwd) {
  * = rain [addedCount[0], +addedCount[1]) — plus the weather transition
  * driver (SystemUpdate order), the wind ramp, the rain intensity ramp and
  * the folded RainDraw state mutations.                                   */
-static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
+static void snow_tick(Snow *S, v3 camPos, v3 camFwd, int dtQ12) {
     /* v8: the weather transition (Particle_SystemUpdate, BEFORE the
      * particle update — the sine cross-fade between the banks)           */
     sh_particle_weather_tick(S);
@@ -7171,7 +7177,7 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
             }
             break;
         case 1:
-            snow_movement_update(S, p, &randv, deltaX, deltaZ);
+            snow_movement_update(S, p, &randv, deltaX, deltaZ, dtQ12);
             if (p->type >= 240) p->hide = 1;      /* engine draw sees >=240 */
             break;
         default:
@@ -7211,7 +7217,7 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
             }
             break;
         case 1:
-            rain_movement_update(S, p, &randv, deltaX1, deltaZ1);
+            rain_movement_update(S, p, &randv, deltaX1, deltaZ1, dtQ12);
             break;
         default:
             p->state++;
@@ -7291,11 +7297,28 @@ static void snow_sync_live(Snow *S, double t, v3 camPos, v3 camFwd,
         return;
     }
     while (S->ticksDone < target) {
-        snow_tick(S, camPos, camFwd);   /* live camera at the boundary     */
+        snow_tick(S, camPos, camFwd, SNOW_TS30);   /* live camera at the boundary */
         S->ticksDone++;
         S->lastTickT = (double)S->ticksDone / 30.0;
     }
     S->lastTickT = t;
+}
+
+/* v43 (E-09-4): the engine's V_BLANKS_MAX stall catch-up — ONE
+ * WeatherParticle_Update with g_DeltaTime = 273 instead of two 1x ticks.
+ * game_main.c:133-136 (H_BLANKS_PER_FRAME_MIN 1052, H_BLANKS_Q12_TO_SEC_
+ * SCALE 1063, V_BLANKS_MAX 4) and :284-292 (g_VBlanks = MIN(·, 4),
+ * vCount = MIN(GsGetVcount(), 1052), g_DeltaTime = Q12_MULT(vCount, 1063)
+ * = 1052·1063>>12 = 273 ≈ 2.007× the 136 tick): one MainLoop frame that
+ * spans >= 2 tick-times runs ONE particle update with that dt — one RNG
+ * stream step, one spawn gate, one stateStep advance, one weatherTick,
+ * one camera sample — while the session clock advances the full 2
+ * tick-times. The grid bookkeeping advances 2 ticks to stay in lockstep
+ * with the session clock for the next sync.                         */
+static void snow_sync_live_stall(Snow *S, double t, v3 camPos, v3 camFwd) {
+    snow_tick(S, camPos, camFwd, 273);
+    S->ticksDone += 2;
+    S->lastTickT  = t;
 }
 
 /* deterministic variant: camera strictly from evalTrack (editor paused /
@@ -7334,7 +7357,7 @@ static void snow_sync_exact(Snow *S, double t, const CamTrack *track,
                                       : (v3){0.0f, 0.0f, -1.0f};
             fwd = lookDir;
         }
-        snow_tick(S, pos, fwd);
+        snow_tick(S, pos, fwd, SNOW_TS30);
         S->ticksDone++;
     }
     S->lastTickT = t;
@@ -14664,9 +14687,21 @@ static CamPose live_advance(LiveApp *A, double dt) {
     CamPose cp = live_current_pose(A);          /* the held tick state */
     int fired = 0;
     while (!A->play.paused && A->tickPending >= tickDt - 1e-9) {
-        A->tickPending -= tickDt;
+        /* v43 (E-09-4): a >= 2-tick catch-up in one output frame is the
+         * engine's V_BLANKS_MAX stall frame (game_main.c:133-136, 284-292):
+         * ONE update with g_DeltaTime = Q12_MULT(1052, 1063) = 273 — the
+         * snow drift draw, spawn gate, stateStep, weatherTick and the
+         * water pair advance ONCE, while the camera/sample and playback
+         * advance the full 2 tick-times (the clamp bound above). The old
+         * code fired two 1x ticks here: 2x the RNG stream position, 2x
+         * the rest ages (stateStep), 2x the D_800AFDAC water phase and
+         * 2x the ripple-RNG draws — diverging from the engine's stall
+         * model AND the port's own deterministic --shot path. */
+        int stall = (A->tickPending >= 2.0 * tickDt - 1e-9);
+        double stepT = stall ? 2.0 * tickDt : tickDt;
+        A->tickPending -= stepT;
         fired = 1;
-        cp = playback_step(&A->play, A->track, tickDt,
+        cp = playback_step(&A->play, A->track, stepT,
                            A->sc->bounds.diag, &A->ovr);
         /* v23: the engine SELF_VIEW tick (vcExecCamera discipline — one
          * camera update per game tick, on the same tick as the env/light
@@ -14678,7 +14713,14 @@ static CamPose live_advance(LiveApp *A, double dt) {
         if (A->r2.active || A->r2.returning)
             cp = r2view_pose(&A->r2, &cp);
         if (A->snow.enabled) {
-            if (A->ovr.useFixed)
+            if (stall) {
+                /* ONE dt=273 particle update (the engine's stall frame) */
+                if (A->ovr.useFixed)
+                    snow_sync_live_stall(&A->snow, A->play.t, A->ovr.eye,
+                                         v3_norm(v3_sub(A->ovr.target, A->ovr.eye)));
+                else
+                    snow_sync_live_stall(&A->snow, A->play.t, cp.pos, cp.forward);
+            } else if (A->ovr.useFixed)
                 snow_sync_live(&A->snow, A->play.t, A->ovr.eye,
                                v3_norm(v3_sub(A->ovr.target, A->ovr.eye)),
                                A->track, &A->ovr);
