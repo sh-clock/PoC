@@ -16016,7 +16016,23 @@ int main(int argc, char **argv) {
             const char *c2 = strstr(s, "file=");
             const char *c3 = strstr(s, "pan=");
             if (c1) tt = atof(c1 + 2);
+            /* v41 audit (E-4): the v40 E-F1 isfinite rejection covered
+             * --cam/--t/--shot but missed --r2shot — t=inf fast-forwards
+             * forever (verified timeout-kill), t=nan skips the loop and
+             * silently renders the t=0 pose (NaN in the filename). The
+             * --shot guard, mirrored. */
+            if (c1 && !isfinite(tt)) {
+                fprintf(stderr, "bad --r2shot t= (not a finite number)\n");
+                return 1;
+            }
             if (c3) { if (sscanf(c3 + 4, "%lf,%lf", &py, &pp) != 2) py = atof(c3 + 4); }
+            /* v41 audit (E-4, sibling per the verifier): pan= feeds
+             * llround(deg/360*4096) — non-finite pan is UB there
+             * (verified: pan=inf exits 0 with a saturated pan). */
+            if (c3 && (!isfinite(py) || !isfinite(pp))) {
+                fprintf(stderr, "bad --r2shot pan= (values must be finite)\n");
+                return 1;
+            }
             if (c2) snprintf(fn, sizeof(fn), "%s", c2 + 5);
             if (!fn[0]) snprintf(fn, sizeof(fn), "r2shot_%08.2f.png", tt);
             r2Shot.t = tt; r2Shot.panYawDeg = py; r2Shot.panPitchDeg = pp;
