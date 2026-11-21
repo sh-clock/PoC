@@ -6756,6 +6756,24 @@ function registerModel(name, gltf) {
          * registration (the panel + the gizmo follow the active model)   */
         if (entry.light && typeof entry.light.on === 'boolean')
           window.SHUI.applyModelLight(entry);
+        /* v41 fix 2 (CT-IMPL, RC-G A-1) — the FIRST-IMPRESSION rule: a DARK
+         * TRACKLESS room auto-engages the session-only "Effects Off" view
+         * (env mode 0 — fog-off ambient + weather none) so the room is
+         * VISIBLE on load instead of a black screen (the DarkEnv presets'
+         * black fog + a paused engine = the RC-G 99.66%-background finding).
+         * The override is SESSION-ONLY and SHADOWED (the SHUI discipline:
+         * writeEnvToModel serializes the shadowed pair, never the view), a
+         * URL-param session is never overridden (the session's explicit
+         * intent), and rooms WITH tracks keep the authored env (the track
+         * cam previews the authentic night look). Key 0 / the View assist
+         * toggle restores the authentic night env on request. */
+        if (window.SHUI.ready && !window.SHUI.effectsOff &&
+            !window.SHUI.hadUrlParams() &&
+            !(entry.tracks && entry.tracks.length) &&
+            envPairIsDark(entry.env && entry.env.pair)) {
+          window.SHUI.setEffectsOff(true);
+          toast('Dark room — Effects Off engaged for the first look (session-only, never saved; press 0 for the authentic night env)');
+        }
       }
       toast('World engine ready — 21 presets / 24 pairs / 9 weather states' +
             (window.SHView.V.snow.gh ? ' · ground datum ' + window.SHView.V.snow.datumM.toFixed(2) + ' m' : ' · no track yet (ground pending)'));
@@ -6796,7 +6814,31 @@ function frameModel() {
     for (let i = 0; i < 3; i++) c[i] = (loaded.box.min[i] + loaded.box.max[i]) / 2;
     diag = loaded.diag;
   } else return;
-  orbitCam.position.set(c[0] + diag * 0.62, c[1] + diag * 0.45, c[2] + diag * 0.95);
+  /* v41 fix 2 (CT-IMPL, RC-G A-1) — DARK-ROOM FRAMING. The DarkEnv night
+   * presets (6/7/19: BLACK fog 14 / 9.3 / 15 m) fog out everything beyond
+   * fog.far; the classic framing parks the orbit camera ~diag*1.22 from
+   * the room center (SPU0401: ~40 m from a 33 m diag room — measured:
+   * cam [189.1,15.2,-32.7] vs box [160,-5,-77.5 .. 177,5.5,-51]), so the
+   * WHOLE room rendered as the fog color over the #14161c background —
+   * the RC-G "SPU0401 renders nothing" finding (99.66% background
+   * pixels). For a room whose authored env pair slot-A preset carries the
+   * Dark flag, frame the camera INSIDE the room AABB instead — mounted
+   * like the engine's fixed room cameras: 12% inset from the room's min
+   * corner, eye height min(size.y/4, 1.8 m) above the floor, looking at
+   * the room center. The near field renders (the authentic night look —
+   * the far corner fades into the fog exactly like the game); orbit
+   * controls stay usable (pivot = the center, radius ~ the corner
+   * distance). Day-lit rooms keep the classic outside-the-room framing
+   * UNCHANGED. */
+  if (envPairIsDark(activeModel() && activeModel().env && activeModel().env.pair)) {
+    const sz = [0, 1, 2].map(i => Math.max(loaded.box.max[i] - loaded.box.min[i], 0.1));
+    const eyeY = loaded.box.min[1] + Math.min(sz[1] * 0.25, 1.8);
+    orbitCam.position.set(loaded.box.min[0] + sz[0] * 0.12,
+                          eyeY,
+                          loaded.box.min[2] + sz[2] * 0.12);
+  } else {
+    orbitCam.position.set(c[0] + diag * 0.62, c[1] + diag * 0.45, c[2] + diag * 0.95);
+  }
   controls.target.set(c[0], c[1], c[2]);
   orbitCam.near = Math.max(diag / 2000, 0.005);
   orbitCam.far = diag * 40;
@@ -6804,6 +6846,18 @@ function frameModel() {
   pipCam.near = orbitCam.near;
   pipCam.far = orbitCam.far;
   pipCam.updateProjectionMatrix();
+}
+
+/* v41 fix 2 (CT-IMPL): the DarkEnv signature of an env pair's slot-A preset
+ * (the flashlight-OFF baseline the room boots in). Presets 6/7/19 carry
+ * SHENV_FLAG_DARKENV (map_info.c:5-342, the black-fog night family).
+ * Small + local: reads the embedded preset table through SHCore. */
+function envPairIsDark(pair) {
+  if (!Array.isArray(pair) || pair.length !== 2) return false;
+  const SC1 = window.SHCore;
+  if (!SC1 || !SC1.SH_MAP_EFFECTS_INFOS) return false;
+  const p = SC1.SH_MAP_EFFECTS_INFOS[Math.max(0, Math.min(20, pair[0] | 0))];
+  return !!(p && Array.isArray(p.flags) && (p.flags[0] & SC1.SHENV_FLAG_DARKENV));
 }
 
 /* ========================================================== track visuals */
