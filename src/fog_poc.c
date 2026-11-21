@@ -7373,7 +7373,7 @@ static inline void fb_put(Frame *fb, int x, int y, int r, int g, int b,
     p[0] = (uint8_t)r; p[1] = (uint8_t)g; p[2] = (uint8_t)b;
 }
 
-typedef enum { RP_OPAQUE, RP_BLEND_TEX, RP_ADD_TEX } PassMode;
+typedef enum { RP_OPAQUE, RP_BLEND_TEX, RP_ADD_TEX, RP_MASK_TEX } PassMode;
 
 /* texture sample: nearest, wrap (glTF sampler wrapS/T = REPEAT; the PS1
  * GPU has no linear filtering — engine-identical sampling).                 */
@@ -7640,8 +7640,17 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
             if (ta == 0) continue;   /* PSX 0x0000 hole (DuckStation: `texture_color == 0 -> return`) */
             /* v15: painter's algorithm — the opaque depth write is now
              * UNCONDITIONAL (last-drawn covering quad wins, exactly like
-             * the engine's OT paint-over); it never gates visibility.   */
-            if (pass == RP_OPAQUE) fb->z[pi] = z;   /* flake-occlusion ref */
+             * the engine's OT paint-over); it never gates visibility.
+             * V41 C-5: MASK (ST-clear punch-through leaf) prims write the
+             * depth reference TOO — the engine's leaf GT4s are OPAQUE
+             * (Gfx_BillboardDraw billboard.c:283 setPolyGT4, no
+             * setSemiTrans; only their 0x0000 texels are holes), so a
+             * ta>0 leaf texel COVERS the flare probe's 1x1 white TILE
+             * (shLensFlareLightCenterIsVisible reads it back non-white).
+             * BLEND semi-trans prims still write nothing (white + F
+             * saturates at 0x7FFF — they never cover the tile).        */
+            if (pass == RP_OPAQUE || pass == RP_MASK_TEX)
+                fb->z[pi] = z;   /* flake-occlusion ref */
             if (pass == RP_ADD_TEX && ta < 128) {
                 /* v37: the STP-CLEAR texel of a semi-trans prim — the PS1
                  * rule (DuckStation gpu_sw_rasterizer): the ABR blend
@@ -10847,14 +10856,31 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
      * the light's screen center (pixels[0] & 0x7FFF) == 0x7FFF). PoC:
      * probe the depth buffer — visible iff NO opaque geometry closer
      * than the light depth at that pixel (fb->z < light depth = covered).
-     */
+     *
+     * V41 C-5: the engine draws the white TILE only when
+     * check_screen_bounds passes (lens_flare.c:99-104):
+     *   return ... && scr_l_pos->vz >= 0 &&
+     *          scr_l_ang_z >= Q12_ANGLE(75.0f);
+     * ang_z < 75deg -> NO tile is drawn -> the DR_MOVE at org[5] copies
+     * STALE VRAM scratch (rect 784,113, lens_flare.c:151-155) -> the
+     * readback is not 0x7FFF -> shLensFlareLightCenterIsVisible (:204-
+     * 222) reports NOT visible -> add_rate = -now -> the rate decays to
+     * 0 -> NO flare, at any distance/occlusion. The engine's vz >= 0
+     * term is subsumed by Gate 2 (vz > 112 Q8). MODELED: the PoC gate
+     * additionally requires scrLAngZ >= Q12_ANGLE(75deg) — the SAME
+     * bound shLensFlareMakeEffectTargetRate's ang_z_rate table starts at
+     * (Q12(75deg) = 853, fx_q12_angle truncation = the engine's
+     * Q12_ANGLE). Combined with C-1's view-space ang_z this makes the
+     * shipped sewer/TV ahead-light (engine-true 27.07deg < 75deg) show
+     * NO flare — engine-true (the tile is never drawn there).      */
     {
         int px = g_flaresys.scrLPos[0] + fb->w / 2;
         int py = g_flaresys.scrLPos[1] + fb->h / 2;
         int visible = 0;
         if (px >= 0 && px < (int)fb->w && py >= 0 && py < (int)fb->h) {
             float lightDepth = (float)g_flaresys.scrLPos[2] / 256.0f;
-            visible = fb->z[(size_t)py * fb->w + px] >= lightDepth;
+            visible = fb->z[(size_t)py * fb->w + px] >= lightDepth &&
+                      g_flaresys.scrLAngZ >= fx_q12_angle(75.0f);
         }
         g_flaresys.centerVisible = visible;
         /* rate easing (lens_flare.c:182-192): now += (tgt-now)/2 or ->0 */
@@ -13375,9 +13401,14 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
         }
         /* v34: waterLive forces the ADDITIVE semi-trans pass (the runtime
          * field_E=45 rewrite); everything else follows the ripper's
-         * alphaMode exactly as before. */
+         * alphaMode exactly as before.
+         * V41 C-5: MASK (alphaMode 1) gets its OWN pass value so the
+         * raster can write fb->z for its ta>0 texels (the engine's leaf
+         * GT4s are opaque ST-clear punch-through — see raster_tri);
+         * BLEND (alphaMode 2) stays RP_BLEND_TEX (no depth write). */
         const PassMode quadPass = m->waterLive ? RP_ADD_TEX
-            : ((m->alphaMode == 0) ? RP_OPAQUE : RP_BLEND_TEX);
+            : ((m->alphaMode == 0) ? RP_OPAQUE
+               : ((m->alphaMode == 1) ? RP_MASK_TEX : RP_BLEND_TEX));
         for (int ti = 0; ti < post[bi].ntri && post[bi].tri0 + ti * 3 + 2 < it->icount; ti++) {
             int k = post[bi].tri0 + ti * 3;
             uint32_t ia = sc->idxs[it->ibase + k], ib = sc->idxs[it->ibase + k + 1],
