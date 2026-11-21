@@ -2438,6 +2438,23 @@ window.SHView = (function () {
       ctx.putImageData(img, 0, 0);
     }, 16, 128);
   }
+  function buildStreakAtlas(three) {   /* 8 clut rows x the 3x16 sprite's
+                                         MIDDLE column (kRainStreak[v][1],
+                                         the 1-px-wide quad's texel column) */
+    return makeAtlas(three, ctx => {
+      const img = ctx.createImageData(1, 16 * 8);
+      for (let r = 0; r < 8; r++)
+        for (let v = 0; v < 16; v++) {
+          const entry = SC.kRainClut[r][SC.kRainStreak[v][1]];
+          const o = ((r * 16 + v) * 1 + 0) * 4;
+          if (entry === 0x0000) { img.data[o + 3] = 0; continue; }
+          const c = clutRGB(entry);
+          img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2];
+          img.data[o + 3] = 255;
+        }
+      ctx.putImageData(img, 0, 0);
+    }, 1, 128);
+  }
 
   /* ------------------------------------------------------------------ */
   /* the ground probe grid — snow_ground_build port (fog_poc.c:3973)      */
@@ -2751,16 +2768,71 @@ window.SHView = (function () {
       gl_FragColor = vec4(floor(f5 * 255.0 / 31.0 + 0.5) / 255.0, 1.0);
     }`;
 
+  /* v43 (CT-2#7d): the streak = the engine's 1-px-wide screen-space quad
+   * (rain_blit_streak, fog_poc.c:8524-8562): tail->head projected to RT
+   * pixels, a 1-RT-px-wide ribbon built around the screen segment, the
+   * whole quad carried at the TAIL clip plane (the C's single per-prim
+   * depth: OT bucket zHalf of the tail OTZ + the per-pixel
+   * `depth >= fb->z[pi]` occlusion test — depthTest against the opaque
+   * scene, never writing z). position.xy carries the per-VERTEX corner
+   * fractions (x: 0 tail / 1 head, y: -0.5/+0.5 across the width).   */
   const STREAK_VERT = `
-    attribute vec3 sCol;
-    varying vec3 vCol;
+    attribute vec3 iTail; attribute vec3 iHead;
+    attribute float iClut; attribute vec3 iPrim;
+    varying vec3 vColS; varying float vClut;
+    varying float vProf; varying float vLenS; varying float vDepth;
+    uniform float uRT_W; uniform float uRT_H;
     void main() {
-      vCol = sCol;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      vColS = iPrim;
+      vClut = iClut;
+      vec4 mvT = modelViewMatrix * vec4(iTail, 1.0);
+      vec4 mvH = modelViewMatrix * vec4(iHead, 1.0);
+      vDepth = -mvT.z;              /* the C keys the prim depth on the TAIL */
+      vec4 cT = projectionMatrix * mvT;
+      vec4 cH = projectionMatrix * mvH;
+      vec2 sT = vec2((cT.x / cT.w + 1.0) * 0.5 * uRT_W,
+                     (1.0 - (cT.y / cT.w + 1.0) * 0.5) * uRT_H);
+      vec2 sH = vec2((cH.x / cH.w + 1.0) * 0.5 * uRT_W,
+                     (1.0 - (cH.y / cH.w + 1.0) * 0.5) * uRT_H);
+      vec2 d = sH - sT;
+      float len = max(abs(d.x), abs(d.y));   /* the C's major-axis length */
+      if (len < 1.0) len = 1.0;              /* the C: if (len <= 0) len = 1 */
+      vLenS = len;
+      vProf = position.x;
+      /* a zero-length streak still walks s=0..1 at (x0,y0) on the C (the
+         s=1 paint, v=(1*16)/2=8, lands on the tail pixel) — realize it
+         as a 2-px vertical ribbon: pixel 0 = v(0) transparent (discard),
+         pixel 1 = v(1)=8, the C's single visible texel                   */
+      vec2 dir = (abs(d.x) + abs(d.y) > 0.0) ? d / len : vec2(0.0, 1.0);
+      vec2 nrm = vec2(-dir.y, dir.x);        /* the screen perpendicular   */
+      /* v43 (CT-2#7d): the C's DDA paints the INCLUSIVE pixel range
+         x0..x1 = len+1 pixels (px = x0 + dx*s/len, s = 0..len). The float
+         endpoints are the truncated indices' pixel CENTERS, so the paint
+         span = the segment expanded half a pixel each way; each device
+         pixel then carries exactly its own walk step (vProf*(len+1)
+         floored in the fragment shader).                                  */
+      vec2 p = sT + (position.x * (len + 1.0) - 0.5) * dir + position.y * nrm;
+      vec2 ndc = vec2(p.x / uRT_W * 2.0 - 1.0, 1.0 - p.y / uRT_H * 2.0);
+      gl_Position = vec4(ndc * cT.w, cT.z, cT.w);
     }`;
   const STREAK_FRAG = `
-    varying vec3 vCol;
-    void main() { gl_FragColor = vec4(vCol, 1.0); }`;
+    uniform sampler2D map;
+    varying vec3 vColS; varying float vClut;
+    varying float vProf; varying float vLenS; varying float vDepth;
+    void main() {
+      if (vDepth <= 0.05) discard;
+      /* the C's per-pixel walk: s = the integer step along the major axis,
+         v = (s*16)/(len+1) -> the 3x16 sprite's middle column texel   */
+      float sIdx = floor(vProf * (vLenS + 1.0));
+      float vF = floor(sIdx * 16.0 / (vLenS + 1.0));
+      if (vF < 0.0) vF = 0.0;
+      if (vF > 15.0) vF = 15.0;
+      vec4 texel = texture2D(map, vec2(0.5, (vClut + (vF + 0.5) / 16.0) / 8.0));
+      if (texel.a < 0.5) discard;               /* CLUT entry 0x0000       */
+      vec3 t5 = floor(texel.rgb * 255.0 / 8.0);          /* trunc recovery */
+      vec3 f5 = min(vec3(31.0), floor(t5 * vColS / 128.0));  /* (T5*P8)>>7 */
+      gl_FragColor = vec4((f5 * 8.0 + floor(f5 / 4.0)) / 255.0, 1.0);
+    }`;
 
   const SPLASH_VERT = `
     attribute vec3 iPos; attribute float iScale; attribute float iClut;
@@ -2857,18 +2929,28 @@ window.SHView = (function () {
       V.scene.add(V.flakes);
     }
 
-    /* ---- rain streak LineSegments ---- */
+    /* ---- rain streak InstancedMesh (v43 CT-2#7d: the CLUT ribbon) ---- */
     {
       const N = SC.SNOW_COUNT_MAX;
-      const geo = new three.BufferGeometry();
-      geo.setAttribute('position', new three.BufferAttribute(new Float32Array(N * 6), 3));
-      geo.setAttribute('sCol', new three.BufferAttribute(new Float32Array(N * 6), 3));
+      const geo = new three.InstancedBufferGeometry();
+      /* the corner fractions: x = along (0 tail / 1 head),
+         y = across (-0.5/+0.5) — the 1-RT-px-wide screen ribbon */
+      geo.setAttribute('position', new three.BufferAttribute(new Float32Array([
+        0, -0.5, 0,   1, -0.5, 0,   0, 0.5, 0,   1, 0.5, 0]), 3));
+      geo.setIndex([0, 2, 1, 1, 2, 3]);
+      geo.setAttribute('iTail', new three.InstancedBufferAttribute(new Float32Array(N * 3), 3));
+      geo.setAttribute('iHead', new three.InstancedBufferAttribute(new Float32Array(N * 3), 3));
+      geo.setAttribute('iClut', new three.InstancedBufferAttribute(new Float32Array(N), 1));
+      geo.setAttribute('iPrim', new three.InstancedBufferAttribute(new Float32Array(N * 3), 3));
       const mat = new three.ShaderMaterial({
         vertexShader: STREAK_VERT, fragmentShader: STREAK_FRAG,
+        uniforms: { map: { value: buildStreakAtlas(three) },
+                    uRT_W: { value: V.RT_W }, uRT_H: { value: V.RT_H } },
         transparent: true, depthWrite: false,
+        side: three.DoubleSide,
         blending: three.AdditiveBlending
       });
-      V.streaks = new three.LineSegments(geo, mat);
+      V.streaks = new three.Mesh(geo, mat);
       V.streaks.frustumCulled = false;
       V.streaks.visible = false;
       V.streaks.renderOrder = 20;
@@ -3331,7 +3413,9 @@ window.SHView = (function () {
           const base = env.rainBase();
           r = base[0]; g = base[1]; b = base[2];
         }
-        streaks.push({ tail: [tx, ty, tz], head: [hx, hy, hz], r, g, b });
+        /* v43 (CT-2#7d): clutRow rides with the streak — the depth CLUT
+           (kRainClut[clutRow-104]) the ribbon samples, fog_poc.c:13027 */
+        streaks.push({ tail: [tx, ty, tz], head: [hx, hy, hz], r, g, b, clutRow });
       } else if (p.type === 2 || p.type === 242) {
         if (p.state >= 17) continue;
         const sp64 = (snow.rainIntensity < 27000) ? 3 :
@@ -3351,8 +3435,14 @@ window.SHView = (function () {
       } else {
         if (p.state >= 49) continue;
         const cc = (p.state < 31) ? p.state : 0x20;
-        streaks.push({ tail: [tx, ty, tz], head: [hx, hy + 1 / 4096, hz],
-                       r: cc, g: cc, b: (cc + 0x18) & 0xFF });
+        /* v43 (CT-2#7d): the drip head extension is +1 ENGINE SCREEN pixel
+           (fog_poc.c:13027 `pe.rfd.y1 = (int)hsy + 1;` — y1++ = one row
+           DOWN on screen), i.e. 2*d*tan(fov/2)/224 m of world at the HEAD
+           depth toward screen-down (world -Y) — NOT +1/4096 m (+0.244 mm,
+           ~0.5% of an engine pixel at typical depths).                   */
+        const wpp = 2.0 * hDepth * Math.tan(V.pipCam.fov * Math.PI / 360) / 224.0;
+        streaks.push({ tail: [tx, ty, tz], head: [hx, hy - wpp, hz],
+                       r: cc, g: cc, b: (cc + 0x18) & 0xFF, clutRow });
       }
     }
     return { flakes, streaks, splashes };
@@ -3587,17 +3677,19 @@ window.SHView = (function () {
   }
   function updateStreakBuffers(streaks) {
     const geo = V.streaks.geometry;
-    const pos = geo.attributes.position, col = geo.attributes.sCol;
+    const iTail = geo.attributes.iTail, iHead = geo.attributes.iHead,
+          iClut = geo.attributes.iClut, iPrim = geo.attributes.iPrim;
     const n = Math.min(streaks.length, SC.SNOW_COUNT_MAX);
     for (let i = 0; i < n; i++) {
       const s = streaks[i];
-      pos.setXYZ(i * 2, s.tail[0], s.tail[1], s.tail[2]);
-      pos.setXYZ(i * 2 + 1, s.head[0], s.head[1], s.head[2]);
-      col.setXYZ(i * 2, 0, 0, 0);
-      col.setXYZ(i * 2 + 1, s.r / 255, s.g / 255, s.b / 255);
+      iTail.setXYZ(i, s.tail[0], s.tail[1], s.tail[2]);
+      iHead.setXYZ(i, s.head[0], s.head[1], s.head[2]);
+      iClut.setX(i, s.clutRow ? (s.clutRow - 104) : 0);
+      iPrim.setXYZ(i, s.r, s.g, s.b);
     }
-    geo.setDrawRange(0, n * 2);
-    pos.needsUpdate = true; col.needsUpdate = true;
+    geo.instanceCount = n;
+    iTail.needsUpdate = iHead.needsUpdate = iClut.needsUpdate = true;
+    iPrim.needsUpdate = true;
   }
   function updateSplashBuffers(splashes) {
     const geo = V.splashes.geometry;
