@@ -10468,11 +10468,19 @@ static void fx_water_glint_blit(Frame *fb, int px0, int py0,
              * cover it too. The old 19.53125 was the ripple-rule
              * inversion (641*8-128 = 5000).                         */
             if (fb->z && fb->z[pi] < 20.0625f) continue;
-            /* affine sprite UVs: x -> u 64..127, y -> v 31..0 (flipped)   */
+            /* affine sprite UVs — the ENGINE window axes (V43 E-14-1):
+             * the FT4 corners are u0=64 u1=64 u2=127 u3=127 (u runs
+             * top->bottom, the 96-px quad height) and v0=31 v1=0 v2=31
+             * v3=0 (v runs left->right, FLIPPED, the 48-px width) —
+             * lens_flare.c:661-676. The old form sampled the window
+             * TRANSPOSED (u from the horizontal fraction, v from the
+             * vertical): the 63-texel u axis squeezed into 48 px and
+             * the 32-texel v axis stretched over 96 — the wide streaked
+             * blob was rotated 90 degrees.                              */
             double fu = (double)(xx - x0) / (double)(x1 - x0);
             double fv = (double)(yy - y0) / (double)(y1 - y0);
-            int tu = 64 + (int)(fu * 63.0);
-            int tv = 31 - (int)(fv * 31.0);
+            int tu = 64 + (int)(fv * 63.0);   /* u: top->bottom  64..127 */
+            int tv = 31 - (int)(fu * 31.0);   /* v: left->right  31..0   */
             if (tu < 64 || tu > 127 || tv < 0 || tv > 31) continue;
             /* v40 audit (A-F1): g_drWaveIdx is the UNPACKED byte-per-texel
              * sheet (dr_wave_data.h: [64][128], one palette index per
