@@ -7038,12 +7038,14 @@ static void snow_reset_seed(Snow *S, unsigned seed) {
                         if (p->pos[1] == 0) p->state++; /* land -> rest */
                     } else {
                         rain_spawn_movement_apply(S, p, dt);
-                        /* engine: clamp Y at 0 and rest (SpawnMovementApply
-                         * case 1 has NO state++ — the warm-up rain rests in
-                         * state 1 only if clamped... the engine's shared tail
-                         * clamps vy but the state advance for the warm-up is
-                         * absent; particles stay Active until the steady
-                         * update lands them. Verbatim: no state++ here. */
+                        if (p->pos[1] == 0) p->state++;
+                        /* Step to rest state when Y position reaches 0 —
+                         * engine particle.c:771-783: the vy==0 check lives
+                         * in the CALLER's state switch (SnowInit), applied
+                         * for BOTH banks (only the SpawnMovementApply body
+                         * differs per bank; the shared tail clamp that
+                         * zeroes vy is particle.c:3157-3161). map0_s00 takes
+                         * stateStep++ (MAP1_S06 is the only #else).        */
                     }
                     break;
                 default:
