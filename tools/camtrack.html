@@ -1363,18 +1363,59 @@ const SHCore = (function () {
         L.dir[0] = evx; L.dir[1] = -evy; L.dir[2] = -evz;
         this.light.intensity = lightWeight;
       } else {
-        /* the flashlight: rotate the camera-local beam by the camera basis */
-        const d = SH_LIGHT_DIR_CAM_Q12;
-        const X = camAxes[0], Y = camAxes[1], Z = camAxes[2];
-        L.dir[0] = Math.trunc(X[0] * d[0] + Y[0] * d[1] + Z[0] * d[2]);
-        L.dir[1] = Math.trunc(X[1] * d[0] + Y[1] * d[1] + Z[1] * d[2]);
-        L.dir[2] = Math.trunc(X[2] * d[0] + Y[2] * d[1] + Z[2] * d[2]);
+        /* v41 (CT-IMPL fix 4): the AUTHORED beam — the engine's authored-
+         * light branch VERBATIM (fog_poc.c:5698-5726): sh_light_dir_from_rot
+         * (the VERBATIM func_8003F4DC rot math — Q12_ANGLE trunc, the RAW
+         * sine LUT, the (x,-y,-z) engine->glTF axis map) over the authored
+         * rot when present, the fixed -15deg default otherwise; mode 1
+         * (follow "world") keeps the aim WORLD-FIXED (the NULL-bone path),
+         * else the camera-basis rotation (the legacy v13.5 discipline).
+         * The carrier is this.userLight (SHView.setUserLight sets it —
+         * ShEnv lives in the SHCore script, V is not in scope here). */
+        const UL = this.userLight || null;
+        let d0, d1, d2;
+        if (UL && UL.hasRot) {
+          const rx = Math.trunc(UL.rot[0] / 360 * 4096);   /* Q12_ANGLE, trunc-toward-0 */
+          const ry = Math.trunc(UL.rot[1] / 360 * 4096);
+          const evy = -shMathSin(rx);              /* the engine's vy (y-down)   */
+          const t = shMathCos(rx);
+          d0 = shR(t * shMathCos(ry), 12);         /* (int64)t*cos >> 12        */
+          d1 = -evy;
+          d2 = shR(t * shMathSin(ry), 12);
+        } else {
+          d0 = SH_LIGHT_DIR_CAM_Q12[0];
+          d1 = SH_LIGHT_DIR_CAM_Q12[1];
+          d2 = SH_LIGHT_DIR_CAM_Q12[2];
+        }
+        if (UL && UL.mode === 1) {
+          L.dir[0] = Math.trunc(d0);
+          L.dir[1] = Math.trunc(d1);
+          L.dir[2] = Math.trunc(d2);
+        } else {
+          const X = camAxes[0], Y = camAxes[1], Z = camAxes[2];
+          L.dir[0] = Math.trunc(X[0] * d0 + Y[0] * d1 + Z[0] * d2);
+          L.dir[1] = Math.trunc(X[1] * d0 + Y[1] * d1 + Z[1] * d2);
+          L.dir[2] = Math.trunc(X[2] * d0 + Y[2] * d1 + Z[2] * d2);
+        }
       }
 
-      /* v6 user directive: light position == camera position EXACTLY */
-      L.pos[0] = Math.trunc(camPos[0] * 4096);
-      L.pos[1] = Math.trunc(camPos[1] * 4096);
-      L.pos[2] = Math.trunc(camPos[2] * 4096);
+      /* v41 (CT-IMPL fix 4): the AUTHORED WORLD light position — the
+       * engine's mode-1 branch VERBATIM (fog_poc.c:5746-5752: L->pos =
+       * (int)(g_userLightWorld * 4096.0f)) — follow "world" lights the
+       * geometry from its OWN position, not the camera's eye. Otherwise
+       * the v6 user directive stands (light position == camera position
+       * EXACTLY; the legacy camera-follow behavior unchanged). */
+      const ULp = this.userLight || null;
+      if (ULp && ULp.mode === 1) {
+        const w = ULp.world;
+        L.pos[0] = Math.trunc(w[0] * 4096);
+        L.pos[1] = Math.trunc(w[1] * 4096);
+        L.pos[2] = Math.trunc(w[2] * 4096);
+      } else {
+        L.pos[0] = Math.trunc(camPos[0] * 4096);
+        L.pos[1] = Math.trunc(camPos[1] * 4096);
+        L.pos[2] = Math.trunc(camPos[2] * 4096);
+      }
 
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),
          field_30 = light position Q8 */
@@ -2328,6 +2369,14 @@ window.SHView = (function () {
      * after the RT render — the water/sprites' discipline). RT-ONLY: the
      * editor orbit view never shows the engine FX. */
     tvMeshes: [], tvPaintHook: null,
+
+    /* v41 (CT-IMPL fix 4): the AUTHORED USER LIGHT carrier — the editor
+     * glue's per-frame resolution of the ACTIVE model's models[].light
+     * (the analog of the engine's g_userLightMode/g_userLightHasRot/
+     * g_userLightRot/g_userLightWorld globals, fog_poc.c:5131-5159,
+     * resolved per-frame here because the LINE mode's travel pos moves).
+     * null = the engine anchor (the legacy default). updatePose reads it. */
+    userLight: null,
 
     /* scratch */
     _m4: null, _m4b: null, _v3: null, _col: null,
@@ -3623,6 +3672,15 @@ window.SHView = (function () {
     V.tvMeshes = meshes || [];
     V.tvPaintHook = hook || null;
   }
+  /* v41 (CT-IMPL fix 4): the AUTHORED USER LIGHT carrier — the editor
+   * glue resolves the ACTIVE model's models[].light into this slot every
+   * frame (lightResolveForView); null restores the engine anchor. The
+   * env's own this.userLight slot mirrors it (ShEnv lives in the SHCore
+   * classic script — V is not in ITS scope, the env carries the state). */
+  function setUserLight(ul) {
+    V.userLight = ul || null;
+    if (V.env) V.env.userLight = V.userLight;
+  }
   function setDither(on) { V.dither = !!on; }
   function setParticles(on) {
     V.particlesOn = !!on;
@@ -3634,7 +3692,7 @@ window.SHView = (function () {
     V, init, registerModel, syncAndDraw, blitFaithful,
     setPair, setFlashlight, toggleFlashlight, lightning, setLensFlare,
     setWeatherTarget, setBootWeather, setPsx, setDither, setParticles,
-    setEnabled, setWaterFx, setTvPaintFx
+    setEnabled, setWaterFx, setTvPaintFx, setUserLight
   };
 })();
 
@@ -3699,19 +3757,27 @@ window.SHUI = (function () {
     effectsOff: false,
     fxOffPair: null,      /* the real session pair while the override runs */
     fxOffFlash: false,    /* the real flashlight state while it runs       */
-    /* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT (models[].light) —
-     * the authored 6-DOF flashlight emulating Harry's: follow "world" =
-     * the free pose (pos + the world-fixed aim); follow "camera" = the
-     * anchor (offset + rot in the camera frame) + ahead; on = the boot
-     * toggle (Game_TurnFlashlightOn); the aim = the ANGLE DISTINCTION
-     * (func_8003F4DC's rot math, the verbatim -15deg default). The light
-     * NEVER fires in day modes — the verbatim Spot/unavailable gates.  */
+    /* v13.5 (T7 — task 3) / v41 (CT-IMPL fix 4): the USER PROGRAMMABLE
+     * LIGHT (models[].light) — authoring EXACTLY LIKE THE CAMERA PATH
+     * SPHERES (dragged spheres in the 3D view; the 12-control number form
+     * is GONE) with THREE modes only: fixed (one gold sphere),
+     * static rotation (gold + amber aim sphere), line (two endpoint
+     * spheres; the light travels start→end with speedMS/loopMode).
+     * The legacy follow:"camera" + offset/ahead block keeps parsing and
+     * editing (tv_camdat.json's ahead:1.2 is the CI regression surface —
+     * legacy fields are MAPPED, never dropped). */
     lightOn: true,       /* the authored on/off (light.on)                 */
     lightFollow: 'camera',
+    lightMode: 'fixed',   /* fixed | rotate | line (follow world)           */
     lightPos: [0, 1, 0],       /* m, world (follow world)                */
     lightRot: [-15, 0, 0],    /* deg (pitch, yaw, roll — the aim)        */
-    lightOffset: [-0.08, 0.28, -0.12],  /* m, camera-local (follow camera) */
-    lightAhead: 0,            /* m along the beam                        */
+    lightRotAuthored: false,   /* an authored aim came in (legacy round-trip) */
+    lightStart: [0, 1, 0],     /* m, line-mode endpoints                  */
+    lightEnd: [2, 1, 0],
+    lightSpeedMS: 1.0,         /* m/s along the line                      */
+    lightLoopMode: 'loop',     /* loop | pingPong | once                  */
+    lightOffset: [-0.08, 0.28, -0.12],  /* m, camera-local (legacy camera)  */
+    lightAhead: 0,            /* m along the beam (legacy camera)         */
     cmdEl: null, stateEl: null, lockEl: null,
     refreshAcc: 0
   };
@@ -3914,46 +3980,49 @@ window.SHUI = (function () {
   </div>
 </div>
 <div class="wgroup open" id="wg-light">
-  <div class="wgroup-h">User light — task 3 · v13.5<span class="chev">&#9654;</span></div>
+  <div class="wgroup-h">Light — v41 sphere authoring<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <label class="tgl-row"><input type="checkbox" id="tgl-lighton">
       <span><b>Light on</b> — Game_TurnFlashlightOn/Off</span></label>
-    <div class="wrow"><label>Follow</label>
-      <select class="sel" id="light-follow" style="flex:1">
-        <option value="camera">camera — Harry's anchor (offset + rot in the camera frame)</option>
-        <option value="world">world — the FREE 6-DOF pose (pos + the world-fixed aim)</option>
+    <div class="wrow"><label>Mode</label>
+      <select class="sel" id="light-mode" style="flex:1">
+        <option value="fixed">Fixed — one gold sphere (drag it)</option>
+        <option value="rotate">Static rotation — gold + amber aim spheres</option>
+        <option value="line">Line — two endpoint spheres (light travels)</option>
+        <option value="legacy">Camera anchor (legacy) — offset/ahead numbers</option>
       </select></div>
-    <div class="wrow"><label>Pos (m)</label>
-      <div style="flex:1;display:flex;gap:4px">
-        <input type="number" step="0.1" id="light-px" style="width:100%" title="world x">
-        <input type="number" step="0.1" id="light-py" style="width:100%" title="world y">
-        <input type="number" step="0.1" id="light-pz" style="width:100%" title="world z">
-      </div></div>
-    <div class="wrow"><label>Aim (deg)</label>
-      <div style="flex:1;display:flex;gap:4px">
-        <input type="number" step="1" id="light-rp" style="width:100%" title="pitch (down = negative; the verbatim -15)">
-        <input type="number" step="1" id="light-ry" style="width:100%" title="yaw">
-        <input type="number" step="1" id="light-rr" style="width:100%" title="roll (no engine term — parsed for symmetry)">
-      </div></div>
-    <div class="wrow"><label>Offset (m)</label>
-      <div style="flex:1;display:flex;gap:4px">
-        <input type="number" step="0.01" id="light-ox" style="width:100%" title="camera-local x">
-        <input type="number" step="0.01" id="light-oy" style="width:100%" title="camera-local y">
-        <input type="number" step="0.01" id="light-oz" style="width:100%" title="camera-local z">
-      </div></div>
-    <div class="wrow"><label>Ahead (m)</label>
-      <input type="number" step="0.1" min="0" id="light-ahead" style="flex:1"
-        title="meters forward along the beam (the --userlight-ahead surface)"></div>
-    <div class="wlegend"><b>v13.5:</b> the USER PROGRAMMABLE LIGHT (task 3) — a light source that
-      emulates Harry's flashlight and <b>moves in all the ways the camera can</b>: a full 6-DOF pose
-      (position + the independent AIM — the angle distinction; func_8003F4DC's rot math with the
-      verbatim −15° tilt as the default). <b>on/off</b> = the engine's flashlight toggle; in DAY
-      modes the light stays INERT exactly like the engine (lightMode None + the identical-pair
-      auto-off rule — never a forced Spot). follow <b>camera</b> = the Harry anchor
-      (Game_FlashlightAttribsSet offset −0.08,−0.28,0.12 + the beam rot, camera-relative);
-      follow <b>world</b> = the free-world light (the NULL-bone path — lights the geometry from
-      its own position with a world-fixed aim). Saved as <code>models[].light</code>; the PoC
-      consumes it at boot (CLI &gt; camdat &gt; the GLB's unbiased userLight EXTRAs).</div>
+    <div id="light-line-opts" style="display:none">
+      <div class="wrow"><label>Speed (m/s)</label>
+        <input type="number" step="0.1" min="0.01" id="light-speed" style="flex:1"
+          title="the light travels start -> end at this speed"></div>
+      <div class="wrow"><label>Loop</label>
+        <select class="sel" id="light-loop" style="flex:1">
+          <option value="loop">loop — restart at start</option>
+          <option value="pingPong">pingPong — mirror at the ends</option>
+          <option value="once">once — stop at the end</option>
+        </select></div>
+    </div>
+    <div id="light-legacy-opts" style="display:none">
+      <div class="wrow"><label>Offset (m)</label>
+        <div style="flex:1;display:flex;gap:4px">
+          <input type="number" step="0.01" id="light-ox" style="width:100%" title="camera-local x">
+          <input type="number" step="0.01" id="light-oy" style="width:100%" title="camera-local y">
+          <input type="number" step="0.01" id="light-oz" style="width:100%" title="camera-local z">
+        </div></div>
+      <div class="wrow"><label>Ahead (m)</label>
+        <input type="number" step="0.1" min="0" id="light-ahead" style="flex:1"
+          title="meters forward along the beam (the --userlight-ahead surface)"></div>
+    </div>
+    <div class="wlegend"><b>v41 (fix 4):</b> light authoring is EXACTLY LIKE THE CAMERA PATH
+      SPHERES — <b>drag the gold sphere in the 3D view</b> (Shift-drag = height, the axis lock
+      works too; the number form is gone). <b>Fixed</b> = one gold sphere, aim locked to the
+      verbatim &minus;15&deg;,0,0. <b>Static rotation</b> = gold source + amber aim sphere (drag the
+      amber to aim). <b>Line</b> = two endpoint spheres; the light travels start&#8594;end at the
+      speed with the loop mode. Saved as <code>models[].light</code> (engine mode 1, the
+      NULL-bone world light: the faithful preview lights the geometry from the light's OWN
+      position, fog_poc.c:5746-5752). The <b>legacy camera anchor</b> (offset/ahead) keeps
+      parsing &amp; exporting unchanged (tv_camdat.json's ahead:1.2). In DAY modes the light
+      stays INERT exactly like the engine (lightMode None + the identical-pair auto-off rule).</div>
     <div class="lock-note" id="light-note"></div>
   </div>
 </div>
@@ -4084,7 +4153,11 @@ window.SHUI = (function () {
         const [a, c] = b.dataset.pair.split(',').map(Number);
         applyPair(a, c, 'chip');
       }));
-    /* v13.5 (T7 — task 3): the USER LIGHT panel listeners */
+    /* v41 (CT-IMPL fix 4): the LIGHT panel listeners — THREE authoring
+     * modes (fixed / static rotation / line) + the legacy camera anchor.
+     * The pos/rot/aim are owned by the DRAGGED SPHERES in the 3D view;
+     * the panel carries only what cannot be dragged (speed/loop for the
+     * line, offset/ahead for the legacy anchor). */
     {
       const onEl = host.querySelector('#tgl-lighton');
       if (onEl) onEl.addEventListener('change', e => {
@@ -4092,25 +4165,52 @@ window.SHUI = (function () {
         SV.setFlashlight(U.lightOn);   /* the preview env follows the toggle */
         syncLightModel(); syncEnvUI();
       });
-      const fwEl = host.querySelector('#light-follow');
-      if (fwEl) fwEl.addEventListener('change', e => {
-        U.lightFollow = e.target.value === 'world' ? 'world' : 'camera';
+      const modeEl = host.querySelector('#light-mode');
+      if (modeEl) modeEl.addEventListener('change', e => {
+        const v = e.target.value;
+        if (v === 'legacy') U.lightFollow = 'camera';
+        else { U.lightFollow = 'world'; U.lightMode = v; }
+        if (v !== 'legacy') {
+          /* v41 fix 4: seed the spheres INTO the model's bounds when the
+           * fields are still the un-authored defaults ([0,1,0] is usually
+           * far off-screen for real rooms — the drag surface must start
+           * in view, exactly like the camera track handles do) */
+          const m = bridge.getActiveModel();
+          if (m && m.bounds && m.bounds.min && m.bounds.max) {
+            const c = [0, 1, 2].map(i => (m.bounds.min[i] + m.bounds.max[i]) / 2);
+            const diag = Math.hypot(...[0, 1, 2].map(i => m.bounds.max[i] - m.bounds.min[i]));
+            if (v === 'line') {
+              if (U.lightStart[0] === 0 && U.lightStart[1] === 1 && U.lightStart[2] === 0 &&
+                  U.lightEnd[0] === 2 && U.lightEnd[1] === 1 && U.lightEnd[2] === 0) {
+                U.lightStart = [c[0], c[1] + 0.5, c[2]];
+                U.lightEnd = [c[0] + Math.min(diag * 0.15, 2), c[1] + 0.5, c[2]];
+              }
+            } else if (U.lightPos[0] === 0 && U.lightPos[1] === 1 && U.lightPos[2] === 0) {
+              U.lightPos = [c[0], c[1] + 0.5, c[2]];
+            }
+          }
+        }
         syncLightModel(); syncLightUI();
       });
-      const numIds = ['light-px', 'light-py', 'light-pz', 'light-rp', 'light-ry', 'light-rr',
-                      'light-ox', 'light-oy', 'light-oz', 'light-ahead'];
+      const spEl = host.querySelector('#light-speed');
+      if (spEl) spEl.addEventListener('change', () => {
+        const v = +spEl.value;
+        if (isFinite(v) && v > 0) U.lightSpeedMS = v;
+        syncLightModel(); syncLightUI();
+      });
+      const lpEl = host.querySelector('#light-loop');
+      if (lpEl) lpEl.addEventListener('change', () => {
+        U.lightLoopMode = ['loop', 'pingPong', 'once'].includes(lpEl.value) ? lpEl.value : 'loop';
+        syncLightModel(); syncLightUI();
+      });
+      /* the LEGACY camera-anchor fields (offset/ahead) — mapped, never dropped */
+      const numIds = ['light-ox', 'light-oy', 'light-oz', 'light-ahead'];
       numIds.forEach(id => {
         const el = host.querySelector('#' + id);
         if (el) el.addEventListener('change', () => {
           const v = +el.value;
           if (!isFinite(v)) { syncLightUI(); return; }
-          if (id === 'light-px') U.lightPos[0] = v;
-          else if (id === 'light-py') U.lightPos[1] = v;
-          else if (id === 'light-pz') U.lightPos[2] = v;
-          else if (id === 'light-rp') U.lightRot[0] = v;
-          else if (id === 'light-ry') U.lightRot[1] = v;
-          else if (id === 'light-rr') U.lightRot[2] = v;
-          else if (id === 'light-ox') U.lightOffset[0] = v;
+          if (id === 'light-ox') U.lightOffset[0] = v;
           else if (id === 'light-oy') U.lightOffset[1] = v;
           else if (id === 'light-oz') U.lightOffset[2] = v;
           else if (id === 'light-ahead') U.lightAhead = Math.max(0, v);
@@ -4899,47 +4999,90 @@ window.SHUI = (function () {
   }
 
   /* ------------------------------------------------------------------
-   * v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT — apply/sync the
-   * models[].light block (the authored 6-DOF flashlight; the panel state
-   * mirrors the model; the authored on/off also drives the preview's
-   * flashlight env state — exactly what the players' boots resolve).   */
+   * v13.5 (T7 — task 3) / v41 (CT-IMPL fix 4): the USER PROGRAMMABLE
+   * LIGHT — apply/sync the models[].light block. The DRAGGED SPHERES in
+   * the 3D view own pos/rot/start/end (the camtrack glue writes them
+   * straight into m.light; applyModelLight mirrors the model back into
+   * the panel state); the panel owns only the non-draggable fields. The
+   * authored on/off drives the preview's flashlight env state (exactly
+   * what the players' boots resolve). */
   function applyModelLight(m) {
     if (m && m.light) {
       const l = m.light;
       if (typeof l.on === 'boolean') U.lightOn = l.on;
       if (l.follow === 'world' || l.follow === 'camera') U.lightFollow = l.follow;
+      /* the v41 modes: explicit light.mode, else derived (line when the
+       * endpoints+speed are present; rotate when an authored rot came in;
+       * fixed otherwise — the legacy world lights keep working) */
+      if (l.mode === 'fixed' || l.mode === 'rotate' || l.mode === 'line') U.lightMode = l.mode;
+      else if (Array.isArray(l.start) && Array.isArray(l.end) && l.speedMS > 0) U.lightMode = 'line';
+      else if (Array.isArray(l.rot)) U.lightMode = 'rotate';
+      else U.lightMode = 'fixed';
       if (Array.isArray(l.pos) && l.pos.length >= 3) U.lightPos = [+l.pos[0] || 0, +l.pos[1] || 0, +l.pos[2] || 0];
-      if (Array.isArray(l.rot) && l.rot.length >= 3) U.lightRot = [+l.rot[0] || 0, +l.rot[1] || 0, +l.rot[2] || 0];
+      U.lightRotAuthored = false;
+      if (Array.isArray(l.rot) && l.rot.length >= 3) {
+        U.lightRot = [+l.rot[0] || 0, +l.rot[1] || 0, +l.rot[2] || 0];
+        U.lightRotAuthored = true;
+      } else U.lightRot = [-15, 0, 0];
+      if (Array.isArray(l.start) && l.start.length >= 3) U.lightStart = [+l.start[0] || 0, +l.start[1] || 0, +l.start[2] || 0];
+      if (Array.isArray(l.end) && l.end.length >= 3) U.lightEnd = [+l.end[0] || 0, +l.end[1] || 0, +l.end[2] || 0];
+      if (l.speedMS != null && isFinite(+l.speedMS) && +l.speedMS > 0) U.lightSpeedMS = +l.speedMS;
+      if (l.loopMode === 'loop' || l.loopMode === 'pingPong' || l.loopMode === 'once') U.lightLoopMode = l.loopMode;
       if (Array.isArray(l.offset) && l.offset.length >= 3) U.lightOffset = [+l.offset[0] || 0, +l.offset[1] || 0, +l.offset[2] || 0];
       if (l.ahead != null && isFinite(+l.ahead)) U.lightAhead = Math.max(0, +l.ahead);
       /* the authored on/off drives the preview's flashlight env state too
        * (the engine's boot toggle — the camdat light.on replaces the env
        * flashlightOn at boot in the PoC/wallpaper precedence)             */
       if (typeof l.on === 'boolean') SV.setFlashlight(l.on);
+    } else {
+      /* no authored light: the panel defaults (nothing authored) */
+      U.lightOn = true; U.lightFollow = 'camera'; U.lightMode = 'fixed';
+      U.lightPos = [0, 1, 0]; U.lightRot = [-15, 0, 0]; U.lightRotAuthored = false;
+      U.lightStart = [0, 1, 0]; U.lightEnd = [2, 1, 0];
+      U.lightSpeedMS = 1.0; U.lightLoopMode = 'loop';
+      U.lightOffset = [-0.08, 0.28, -0.12]; U.lightAhead = 0;
     }
     syncLightUI();
   }
   function syncLightUI() {
     const on = document.querySelector('#tgl-lighton');
     if (on) on.checked = U.lightOn;
-    const fw = document.querySelector('#light-follow');
-    if (fw) fw.value = U.lightFollow;
-    const vals = { 'light-px': U.lightPos[0], 'light-py': U.lightPos[1], 'light-pz': U.lightPos[2],
-                   'light-rp': U.lightRot[0], 'light-ry': U.lightRot[1], 'light-rr': U.lightRot[2],
-                   'light-ox': U.lightOffset[0], 'light-oy': U.lightOffset[1], 'light-oz': U.lightOffset[2],
+    const mode = document.querySelector('#light-mode');
+    const isLegacy = U.lightFollow === 'camera';
+    if (mode) mode.value = isLegacy ? 'legacy' : (U.lightMode || 'fixed');
+    const lineOpts = document.querySelector('#light-line-opts');
+    if (lineOpts) lineOpts.style.display = (!isLegacy && U.lightMode === 'line') ? '' : 'none';
+    const legOpts = document.querySelector('#light-legacy-opts');
+    if (legOpts) legOpts.style.display = isLegacy ? '' : 'none';
+    const spEl = document.getElementById('light-speed');
+    if (spEl) spEl.value = String(Math.round(U.lightSpeedMS * 1000) / 1000);
+    const lpEl = document.getElementById('light-loop');
+    if (lpEl) lpEl.value = U.lightLoopMode;
+    const vals = { 'light-ox': U.lightOffset[0], 'light-oy': U.lightOffset[1], 'light-oz': U.lightOffset[2],
                    'light-ahead': U.lightAhead };
     for (const k in vals) {
       const el = document.getElementById(k);
       if (el) el.value = String(Math.round(+vals[k] * 1000) / 1000);
     }
     const note = document.querySelector('#light-note');
-    if (note)
-      note.textContent = U.lightFollow === 'world'
-        ? 'follow WORLD — pos ' + U.lightPos.map(v => v.toFixed(1)).join(', ') +
-          ' m, aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (world-fixed)'
-        : 'follow CAMERA — offset ' + U.lightOffset.join(', ') + ' m, aim ' +
-          U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' +
-          (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '');
+    if (note) {
+      if (isLegacy) {
+        note.textContent = 'camera anchor (legacy) — offset ' + U.lightOffset.join(', ') +
+          ' m' + (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '') +
+          (U.lightRotAuthored ? ' \u00b7 aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' : '');
+      } else if (U.lightMode === 'line') {
+        note.textContent = 'line light — start ' + U.lightStart.map(v => v.toFixed(1)).join(', ') +
+          ' \u2192 end ' + U.lightEnd.map(v => v.toFixed(1)).join(', ') + ' m \u00b7 ' +
+          U.lightSpeedMS.toFixed(2) + ' m/s \u00b7 ' + U.lightLoopMode + ' (drag the two gold spheres)';
+      } else if (U.lightMode === 'rotate') {
+        note.textContent = 'static rotation — pos ' + U.lightPos.map(v => v.toFixed(1)).join(', ') +
+          ' m, aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') +
+          '\u00b0 (drag the gold sphere + the amber aim sphere)';
+      } else {
+        note.textContent = 'fixed — pos ' + U.lightPos.map(v => v.toFixed(1)).join(', ') +
+          ' m, aim ' + String(U.lightRot[0]) + '\u00b0 (the verbatim default; drag the gold sphere)';
+      }
+    }
   }
   function syncLightModel() {
     if (!bridge || !SV.V.env) return;
@@ -4947,11 +5090,32 @@ window.SHUI = (function () {
     if (!m) return;
     const l = {};
     l.on = U.lightOn === true;
-    l.follow = U.lightFollow === 'world' ? 'world' : 'camera';
-    if (l.follow === 'world') l.pos = U.lightPos.slice();
-    else l.offset = U.lightOffset.slice();
-    l.rot = U.lightRot.slice();
-    if (U.lightAhead > 0) l.ahead = U.lightAhead;
+    if (U.lightFollow === 'camera') {
+      /* the LEGACY camera anchor — mapped, never dropped: offset/ahead
+       * + the authored aim when one came in (tv_camdat.json's ahead:1.2
+       * is the CI regression surface) */
+      l.follow = 'camera';
+      l.offset = U.lightOffset.slice();
+      if (U.lightAhead > 0) l.ahead = U.lightAhead;
+      if (U.lightRotAuthored) l.rot = U.lightRot.slice();
+    } else {
+      l.follow = 'world';
+      l.mode = ['fixed', 'rotate', 'line'].includes(U.lightMode) ? U.lightMode : 'fixed';
+      if (l.mode === 'line') {
+        l.start = U.lightStart.slice();
+        l.end = U.lightEnd.slice();
+        l.speedMS = Math.max(0.01, +U.lightSpeedMS || 1.0);
+        l.loopMode = U.lightLoopMode;
+        l.pos = U.lightStart.slice();          /* the stable engine-mode-1 snapshot */
+        l.rot = [-15, 0, 0];
+      } else if (l.mode === 'rotate') {
+        l.pos = U.lightPos.slice();
+        l.rot = U.lightRot.slice();
+      } else {                                  /* fixed: the verbatim default aim */
+        l.pos = U.lightPos.slice();
+        l.rot = [-15, 0, 0];
+      }
+    }
     m.light = l;
     if (bridge.markDirty) bridge.markDirty();
   }
@@ -5011,7 +5175,7 @@ const DOC_STRING =
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
-  'USER PROGRAMMABLE LIGHT (v13.5, task 3): models[].light { on (boolean, the Game_TurnFlashlightOn boot toggle), follow "camera"|"world", pos[3] meters (world), rot[3] degrees (pitch,yaw,roll — the AIM; the verbatim default -15,0,0 = Harry\u2019s lightRotation; roll has no engine term), offset[3] meters (camera-local; the verbatim Game_FlashlightAttribsSet anchor -0.08,-0.28,0.12), ahead meters (forward along the beam) } — the 6-DOF light source that emulates Harry\u2019s flashlight: it moves in all the ways the camera can (a free world pose OR the camera-follow anchor), is disable-able (on=false + the runtime F key), NEVER fires in day modes (the verbatim lightMode-None + identical-pair auto-off gates — never a forced Spot), and has angle distinction (the authored aim drives func_8003F4DC\u2019s rot math in every consumer: the per-vertex MESH light, the lens-flare/water FX, the screen angles). Resolution: CLI --userlight/--userlightrot > camdat light > the GLB\u2019s unbiased userLight EXTRAs > the verbatim constants. ' +
+  'USER PROGRAMMABLE LIGHT (v41 fix 4 — SPHERE AUTHORING): models[].light { on, follow "camera"|"world", mode "fixed"|"rotate"|"line", pos[3] m (world), rot[3] deg (pitch,yaw,roll — the AIM; the verbatim default -15,0,0 = Harry\u2019s lightRotation; roll has no engine term), start[3]/end[3] m + speedMS + loopMode "loop"|"pingPong"|"once" (the LINE mode — the light travels start→end), offset[3] m (camera-local; the verbatim Game_FlashlightAttribsSet anchor -0.08,-0.28,0.12) + ahead m (the LEGACY camera anchor — mapped, never dropped; tv_camdat.json\u2019s ahead:1.2 is the CI regression surface) } — authored EXACTLY LIKE THE CAMERA PATH SPHERES: fixed = ONE gold draggable sphere; static rotation = gold source + amber AIM sphere (the dragged aim rewrites the pitch/yaw); line = two endpoint gold spheres (the light travels start→end at speedMS with the loop mode). The dragged positions write back to the camdat light fields (engine mode 1 — the NULL-bone world light; the faithful preview lights the geometry from the light\u2019s OWN position, ShEnv.updatePose honoring the authored pos/rot — fog_poc.c:5698-5758). NEVER fires in day modes (the verbatim lightMode-None + identical-pair auto-off gates — never a forced Spot). Resolution: CLI --userlight/--userlightrot > camdat light > the GLB\u2019s unbiased userLight EXTRAs > the verbatim constants. ' +
   'DAY/NIGHT ENVIRONMENTS (v13): models[].env.dayEnv and models[].env.nightEnv (optional, 0..20, MAP_EFFECTS_INFOS indices) are the scene\u2019s Auto-Mode presets — the environments the wallpaper applies by daylight phase (sun-time or the device schedule); models[].tracks[].envDay / models[].tracks[].envNight (optional, 0..20) override them per track (resolved track > model; absent = inherit the model preset, which itself falls back to the base env pair slot A). The wallpaper app layers them under its own preferences (app override > camdat track > camdat model > app custom mapping > the authentic defaults 1/3). The CamTrack v13 EDITOR previews the phase presets INSTANTLY through its session-only Day/Night lens (applied as the pair {N,N}, never serialized); the ENGINE transitions day/night through its own environment paths.';
 
 /* ------------------------------------------------------------------ utils */
@@ -5853,14 +6017,17 @@ function sanitizeEnv(raw) {
  * the caller's clamp exactly like the C. NaN cannot occur in
  * JSON.parse output. */
 function num(v, def) { return (typeof v === 'number') ? v : def; }
-/* v13.5 (T7 — task 3): the USER PROGRAMMABLE LIGHT sanitizer — the export
- * whitelist (mirrors the engine's models[].light parse exactly: strict
- * types, per-field presence, clamps). */
+/* v13.5 (T7 — task 3) / v41 (CT-IMPL fix 4): the USER LIGHT sanitizer —
+ * the export whitelist (strict types, per-field presence, clamps; the
+ * legacy camera fields map straight through — never dropped). */
 function sanitizeLight(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const l = {};
   if (typeof raw.on === 'boolean') l.on = raw.on;
   if (raw.follow === 'world' || raw.follow === 'camera') l.follow = raw.follow;
+  /* v41 (CT-IMPL fix 4): the three authoring modes (the engine's jget
+   * parse ignores unknown keys — the mode fields are editor-carried) */
+  if (raw.mode === 'fixed' || raw.mode === 'rotate' || raw.mode === 'line') l.mode = raw.mode;
   /* v41 audit (B-3): typeof-number gates on every element (the C's
    * all-three-JV_NUM rule, fog_poc.c:3493-3495) — the old isFinite(+x)
    * coerced "1.5"->1.5 and true->1; ahead likewise (the C's jnum,
@@ -5869,6 +6036,13 @@ function sanitizeLight(raw) {
     l.pos = [raw.pos[0], raw.pos[1], raw.pos[2]];
   if (Array.isArray(raw.rot) && raw.rot.length >= 3 && raw.rot.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
     l.rot = [raw.rot[0], raw.rot[1], raw.rot[2]];
+  if (Array.isArray(raw.start) && raw.start.length >= 3 && raw.start.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
+    l.start = [raw.start[0], raw.start[1], raw.start[2]];
+  if (Array.isArray(raw.end) && raw.end.length >= 3 && raw.end.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
+    l.end = [raw.end[0], raw.end[1], raw.end[2]];
+  if (raw.speedMS != null && typeof raw.speedMS === 'number' && isFinite(raw.speedMS) && raw.speedMS > 0)
+    l.speedMS = raw.speedMS;
+  if (raw.loopMode === 'loop' || raw.loopMode === 'pingPong' || raw.loopMode === 'once') l.loopMode = raw.loopMode;
   if (Array.isArray(raw.offset) && raw.offset.length >= 3 && raw.offset.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
     l.offset = [raw.offset[0], raw.offset[1], raw.offset[2]];
   if (raw.ahead != null && typeof raw.ahead === 'number' && isFinite(raw.ahead)) l.ahead = Math.max(0, raw.ahead);
@@ -6784,10 +6958,11 @@ function registerModel(name, gltf) {
         else if (!window.SHUI.hadUrlParams() && entry.env) window.SHUI.applyModelEnv(entry);
         else window.SHUI.reapplyBootSelection();
         window.SHUI.writeEnvToModel(entry);
-        /* v13.5 (T7 — task 3): the model's authored USER LIGHT rides the
-         * registration (the panel + the gizmo follow the active model)   */
-        if (entry.light && typeof entry.light.on === 'boolean')
-          window.SHUI.applyModelLight(entry);
+        /* v13.5 (T7 — task 3) / v41 (CT-IMPL fix 4): the model's authored
+         * USER LIGHT rides the registration (the panel + the SPHERES +
+         * the gizmo follow the active model; a model without a light
+         * resets the panel to the un-authored defaults)             */
+        window.SHUI.applyModelLight(entry);
         /* v41 fix 2 (CT-IMPL, RC-G A-1) — the FIRST-IMPRESSION rule: a DARK
          * TRACKLESS room auto-engages the session-only "Effects Off" view
          * (env mode 0 — fog-off ambient + weather none) so the room is
@@ -7117,6 +7292,10 @@ function handleMeshes() {
   const out = [];
   visuals.forEach(v => { if (v.handles.visible) out.push(...v.handles.children); });
   if (pointer.on && pointerMarker && pointerMarker.visible) out.push(pointerMarker.userData.sphere);
+  /* v41 (CT-IMPL fix 4): the LIGHT SPHERES join the camera-handle drag
+   * machinery (draggable exactly like the path spheres) */
+  if (lightHandles && lightHandles.group.visible)
+    out.push(lightHandles.pos, lightHandles.aim, lightHandles.start, lightHandles.end);
   return out.filter(o => o.isMesh);            /* rail lines are not grabbable */
 }
 function pathLines() {
@@ -7166,6 +7345,13 @@ function onCanvasDown(e) {
       if (pointer.on) startDrag(e, hit.object, null, 'ptr');
       return;
     }
+    /* v41 (CT-IMPL fix 4): the light spheres (fixed/rotate/line) — the
+     * SAME drag machinery, no track behind them */
+    if (hit.object.userData.lightHandle) {
+      startDrag(e, hit.object, null, 'light:' + hit.object.userData.lightHandle);
+      updateDragHint(e, null, role);
+      return;
+    }
     const tr = activeTracks().find(t => t.id === trackId);
     if (!tr) return;
     startDrag(e, hit.object, tr, role);
@@ -7188,6 +7374,20 @@ function onPointerMove(e) {
         updatePointerMarker();
         updateDragHint(e, null, 'ptr');
         updateNavHud();
+      }
+      return;
+    }
+    /* v41 (CT-IMPL fix 4): the light spheres' drag — the write-back to the
+     * camdat light fields (engine mode 1) + the visuals/panel refresh */
+    if (drag.role && drag.role.indexOf('light:') === 0) {
+      raycaster.setFromCamera(ndcFromEvent(e), orbitCam);
+      const p = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(drag.plane, p)) {
+        applyLightHandleDrag(drag.role.slice(6), p, drag.vertical);
+        updateLightHandles();
+        updateLightGizmo();
+        markDirty();
+        updateDragHint(e, null, drag.role);
       }
       return;
     }
@@ -7303,6 +7503,21 @@ function updateDragHint(e, tr, role) {
   if (role === 'ptr') {
     const v = pointer.pos || [0, 0, 0];
     txt = 'ptr  x ' + v[0].toFixed(3) + '  y ' + v[1].toFixed(3) + '  z ' + v[2].toFixed(3) + ' m (temporary)';
+  } else if (role && role.indexOf('light:') === 0) {
+    /* v41 (CT-IMPL fix 4): the light spheres' own hint */
+    const m = activeModel();
+    const l = m && m.light;
+    const which = role.slice(6);
+    if (!l) { hideDragHint(); return; }
+    if (which === 'aim') {
+      txt = 'light aim  pitch ' + (l.rot ? l.rot[0].toFixed(1) : '0') + '\u00b0  yaw ' + (l.rot ? l.rot[1].toFixed(1) : '0') + '\u00b0';
+    } else if (which === 'start' || which === 'end') {
+      const v = vec3(l[which], vec3(l.pos, [0, 1, 0]));
+      txt = 'light ' + which + '  x ' + v[0].toFixed(3) + '  y ' + v[1].toFixed(3) + '  z ' + v[2].toFixed(3) + ' m';
+    } else {
+      const v = vec3(l.pos, [0, 1, 0]);
+      txt = 'light pos  x ' + v[0].toFixed(3) + '  y ' + v[1].toFixed(3) + '  z ' + v[2].toFixed(3) + ' m';
+    }
   } else if (role === 'rx') txt = 'radiusX ' + tr.radiusX.toFixed(3) + ' m';
   else if (role === 'rz') txt = 'radiusZ ' + tr.radiusZ.toFixed(3) + ' m';
   else if (role === 'yaw') txt = 'yaw ' + tr.yawDeg.toFixed(1) + '\u00b0';
@@ -10098,13 +10313,14 @@ function sh1xDriverReset(rec) {
   rec.sh1xSt.steps = 0;
 }
 
-/* T7 (v13.5): the USER LIGHT gizmo — the authored pose VISUALIZED (a
- * wireframe marker + the beam arrow; follow camera rides the ACTIVE TRACK
- * camera via the PiP pose, follow world stays at the authored world pose;
- * hidden when the light is off). PREVIEW AID ONLY — the per-vertex light
- * RENDER is the players' engine job (the PoC/wallpaper consume the same
- * models[].light at boot); the editor shows where the authored light sits
- * and where it aims — the angle distinction made visible.                */
+/* T7 (v13.5)/v41 (CT-IMPL fix 4): the USER LIGHT gizmo — the authored pose
+ * VISUALIZED (a wireframe marker + the beam arrow; follow camera rides the
+ * ACTIVE TRACK camera via the PiP pose, follow world stays at the authored
+ * world pose — the LINE mode rides the travel position; hidden when the
+ * light is off). PREVIEW AID ONLY for the legacy camera anchor; the world
+ * modes' per-vertex light RENDER is the faithful RT's own (ShEnv.updatePose
+ * honors the authored light — fix 4's engine-mode-1 port, fog_poc.c:5698-
+ * 5758): the gizmo shows where the authored light sits and where it aims.  */
 let lightGizmo = null;
 function lightGizmoEnsure() {
   if (lightGizmo) return lightGizmo;
@@ -10121,6 +10337,38 @@ function lightGizmoEnsure() {
   scene.add(g);
   return g;
 }
+/* v41 (CT-IMPL fix 4): the mode of a models[].light block (explicit
+ * light.mode, else derived — the legacy world lights keep working) */
+function lightModeOf(l) {
+  if (!l) return 'none';
+  if (l.follow !== 'world') return 'legacy';
+  if (l.mode === 'fixed' || l.mode === 'rotate' || l.mode === 'line') return l.mode;
+  if (Array.isArray(l.start) && Array.isArray(l.end) && l.speedMS > 0) return 'line';
+  if (Array.isArray(l.rot)) return 'rotate';
+  return 'fixed';
+}
+/* v41 (CT-IMPL fix 4): the LINE mode's travel position at time t —
+ * start -> end at speedMS with the loop mode (loop | pingPong | once,
+ * the tracks' own naming); a degenerate/absent line = the static pos. */
+function lightWorldPos(l, t) {
+  const A = vec3(l.pos, [0, 1, 0]);
+  if (Array.isArray(l.start) && Array.isArray(l.end) && +l.speedMS > 0) {
+    const B = vec3(l.end, A);
+    const a = vec3(l.start, A);
+    const dx = B[0] - a[0], dy = B[1] - a[1], dz = B[2] - a[2];
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len > 1e-9) {
+      const dur = len / Math.max(1e-6, +l.speedMS);
+      let f = t / dur;
+      const lm = l.loopMode === 'once' || l.loopMode === 'pingPong' ? l.loopMode : 'loop';
+      if (lm === 'once') f = Math.min(f, 1);
+      else if (lm === 'pingPong') { const c = f % 2; f = c <= 1 ? c : 2 - c; }
+      else f = f % 1;
+      return [a[0] + dx * f, a[1] + dy * f, a[2] + dz * f];
+    }
+  }
+  return A;
+}
 function updateLightGizmo() {
   const m = activeModel();
   const g = lightGizmoEnsure();
@@ -10135,7 +10383,10 @@ function updateLightGizmo() {
   const dir = new THREE.Vector3(t * Math.sin(yaw), Math.sin(pitch), -t * Math.cos(yaw));
   if (l.follow === 'world') {
     g.visible = true;
-    g.position.set(+l.pos[0] || 0, +l.pos[1] || 0, +l.pos[2] || 0);
+    /* v41 fix 4: the LINE mode rides the travel position (the same
+     * resolver the faithful preview uses) */
+    const p = lightWorldPos(l, state.t);
+    g.position.set(p[0], p[1], p[2]);
     g.userData.arrow.setDirection(dir);
   } else {
     /* follow camera: the Harry anchor over the ACTIVE TRACK camera pose
@@ -10153,6 +10404,148 @@ function updateLightGizmo() {
     g.position.copy(world);
     g.userData.arrow.setDirection(dir.clone().applyQuaternion(camQ));
   }
+}
+
+/* ==================================================================== */
+/* v41 (CT-IMPL fix 4): THE LIGHT SPHERES — authoring EXACTLY LIKE THE   */
+/* CAMERA PATH SPHERES. The user DECIDED: the 12-control number form is  */
+/* GONE; the light is authored by dragging movable spheres in the 3D     */
+/* view (the camera-handle drag machinery :6971/:7093 REUSED — the       */
+/* spheres join handleMeshes(), startDrag/onPointerMove carry them, the  */
+/* axis lock + Shift-height discipline applies) with THREE modes only:   */
+/*  - fixed: ONE gold sphere -> {on, follow:'world', pos, rot:[-15,0,0]}*/
+/*  - static rotation: gold source + amber AIM sphere -> {pos, rot}      */
+/*    (dragging the amber sphere rewrites the aim: pitch/yaw from the   */
+/*    gold->amber direction, the engine's sh_light_dir_from_rot inverse)*/
+/*  - line: two endpoint gold spheres + the amber rail; the light        */
+/*    travels start->end with speedMS + loopMode (models[].light         */
+/*    extended with start/end/speedMS/loopMode).                        */
+/* The dragged position writes back to the camdat light fields (engine   */
+/* mode 1). The legacy follow:'camera' anchor has no spheres (it rides    */
+/* the camera — its offset/ahead numbers stay in the panel).            */
+/* ==================================================================== */
+const LIGHT_COL_GOLD = 0xffd24a;    /* the light source          */
+const LIGHT_COL_AMBER = 0xffab40;   /* the aim / the line rail   */
+let lightHandles = null;            /* { group, pos, aim, start, end, rail } */
+const LIGHT_AIM_LEN = 0.9;          /* the aim sphere's offset along the beam (m) */
+function lightHandlesEnsure() {
+  if (lightHandles) return lightHandles;
+  const group = new THREE.Group();
+  const mk = (which, col) => {
+    const m = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: col, depthTest: false, transparent: true, opacity: 0.95 }));
+    m.renderOrder = 11;                 /* the camera handles' own layer */
+    m.visible = false;
+    m.userData = { lightHandle: which, role: 'light:' + which, trackId: null, baseScale: handleR() };
+    group.add(m);
+    return m;
+  };
+  const rail = new THREE.Line(new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: LIGHT_COL_AMBER, transparent: true, opacity: 0.6, depthTest: false }));
+  rail.renderOrder = 10;
+  rail.visible = false;
+  lightHandles = {
+    group, rail,
+    pos: mk('pos', LIGHT_COL_GOLD),
+    aim: mk('aim', LIGHT_COL_AMBER),
+    start: mk('start', LIGHT_COL_GOLD),
+    end: mk('end', LIGHT_COL_GOLD)
+  };
+  group.add(rail);
+  gizmoRoot.add(group);
+  return lightHandles;
+}
+function updateLightHandles() {
+  const H = lightHandlesEnsure();
+  const m = activeModel();
+  const l = m && m.light;
+  const mode = lightModeOf(l);
+  const show = !!(l && l.on !== false && mode !== 'legacy' && mode !== 'none' && state.activeFile);
+  for (const k of ['pos', 'aim', 'start', 'end']) H[k].visible = false;
+  H.rail.visible = false;
+  H.group.visible = show;
+  if (!show) return;
+  const R = handleR();
+  const place = (mesh, p) => {
+    mesh.position.set(p[0], p[1], p[2]);
+    mesh.scale.setScalar(R);
+    mesh.userData.baseScale = R;
+    mesh.visible = true;
+  };
+  if (mode === 'fixed') {
+    place(H.pos, vec3(l.pos, [0, 1, 0]));
+  } else if (mode === 'rotate') {
+    const P = vec3(l.pos, [0, 1, 0]);
+    const pitch = (Array.isArray(l.rot) && isFinite(+l.rot[0])) ? +l.rot[0] : -15;
+    const yaw = (Array.isArray(l.rot) && isFinite(+l.rot[1])) ? +l.rot[1] : 0;
+    const D2R = Math.PI / 180;
+    const t = Math.cos(pitch * D2R);
+    const d = [t * Math.sin(yaw * D2R), Math.sin(pitch * D2R), -t * Math.cos(yaw * D2R)];
+    place(H.pos, P);
+    place(H.aim, [P[0] + d[0] * LIGHT_AIM_LEN, P[1] + d[1] * LIGHT_AIM_LEN, P[2] + d[2] * LIGHT_AIM_LEN]);
+  } else if (mode === 'line') {
+    const A = vec3(l.start, vec3(l.pos, [0, 1, 0]));
+    const B = vec3(l.end, A);
+    place(H.start, A);
+    place(H.end, B);
+    H.rail.visible = true;
+    H.rail.geometry.dispose();
+    H.rail.geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(A[0], A[1], A[2]), new THREE.Vector3(B[0], B[1], B[2])]);
+  }
+}
+/* the dragged sphere's write-back (the camdat light fields, engine mode 1) */
+function applyLightHandleDrag(which, p, vertical) {
+  const m = activeModel();
+  const l = m && m.light;
+  if (!l) return;
+  if (which === 'pos') {
+    const nv = applyLockedMove(vec3(l.pos, [0, 1, 0]), p, vertical);
+    l.pos = [r4(nv[0]), r4(nv[1]), r4(nv[2])];
+  } else if (which === 'aim') {
+    const P = vec3(l.pos, [0, 1, 0]);
+    const dx = p.x - P[0], dy = p.y - P[1], dz = p.z - P[2];
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len > 1e-4) {
+      /* sh_light_dir_from_rot's INVERSE: pitch = asin(dy), yaw =
+       * atan2(dx, -dz) over the gold->amber direction                    */
+      const pitch = Math.asin(Math.max(-1, Math.min(1, dy / len))) / DEG;
+      const yaw = Math.atan2(dx, -dz) / DEG;
+      const roll = (Array.isArray(l.rot) && isFinite(+l.rot[2])) ? +l.rot[2] : 0;
+      l.rot = [r4(pitch), r4(yaw), roll];
+      if (l.mode !== 'rotate') l.mode = 'rotate';
+    }
+  } else if (which === 'start' || which === 'end') {
+    const cur = which === 'start' ? vec3(l.start, vec3(l.pos, [0, 1, 0])) : vec3(l.end, vec3(l.pos, [0, 1, 0]));
+    const nv = applyLockedMove(cur, p, vertical);
+    l[which] = [r4(nv[0]), r4(nv[1]), r4(nv[2])];
+    if (which === 'start') l.pos = l.start.slice();   /* the mode-1 snapshot */
+    if (l.mode !== 'line') l.mode = 'line';
+    if (!(+l.speedMS > 0)) l.speedMS = 1.0;
+    if (!l.loopMode) l.loopMode = 'loop';
+  }
+  /* the panel mirrors the model (the spheres own the model) */
+  if (window.SHUI && window.SHUI.ready) window.SHUI.applyModelLight(m);
+}
+/* v41 (CT-IMPL fix 4): the per-frame resolution of the ACTIVE model's
+ * light into the SHView userLight carrier (the engine's g_userLight*
+ * globals' analog, fog_poc.c:5131-5159 — resolved per-frame because the
+ * LINE mode's travel position moves with the playback clock). */
+function lightResolveForView() {
+  const SV = window.SHView;
+  if (!SV || !SV.V.ready) return;
+  const m = activeModel();
+  const l = m && m.light;
+  let ul = null;
+  if (l && l.on !== false) {
+    const hasRot = !!(Array.isArray(l.rot) && l.rot.length >= 3);
+    if (l.follow === 'world') {
+      ul = { mode: 1, hasRot, rot: vec3(l.rot, [-15, 0, 0]),
+             world: lightWorldPos(l, state.t) };
+    } else if (l.follow === 'camera') {
+      ul = { mode: 0, hasRot, rot: vec3(l.rot, [-15, 0, 0]), world: null };
+    }
+  }
+  SV.setUserLight(ul);
 }
 
 /* ==================================================================== */
@@ -10988,6 +11381,8 @@ function startRenderLoop() {
     tickPlayback(dt);
     applySh1xPropAnims(state.t);   /* v13.2/v13.4: the full SH1X driver-set preview */
     updateLightGizmo();            /* v13.5 (T7): the user-light pose gizmo */
+    updateLightHandles();          /* v41 (fix 4): the draggable light spheres */
+    lightResolveForView();         /* v41 (fix 4): the authored light -> ShEnv.updatePose (mode 1) */
     const tr = playTarget() || selTrack();
     if (tr && tr.id !== lastWeatherTrackId) {
       const fxOff = !!(window.SHUI && window.SHUI.effectsOff);
@@ -12046,13 +12441,23 @@ window.__camtrack = {
       anchor: (Array.isArray(tv.anchor) && tv.anchor.slice(0, 3)) || [160, 0, 40]
     };
   },
-  /* v13.5 (T7): the user-light gizmo debug state (automation surface) */
+  /* v13.5 (T7) / v41 (CT-IMPL fix 4): the user-light debug state (the
+   * automation surface — the gizmo + the draggable SPHERES) */
   lightGizmoInfo() {
     const m = activeModel();
-    if (!lightGizmo) return { exists: false };
+    const mode = lightModeOf(m && m.light);
+    const spheres = {};
+    if (lightHandles && lightHandles.group.visible)
+      for (const k of ['pos', 'aim', 'start', 'end'])
+        if (lightHandles[k].visible)
+          spheres[k] = lightHandles[k].position.toArray();
     return {
-      exists: true, visible: lightGizmo.visible,
-      position: lightGizmo.position.toArray(),
+      exists: !!lightGizmo, visible: lightGizmo ? lightGizmo.visible : false,
+      position: lightGizmo ? lightGizmo.position.toArray() : null,
+      mode,
+      spheresVisible: Object.keys(spheres).length,
+      spheres,
+      userLight: (window.SHView && window.SHView.V.userLight) || null,
       modelLight: (m && m.light) ? JSON.parse(JSON.stringify(m.light)) : null
     };
   },
@@ -12064,6 +12469,16 @@ window.__camtrack = {
       quat: turn.quat ? turn.quat.toArray() : null, trackId: turn.trackId,
       camBodyChildren: camBody ? camBody.children.map(c => c.type + ':' + (c.geometry ? c.geometry.type : '?')) : null
     };
+  },
+  /* v41 (CT-IMPL fix 4): world -> CSS pixels over the #gl canvas (the
+   * orbit camera's projection — the drag-simulation surface for the
+   * sphere probes); null when behind the camera */
+  worldToScreen(p) {
+    if (!orbitCam || !renderer) return null;
+    const v = new THREE.Vector3(+p[0], +p[1], +p[2]).project(orbitCam);
+    if (v.z < -1 || v.z > 1) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    return [r.left + (v.x + 1) * 0.5 * r.width, r.top + (1 - (v.y + 1) * 0.5) * r.height];
   },
   setTurn(enabled, rateDegS) {
     if (enabled !== undefined) turn.enabled = !!enabled;
