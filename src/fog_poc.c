@@ -13919,10 +13919,57 @@ static void blit_tim(Frame *fb, const TimImage *t, int palette) {
     if (!t->w) return;
     if (palette < 0 || palette >= (t->clutCount ? t->clutCount : 1))
         palette = 0;
+    /* V43 E-17-3: STRICT CENTER-CROP (Aspect Fill) — the project's
+     * presentation contract (Wallpaper bench/and_blit_extracted.h:20-27,
+     * 49-107, enforced by bench/blit_crop_test.c property 2: "a CIRCLE
+     * in the source framebuffer must remain a circle"). ONE uniform
+     * factor s = max(fb->w/t->w, fb->h/t->h); the TIM meets or exceeds
+     * the fb in BOTH dimensions and the excess is cropped symmetrically.
+     * ZERO non-uniform scaling — the uniform 16.16 DDA step (SOURCE
+     * texels per DESTINATION pixel = 1/s) comes from the LIMITING axis,
+     * verbatim-logic from and_blit (the v10.1 desktop proof catches any
+     * inversion). The old per-axis sx/sy scales were an aspect-fill
+     * STRETCH of the whole TIM (a 320x224 page on a 16:9 fb stretched
+     * ~24% horizontally; a 128x256 page at 320x224 2.5x/0.875x). The
+     * default 320x224 fb with a 320x224 page stays 1:1 (bit-identical:
+     * inc16 = 65536, cx16 = cy16 = 0, sx == x, sy == y).               */
+    long long inc16, availX16, availY16;
+    if ((long long)fb->w * t->h >= (long long)fb->h * t->w) {
+        /* width-limited (s = fb->w/t->w): the width fills exactly
+         * (window_w = fb->w * t->w/fb->w = t->w), source ROWS are
+         * cropped — and_blit's `ww*fh >= wh*fw` branch with
+         * src=TIM (t->w x t->h), dest=fb (fb->w x fb->h).           */
+        inc16 = ((long long)t->w << 16) / fb->w;   /* 1/s = t->w/fb->w */
+        availX16 = 0;                              /* width fills exactly */
+        availY16 = ((long long)t->h << 16)
+                 - ((long long)fb->h * t->w << 16) / fb->w;   /* cropped rows */
+    } else {
+        /* height-limited (s = fb->h/t->h): the height fills exactly,
+         * source COLUMNS are cropped.                                 */
+        inc16 = ((long long)t->h << 16) / fb->h;   /* 1/s = t->h/fb->h */
+        availY16 = 0;                              /* height fills exactly */
+        availX16 = ((long long)t->w << 16)
+                 - ((long long)fb->w * t->h << 16) / fb->h;   /* cropped cols */
+    }
+    if (inc16 < 1) inc16 = 1;
+    if (availX16 < 0) availX16 = 0;   /* truncation guards (sane dims) */
+    if (availY16 < 0) availY16 = 0;
+    /* symmetric crop-window origin (and_blit's g_and_crop_x/y = 0 default:
+     * the offset is inert on the axis that fills exactly)               */
+    long long cx16 = (availX16 > 0) ? (availX16 >> 1) : 0;
+    long long cy16 = (availY16 > 0) ? (availY16 >> 1) : 0;
+    /* full-bleed presentation: every fb pixel is written (cover in both
+     * orientations) — the DDA keeps 16.16 sub-texel precision on the
+     * window origin; the tail clamp mirrors and_blit (at most 1 texel). */
+    long long ypos = cy16;
     for (int y = 0; y < fb->h; y++) {
+        int sy = (int)(ypos >> 16);
+        if (sy >= t->h) sy = t->h - 1;   /* DDA tail clamp (at most 1 texel) */
+        long long xpos = cx16;
         for (int x = 0; x < fb->w; x++) {
-            int sx = (int)((float)x / fb->w * t->w);
-            int sy = (int)((float)y / fb->h * t->h);
+            int sx = (int)(xpos >> 16);
+            if (sx >= t->w) sx = t->w - 1;
+            xpos += inc16;
             uint16_t e = t->clutCount ? t->clut[palette][t->indices[(size_t)sy * t->w + sx]] : 0x8000;
             int r5 = e & 31, g5 = (e >> 5) & 31, b5 = (e >> 10) & 31;
             int stp = (e >> 15) & 1;
@@ -13932,6 +13979,7 @@ static void blit_tim(Frame *fb, const TimImage *t, int palette) {
             if (isBlack && !stp) { rr = gg = bb = chk; }   /* hole: checker */
             fb_put(fb, x, y, rr, gg, bb, 0, 0);
         }
+        ypos += inc16;
     }
 }
 
