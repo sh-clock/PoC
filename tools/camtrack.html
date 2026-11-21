@@ -5886,13 +5886,23 @@ function sanitizeTrack(raw) {
     tr.lookAt = vec3(raw.lookAt, tr.center.slice());
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
   } else if (type === 'curve') {
-    const pts = [];
-    if (Array.isArray(raw.points)) for (const p of raw.points) {
-      const v = vec3(p, null);
-      if (v) pts.push(v);
+    /* v41 audit (B-2): fog_poc.c:3266-3281 parity — ONE SLOT PER RAW
+     * points[] entry: a non-array / <3-element entry coerces to the
+     * [0,1,0] default anchor (the C's {0,1,0}) and the <2/>64 tests apply
+     * to the RAW count. The old drop-then-validate diverged from the C on
+     * hand-edited camdats: a kinked 3-anchor path vs a straight 2-anchor
+     * preview, a degenerate [5,6] curve the C keeps but the editor dropped
+     * (shifting every --track N index), and >64 mixed lists taking the
+     * first 64 VALID instead of the first 64 RAW. vec3's element rule
+     * (number | true->1 | else 0) is already the C's calloc'd ->num. */
+    const rp = Array.isArray(raw.points) ? raw.points : [];
+    if (rp.length < 2) return null;             /* a curve needs at least 2 anchors (RAW count) */
+    const nPts = Math.min(rp.length, 64);       /* first 64 RAW (fog_poc.c:3270) */
+    tr.points = [];
+    for (let i = 0; i < nPts; i++) {
+      const v = vec3(rp[i], null);
+      tr.points.push(v ? v : [0, 1, 0]);        /* malformed entry -> [0,1,0] slot kept */
     }
-    if (pts.length < 2) return null;             /* a curve needs at least 2 anchors */
-    tr.points = pts.slice(0, 64);
     tr.speedMS = Math.max(num(raw.speedMS, 1), 0.001);
     tr.lookMode = pick(raw.lookMode, ['path', 'lazy', 'point', 'fixed', 'normal'], 'path');
     tr.normalDirection = pick(raw.normalDirection, ['forward', 'backward'], 'forward');
@@ -5906,13 +5916,17 @@ function sanitizeTrack(raw) {
     tr.lookAt = vec3(raw.lookAt, [0, 1, 0]);
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
   } else if (type === 'polyline') {
-    const pts = [];
-    if (Array.isArray(raw.points)) for (const p of raw.points) {
-      const v = vec3(p, null);
-      if (v) pts.push(v);
+    /* v41 audit (B-2): the polyline twin of the curve rule above —
+     * fog_poc.c:3266-3281 parity (one slot per RAW entry, malformed ->
+     * [0,1,0], <2/>64 on the RAW count). */
+    const rp = Array.isArray(raw.points) ? raw.points : [];
+    if (rp.length < 2) return null;             /* a polyline needs at least 2 waypoints (RAW count) */
+    const nPts = Math.min(rp.length, 64);       /* first 64 RAW (fog_poc.c:3270) */
+    tr.points = [];
+    for (let i = 0; i < nPts; i++) {
+      const v = vec3(rp[i], null);
+      tr.points.push(v ? v : [0, 1, 0]);        /* malformed entry -> [0,1,0] slot kept */
     }
-    if (pts.length < 2) return null;             /* a polyline needs at least 2 waypoints */
-    tr.points = pts.slice(0, 64);
     tr.speedMS = Math.max(num(raw.speedMS, 1), 0.001);
     tr.lookMode = pick(raw.lookMode, ['path', 'lazy', 'point', 'fixed', 'normal'], 'path');
     tr.normalDirection = pick(raw.normalDirection, ['forward', 'backward'], 'forward');
