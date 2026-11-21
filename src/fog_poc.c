@@ -10325,8 +10325,13 @@ static void sh1x_anims_reset(Sh1x *sx) {
  * v 0..31 V-FLIPPED (u0=64,v0=31 / u1=64,v1=0 / u2=127,v2=31 / u3=127,v3=0),
  * quad = ±24 x ±48 ENGINE px around the projected mirrored-light point,
  * prim color r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9, OT bucket 641
- * (lens_flare.c:678) = zQ8 5000 -> 19.53 m — covered by any NEARER
- * opaque geometry. The blend: the PS1 semi-trans mode-1 FT4 =
+ * (lens_flare.c:678) = mesh-rule zQ8 [5128,5136) = [20.03125,
+ * 20.0625) m — covered by any NEARER opaque geometry (V41 C-3: the
+ * old "zQ8 5000 -> 19.53 m" inverted the RIPPLE rule (z+128)>>3
+ * (map5_s00.c:167) — the glint bucket competes against MESH geometry,
+ * whose insert rule is (maxSZ>>otShift)>>2 = SZ>>3 (otShift 1,
+ * bodyprog_80056D8C.c:855), so bucket 641 is the [20.03, 20.06) m
+ * band, not 19.53 m). The blend: the PS1 semi-trans mode-1 FT4 =
  * F5 = T5*C8 >> 7 (DuckStation (texture_color * vertex_color) >> 7)
  * then dst5 = B5 + F5 (clamped 31). (The v32 port was an untextured
  * AVERAGE-blend quad — half-strength and up to 5x over-bright at full
@@ -10346,9 +10351,16 @@ static void fx_water_glint_blit(Frame *fb, int px0, int py0,
     for (int yy = by0; yy < by1; yy++)
         for (int xx = bx0; xx < bx1; xx++) {
             size_t pi = (size_t)yy * fb->w + xx;
-            /* OT bucket 641 = zQ8 5000 -> 19.53125 m: occluded wherever
-             * the painter walk left NEARER opaque geometry (fb->z)      */
-            if (fb->z && fb->z[pi] < 19.53125f) continue;
+            /* OT bucket 641 = mesh-rule zQ8 [5128,5136) = [20.03125,
+             * 20.0625) m — occluded wherever
+             * the painter walk left NEARER opaque geometry (fb->z).
+             * V41 C-3: the exact gate is the bucket's FAR edge
+             * 642*8/256 = 20.0625 m — meshes AddPrim'd into the SAME
+             * bucket (before the glint, WorldGfx order objects ->
+             * chunks -> 2dEffects, draw.c:431-446) draw AFTER it and
+             * cover it too. The old 19.53125 was the ripple-rule
+             * inversion (641*8-128 = 5000).                         */
+            if (fb->z && fb->z[pi] < 20.0625f) continue;
             /* affine sprite UVs: x -> u 64..127, y -> v 31..0 (flipped)   */
             double fu = (double)(xx - x0) / (double)(x1 - x0);
             double fv = (double)(yy - y0) / (double)(y1 - y0);
@@ -10799,39 +10811,50 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                             const int g3s2[3] = { 4, 8, 4 };     /* P1 */
                             /* g3[0] OPAQUE (C,P0,P1) (24,22,12) — UNDER */
                             /* v37 (W1-5): both ring pairs depth-gated at
-                             * their OT buckets — opaque pair 641 (zQ8 5000
-                             * = 19.53125 m), semi pair 639 (zQ8 4984 =
-                             * 19.46875 m): covered by NEARER opaque
-                             * geometry exactly like the engine's OT walk. */
+                             * their OT buckets — opaque pair 641, semi
+                             * pair 639. V41 C-3: the buckets are MESH-rule
+                             * (insert (maxSZ>>otShift)>>2 = SZ>>3, otShift
+                             * 1, bodyprog_80056D8C.c:855): bucket 641 =
+                             * zQ8 [5128,5136) = [20.03125, 20.0625) m,
+                             * bucket 639 = [5112,5120) = [19.96875,
+                             * 20.0) m. The old 19.53125/19.46875 pairs
+                             * inverted the RIPPLE rule (z+128)>>3
+                             * (map5_s00.c:167: 641*8-128 = 5000) — wrong
+                             * rule for constants competing against mesh
+                             * geometry. Exact gates = the far bucket edge
+                             * (same-bucket meshes cover too): 642*8/256 =
+                             * 20.0625 m and 640*8/256 = 20.0 m. Covered
+                             * by NEARER opaque geometry exactly like the
+                             * engine's OT walk. */
                             if (cVis)
                                 fx_blit_gouraud_tri(fb, cScx, cScy, g3o0,
                                                    sxp[0], syp[0], g4o1,
                                                    sxp[1], syp[1], g4o1, 0,
-                                                   19.53125f);
+                                                   20.0625f);
                             /* g4[0] OPAQUE (20,18,12)/(20,18,12)/(4,4,4)/(4,4,4) */
                             fx_blit_gouraud_tri(fb, sxp[0], syp[0], g4o0,
                                                sxp[1], syp[1], g4o1,
                                                sxp[2], syp[2], g4o2, 0,
-                                               19.53125f);
+                                               20.0625f);
                             fx_blit_gouraud_tri(fb, sxp[1], syp[1], g4o1,
                                                sxp[2], syp[2], g4o2,
                                                sxp[3], syp[3], g4o3, 0,
-                                               19.53125f);
+                                               20.0625f);
                             /* g3[1] SEMI (C,P0,P1) (8,8,4)/(4,8,4)/(4,8,4) — UNDER */
                             if (cVis)
                                 fx_blit_gouraud_tri(fb, cScx, cScy, g3s0,
                                                    sxp[0], syp[0], g3s1,
                                                    sxp[1], syp[1], g3s2, 1,
-                                                   19.46875f);
+                                                   20.0f);
                             /* g4[1] SEMI (4,8,4)/(4,8,4)/(0,0,0)/(0,0,0) */
                             fx_blit_gouraud_tri(fb, sxp[0], syp[0], g4s0,
                                                sxp[1], syp[1], g4s1,
                                                sxp[2], syp[2], g4s2, 1,
-                                               19.46875f);
+                                               20.0f);
                             fx_blit_gouraud_tri(fb, sxp[1], syp[1], g4s1,
                                                sxp[2], syp[2], g4s2,
                                                sxp[3], syp[3], g4s3, 1,
-                                               19.46875f);
+                                               20.0f);
                         }
                     }
                 }
