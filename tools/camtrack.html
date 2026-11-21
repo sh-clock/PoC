@@ -4182,7 +4182,10 @@ window.SHUI = (function () {
         applyDev(devEl.checked);
         try { localStorage.setItem('camtrack.dev.v1', devEl.checked ? '1' : '0'); } catch (e) { }
       });
-      if (devRow) devRow.addEventListener('click', e => { if (e.target === devRow) devEl.click(); });
+      /* B-14: NO manual forwarding — the row is a <label> wrapping the
+       * checkbox, so the browser's label activation ALREADY forwards
+       * padding clicks to #tgl-dev; the old devEl.click() here made the
+       * checkbox toggle TWICE (net no-op) on the row's padding */
     }
 
     U.cmdEl = host.querySelector('#world-cmd');
