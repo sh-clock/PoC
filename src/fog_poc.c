@@ -12007,7 +12007,20 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
              * particle's own value (field_B=0), NOT sprite 0's.     */
             int sel = a->wrSel[12];
             unsigned char tile[32][32][3];
-            if (sel == 2) memcpy(tile, g_waterTileRGB, sizeof(tile));
+            /* v41 (A-5): the lazy first-composite gate the two material
+             * views already run (fx_water_live_rgba / fx_water_floor_rgba)
+             * — g_waterTileRGB is static zero-init and ONLY
+             * fx_water_tile_update writes it, so an ungated sel-2 read
+             * before the first pass sampled BLACK (and the per-shot reset
+             * clears g_waterTileEverUpdated but NOT g_waterTileRGB — a
+             * multi-shot sel-2 read could sample the STALE previous-shot
+             * composite through this path while the material views
+             * recompute). Mirrors the material sites: composite(0).  */
+            if (sel == 2) {
+                if (!g_waterTileEverUpdated)
+                    fx_water_tile_update(0);
+                memcpy(tile, g_waterTileRGB, sizeof(tile));
+            }
             else fx_water_static_tile(sel, tile);
             int brt = (sh_light_query_pos(R->env, -376832, 2048, 33177) < 129)
                       ? 0 : 8;   /* Q12(-92.0)= -376832, Q12(0.5)=2048,
@@ -12080,7 +12093,13 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
             for (int q = 0; q < 12; q++) {
                 int st = a->wrSel[q];
                 unsigned char rtile[32][32][3];
-                if (st == 2) memcpy(rtile, g_waterTileRGB, sizeof(rtile));
+                /* v41 (A-5): the same lazy first-composite gate as the
+                 * mesh site above + the two material views.             */
+                if (st == 2) {
+                    if (!g_waterTileEverUpdated)
+                        fx_water_tile_update(0);
+                    memcpy(rtile, g_waterTileRGB, sizeof(rtile));
+                }
                 else fx_water_static_tile(st, rtile);
                 float sM = (float)a->wrT[q] * 1.5f / 4096.0f;
                 float ex = (float)a->wrX[q] / 4096.0f;
