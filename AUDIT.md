@@ -833,3 +833,110 @@ Full evidence: the six AUDIT_V41_* reports + five VERIFY_V41_* reports +
 per-fix FIX_V41_* reports (branch, diff, verification transcripts) at
 /home/z/my-project/download/v41_evidence/ (mirrored in the audit fleet's
 sandbox; the PR bodies carry the per-bug essentials).
+
+---
+
+# V42 audit (2026-11-21) — "Rinse and Repeat" wave 2
+
+The V41-gate follow-up round: 6 finder agents (A engine-fresh-code,
+B camtrack, C water/env/lighting, D CLI/determinism, E wallpaper/lively,
+F aims/ripper) → 2 verifier agents (V-1 rasterizer family, V-2 camtrack
+family) + 1 fixer (V-4 lively re-port) + the coordinator's own
+re-verification of every shipped fix (each A/B reproduced independently).
+Evidence: `download/v42_evidence/` (AUDIT_V42_A-F, VERIFY_V42_a/b,
+FIX_V42_d_lively + probes/harnesses/crafted inputs).
+
+## Headline counts (mechanically recounted from the table below)
+
+**40 unique findings: 1 CRITICAL, 1 CRASH, 12 MAJOR, 16 MINOR, 10 INFO.**
+(F-3 == D-5 deduplicated; the C-2 re-land is a V41 follow-up, not a new
+finding.) **0 shipped false positives** — every PR's A/B was reproduced
+by the coordinator before opening. **17 PoC PRs (#51–#67), 1 Wallpaper
+PR (#7), 1 lively PR (#1)** = 19 PRs; 13 findings left as documented
+follow-ups (below) — most need the primary agent's design/re-rip calls.
+
+## Findings table
+
+| ID | Sev | Finding | PR / status |
+|---|---|---|---|
+| E-2 | CRITICAL | the lively repo shipped the v39 engine (every V40/V41/V42 fix missing, in the released v1.0.4-sh1 exe) — full re-port + parity 65/65, render-parity 5/5 md5-identical | lively#1 |
+| D-5 | CRASH | GLB accessor negative byteOffset wraps size_t past the bounds sum → OOB read/SEGV (E-18 live; two finders' ASan proofs; same class as fe9a034) | PoC#64 (=F-3) |
+| A-1 | MAJOR | fx_blit_water_quad still the pre-5e9489d broken inside-test — ripple quads paint mirrored garbage strips (DRFD00 live; DR0000/DR0100 driver-present but player-gate-blocked) | PoC#52 |
+| A-2 | MAJOR | fx_blit_sprite_quad UV solve axis-aligned — rotated streak kites mis-textured / dead at ±45° (swanstation CalcIDeltas is per-triangle 2D affine) | PoC#53 (A2c) |
+| B-10 | MAJOR | camtrack authored-beam dir transcribed wrong (x/z swap + dropped negation) — 0/108 grid match, every authored light renders sideways | PoC#55 |
+| B-11 | MAJOR | camtrack tvEmitQuad never divides V by 256 — TV screens tile vertically (LIVE on shipped SPU0401) | PoC#56 |
+| B-12 | MAJOR | castHandles early-return — light spheres undraggable on trackless models (the SPU0401 first-impression flow) | PoC#57 |
+| C-1 | MAJOR | gte_dpcl_fc0/dpcs negative-MAC saturates 255; hardware (swanstation TruncateRGB signed, psx-spx) clamps 0 — REACHABLE in the night fade (the V41 wLI-floor claim refuted); sub-visual on the shipped battery | PoC#63 (+the C-2 doc misquote folded) |
+| D-1 | MAJOR | K_R never re-armed the boot/camdat weatherTarget cross-fade — restart locks at the room recipe (restart != fresh) | PoC#66 |
+| D-2 | MAJOR | the window --duration/--save-final overshot the tick grid by one tick (181 vs 180; the E-2 residual, NOT the easing model) | PoC#67 |
+| E-1 | MAJOR | copyAssetsIfNeeded never refreshed existing data-dir files on APK update — upgraders stuck on stale assets (blocks the F-1 re-rip from reaching upgraders) | Wallpaper#7 |
+| E-3 | MAJOR | lively bundle camdat pre-9d42961 (7 SPU/DR models still dayEnv=1) + 2.zip repack + freshness gate | lively#1 |
+| F-1 | MAJOR | shipped corpora stale: 0/44 statics (28 expected), WP SU0203 waterfall lacks the v39 stream block, SPU0401 tvPaint strip pre-D-F6 — the V41 F-3 re-rip never ran (the statics driver has now landed) | follow-up (primary's re-rip) |
+| F-2 | MAJOR | aim 5 "ALL of them": FIRE (+Ef) and smoke ambient particles unencoded + unported (env_effects.c:142-158, fire.c:28-30, map1_s05.c:333 — live on 8+/44 scenes); waterfall is the ported precedent | follow-up (primary's port decision) |
+| A-3 | MINOR | the C-5 occlusion probe reads the UNSCALED engine px — wrong pixel at every --res != 320x224 (phantom flare with the C-2 gate: 3372 px @640x448) | PoC#54 |
+| B-13 | MINOR | invisible light spheres stay raycast-grabbable (three r170 Raycaster ignores .visible) — phantom grabs rewrite l.rot | PoC#58 |
+| B-14 | MINOR | dev-toggle label fires change twice on its own padding — dead toggle | PoC#59 |
+| B-15 | MINOR | line/fixed light modes clobber the authored rot | PoC#60 |
+| B-16 | MINOR | __camtrack.fog/night/flashInfo dereference ids that never existed (TypeError) | PoC#61 |
+| B-17 | MINOR | TV_MAX_QUADS 13 vs the C's 24 (latent 2-big-screen drop) | PoC#62 |
+| D-3 | MINOR | --userlight family accepted NaN/Inf (silent garbage frame; the E-F1 gates missed these sites) | PoC#65 |
+| D-4 | MINOR | --cam argc guard demanded a 7th value — the 6-mandatory form at argv end was "unknown arg" | PoC#65 |
+| D-6 | MINOR | --tim-file demands camdat discovery first + --tim N page number dead | follow-up |
+| E-4 | MINOR | false "REMOVED" commit message (the stale Livesly tree still existed) | lively#1 (tree now actually deleted) |
+| E-5 | MINOR | Android opt-in GPU backends still walk a stale render_frame (no propAnims/TV/flare/water-FX; gap grew since V40) | follow-up |
+| F-4 | MINOR | mapLink probe quiet-contract violated: 3 stderr sites not quiet-gated (logcat noise on present-but-invalid neighbors) | follow-up |
+| F-5 | MINOR | camtrack previews no flare/shimmer/waterFloor while SH1X_EXTRAS_V3_FX.md still promises them | follow-up (V41 F-5 re-confirmed) |
+| F-6 | MINOR | the doc/WORKLOG promise the 4.5 m Q8 edge-probe streaming; actual = boot-merge (both engines) and PoC does NOT ignore mapLink | follow-up (doc-vs-code decision) |
+| F-7 | MINOR | SH1X_EXTRAS_V3_FX.md inverts the version scheme (the CI's asset→PATCH matches the owner's 1.7.30→1.7.31) | follow-up (doc) |
+| F-8 | MINOR | ripper problem log truncated at [:10] — content-loss warnings can vanish from derivation logs | follow-up |
+| A-4 | INFO | probe/water-quad occlusion gates use the exact depth, not the OT-bucket far edge (≤0.03125 m band; the C-3 class) | follow-up |
+| A-5 | INFO | claim-accuracy: 5e9489d "proper kite coverage" (33% real), 461d0bd 76.25%, 4467f41 "glint realigns" overstate | recorded |
+| B-I1 | INFO | the LINE light travel (start/end/speedMS/loopMode) is editor-preview-only — the C's camdat parse reads none of it | follow-up (schema decision) |
+| B-I2 | INFO | r4(x) overflows finite x ≥ 1.8e304 to Infinity→JSON null — a new sub-case of the registered B-4 design decision | follow-up (B-4) |
+| C-3 | INFO | the V41 17,639 divergent-triple count CONFIRMED; the old cL≤255 cell restriction + wLI-floor argument refuted | recorded (in #63) |
+| D-7 | INFO | --maplink abc silent 0 (bare atoi); --snow-seed -1 wraps to ULONG_MAX | follow-up |
+| E-6 | INFO | derive_wallpaper_envs.py (credited by 9d42961) committed nowhere — provenance gap | follow-up |
+| F-9 | INFO | the ENTIRE envEffects block is a dead parse in both engines (hasEnvEffects never read); shimmer actually gates on waterZones | follow-up (V41 F-11 broader) |
+| F-10 | INFO | 40 stale false-alarm warnings per corpus rip (CONSUMER_IPD_MODEL_LAYERS claims wrong OT bases pre-v24) | follow-up |
+| F-11 | INFO | sh1x_roundtrip.py expects DWAVE.TIM but the repo carries DR_WAVE.TIM (DRU0100 TIM skipped) | follow-up |
+
+## The C-2 re-land (the maintainer's V41 instruction, executed)
+
+PR #51 — re-derived on current main (not a cherry-pick): the 3-way OT
+branch for core quads 1-2 (front_ot / own bucket / own+7) via the
+fx_blit_gouraud_tri depthM convention. Regression 7/7 byte-identical;
+positive occluded-center repro 273 px (the walkway case). NOTE: A-3's
+visible effect rides this gate (stated precisely in #54's body).
+
+## Verified-correct / passed (no action)
+
+- The 21-preset table verbatim vs decomp (27 fields × 21); the N-cycle
+  order; K_R's other state resets (C-4/C-5/C-6a PASS).
+- The Android twin vs PoC main: **CLEAN — 0 missing engine hunks** (42
+  diff hunks all benign: comments/harness/twin-only feature).
+- tim_load fe9a034 hardening HOLDS: 149 crafted TIMs × 5 views = 745
+  ASan runs, 0 hits.
+- Determinism 17/17, multi-shot==solo 17/17, shot==benchmark bit-exact.
+- The maintainer's reimplementations (fe9a034, c5631de, the gate chain):
+  all re-verified sound.
+- evalTrack C-vs-JS parity 30/30 (worst rel err 8.4e-07) pre/post the
+  B-batch fixes; export round-trip fixpoint over 16 stress tracks.
+- Refuted: --weather 3/4 as "engine values" (the decomp switch is
+  0/1/2/5/6 only); the shared-edge double-paint; PR #32's parallelogram
+  solve itself; the C-5 missing vz≥0 term.
+
+## Wallpaper twin sync note (for the primary agent's next gate)
+
+The twin needs these V42 hunks at the next sync: C-2 (#51), A-1 (#52),
+A-2c (#53), A-3 (#54), C-1 (#63), D-5 (#64), D-1 (#66), D-2 (#67) —
+all engine-logic, all port verbatim like ca23c26.
+
+## Follow-up priorities (coordinator's read)
+
+1. F-1 corpora re-rip (unblocked: the statics driver landed both engines;
+   do it AFTER E-1 merges so upgraders actually receive it).
+2. F-2 fire/smoke port (aim 5's completeness; the finder mapped the
+   decomp sources precisely — a feature port, the primary's call).
+3. E-5 GPU backend render_frame refresh (grew since V40).
+4. The doc batch F-6/F-7 (+F-4/F-8 tooling hygiene).
+5. D-6 (--tim-file standalone), D-7/E-6/F-9/F-10/F-11 hygiene.
