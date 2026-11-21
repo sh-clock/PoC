@@ -15932,7 +15932,12 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        else if (!strcmp(a, "--weather")) {
+        else if (!strcmp(a, "--weather") && i + 1 < argc) {
+            /* v41 audit (E-1): the i+1<argc guard was MISSING on this one
+             * value flag — a trailing --weather read argv[argc] (NULL) ->
+             * atoi(NULL) = SIGSEGV (verified exit 139). With the guard the
+             * missing-value case falls to "unknown arg" exactly like every
+             * other value flag (--lensflare, --weather-target, ...). */
             /* v8: Particle_EnvironmentSet(arg0, field_16=1) at boot — the
              * map-load recipe (instant weather, no transition):
              * 0 none | 1 snow | 2 snow(+wind flag) | 5 rain | 6 rain(+wind) */
