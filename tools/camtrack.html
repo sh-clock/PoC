@@ -7343,9 +7343,16 @@ function handleMeshes() {
   visuals.forEach(v => { if (v.handles.visible) out.push(...v.handles.children); });
   if (pointer.on && pointerMarker && pointerMarker.visible) out.push(pointerMarker.userData.sphere);
   /* v41 (CT-IMPL fix 4): the LIGHT SPHERES join the camera-handle drag
-   * machinery (draggable exactly like the path spheres) */
+   * machinery (draggable exactly like the path spheres).
+   * v43: the cyan Y-rail markers join too (the light up/down control);
+   * the LIGHT family is filtered by EACH mesh's own .visible — three r170
+   * Raycaster ignores visible=false, so the mode-hidden spheres (e.g. the
+   * line endpoints in fixed mode) stayed grabbable and stole clicks
+   * (audit B-13). The camera-path children keep their group gate
+   * (v.handles.visible above) exactly as before. */
   if (lightHandles && lightHandles.group.visible)
-    out.push(lightHandles.pos, lightHandles.aim, lightHandles.start, lightHandles.end);
+    for (const k of ['pos', 'aim', 'start', 'end', 'ypos', 'ystart', 'yend'])
+      if (lightHandles[k].visible) out.push(lightHandles[k]);
   return out.filter(o => o.isMesh);            /* rail lines are not grabbable */
 }
 function pathLines() {
@@ -7354,7 +7361,9 @@ function pathLines() {
   return out.filter(Boolean);
 }
 function castHandles(e) {
-  if (!visuals.size) return null;
+  /* v43 (audit B-12): NO trackless-model early return — a model with zero
+   * tracks still has light spheres / the pointer marker to grab; the
+   * empty-handleMeshes case simply raycasts nothing. */
   raycaster.setFromCamera(ndcFromEvent(e), orbitCam);
   const hits = raycaster.intersectObjects(handleMeshes(), false);
   return hits[0] || null;
@@ -10476,7 +10485,8 @@ function updateLightGizmo() {
 /* ==================================================================== */
 const LIGHT_COL_GOLD = 0xffd24a;    /* the light source          */
 const LIGHT_COL_AMBER = 0xffab40;   /* the aim / the line rail   */
-let lightHandles = null;            /* { group, pos, aim, start, end, rail } */
+let lightHandles = null;            /* { group, pos, aim, start, end, rail,
+                                       ypos/ystart/yend + their rail lines } */
 const LIGHT_AIM_LEN = 0.9;          /* the aim sphere's offset along the beam (m) */
 function lightHandlesEnsure() {
   if (lightHandles) return lightHandles;
@@ -10493,13 +10503,34 @@ function lightHandlesEnsure() {
     new THREE.LineBasicMaterial({ color: LIGHT_COL_AMBER, transparent: true, opacity: 0.6, depthTest: false }));
   rail.renderOrder = 10;
   rail.visible = false;
+  /* v43 (the owner's complaint: "the programmable lighting has no ability
+   * to move up or down making it very hard to control"): the camera path
+   * point handles' OWN pattern — a CYAN Y-rail marker + rail line above
+   * each draggable point — applied to the light pos/start/end spheres.
+   * The 'light:posY' roles end in Y so startDrag's existing
+   * /(Y)$/.test(role) makes them VERTICAL drags (no Shift needed); the
+   * rail line makes the affordance discoverable in the 3D view. */
+  const mkY = (base) => {
+    const m = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ color: 0x4dd0e1, depthTest: false, transparent: true, opacity: 0.95 }));
+    m.renderOrder = 11;
+    m.visible = false;
+    m.userData = { lightHandle: base + 'Y', role: 'light:' + base + 'Y', trackId: null, baseScale: handleR() * 0.8 };
+    group.add(m);
+    return m;
+  };
+  const yRail = (col) => new THREE.Line(new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: col || 0x4dd0e1, transparent: true, opacity: 0.45, depthTest: false }));
   lightHandles = {
     group, rail,
     pos: mk('pos', LIGHT_COL_GOLD),
     aim: mk('aim', LIGHT_COL_AMBER),
     start: mk('start', LIGHT_COL_GOLD),
-    end: mk('end', LIGHT_COL_GOLD)
+    end: mk('end', LIGHT_COL_GOLD),
+    ypos: mkY('pos'), ystart: mkY('start'), yend: mkY('end'),
+    railPos: yRail(), railStart: yRail(), railEnd: yRail()
   };
+  [lightHandles.railPos, lightHandles.railStart, lightHandles.railEnd]
+    .forEach(r => { r.renderOrder = 10; r.visible = false; group.add(r); });
   group.add(rail);
   gizmoRoot.add(group);
   return lightHandles;
@@ -10510,16 +10541,31 @@ function updateLightHandles() {
   const l = m && m.light;
   const mode = lightModeOf(l);
   const show = !!(l && l.on !== false && mode !== 'legacy' && mode !== 'none' && state.activeFile);
-  for (const k of ['pos', 'aim', 'start', 'end']) H[k].visible = false;
+  for (const k of ['pos', 'aim', 'start', 'end', 'ypos', 'ystart', 'yend']) H[k].visible = false;
   H.rail.visible = false;
+  H.railPos.visible = H.railStart.visible = H.railEnd.visible = false;
   H.group.visible = show;
   if (!show) return;
   const R = handleR();
+  const off = railOff();
   const place = (mesh, p) => {
     mesh.position.set(p[0], p[1], p[2]);
     mesh.scale.setScalar(R);
     mesh.userData.baseScale = R;
     mesh.visible = true;
+  };
+  /* the cyan Y marker above a visible base sphere + its rail line */
+  const placeY = (base, yk, rk, p) => {
+    if (!H[base].visible) return;
+    H[yk].position.set(p[0], p[1] + off, p[2]);
+    H[yk].scale.setScalar(R * 0.8);
+    H[yk].userData.baseScale = R * 0.8;
+    H[yk].visible = true;
+    H[rk].geometry.dispose();
+    H[rk].geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(p[0], p[1], p[2]),
+      new THREE.Vector3(p[0], p[1] + off, p[2])]);
+    H[rk].visible = true;
   };
   if (mode === 'fixed') {
     place(H.pos, vec3(l.pos, [0, 1, 0]));
@@ -10537,18 +10583,38 @@ function updateLightHandles() {
     const B = vec3(l.end, A);
     place(H.start, A);
     place(H.end, B);
+    placeY('start', 'ystart', 'railStart', A);
+    placeY('end', 'yend', 'railEnd', B);
     H.rail.visible = true;
     H.rail.geometry.dispose();
     H.rail.geometry = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(A[0], A[1], A[2]), new THREE.Vector3(B[0], B[1], B[2])]);
   }
+  placeY('pos', 'ypos', 'railPos', vec3(l && l.pos, [0, 1, 0]));
 }
 /* the dragged sphere's write-back (the camdat light fields, engine mode 1) */
 function applyLightHandleDrag(which, p, vertical) {
   const m = activeModel();
   const l = m && m.light;
   if (!l) return;
-  if (which === 'pos') {
+  /* v43: the Y-rail roles — VERTICAL-only writes (the cyan markers above
+   * the gold spheres; /(Y)$/.test(role) already forced the vertical drag
+   * plane in startDrag, so p carries the ray's intersection with the
+   * camera-facing vertical plane). */
+  if (which === 'posY' || which === 'startY' || which === 'endY') {
+    const base = which.slice(0, -1);          /* pos / start / end        */
+    const cur = which === 'pos' ? vec3(l.pos, [0, 1, 0])
+      : which === 'posY' ? vec3(l.pos, [0, 1, 0])
+      : (which === 'startY' ? vec3(l.start, vec3(l.pos, [0, 1, 0]))
+                            : vec3(l.end, vec3(l.start, vec3(l.pos, [0, 1, 0]))));
+    const nv = applyLockedMove(cur, p, true);  /* writes ONLY the y term   */
+    if (which === 'posY') {
+      l.pos = [r4(nv[0]), r4(nv[1]), r4(nv[2])];
+    } else {
+      l[base] = [r4(nv[0]), r4(nv[1]), r4(nv[2])];
+      if (which === 'startY') l.pos = l.start.slice();  /* the mode-1 snapshot */
+    }
+  } else if (which === 'pos') {
     const nv = applyLockedMove(vec3(l.pos, [0, 1, 0]), p, vertical);
     l.pos = [r4(nv[0]), r4(nv[1]), r4(nv[2])];
   } else if (which === 'aim') {
@@ -11053,8 +11119,14 @@ try {
   tvOn = new URLSearchParams(location.search).get('tv') !== '0';
 } catch (e) { /* file:// or such — keep on */ }
 
-let tvQuads = 0;                       /* the last frame's quad count (13 max) */
-const TV_MAX_QUADS = 13;                /* 9 small POLY_FT4s + the big screen's 4 sub-quads */
+let tvQuads = 0;                       /* the last frame's quad count */
+const TV_MAX_QUADS = 24;                /* v43: the PoC's TvQuad tvq[24] parity —
+                                           SPU0401's data needs 13 (9 small +
+                                           the big screen's 4 sub-quads) but the
+                                           engine's per-call budget covers the
+                                           2-big-screen data too (16+); 13
+                                           silently DROPPED quads the engine
+                                           draws (the B-17 parity miss). */
 let tvSlotMeshes = [];                  /* the 13 quad slots (mesh + material each) */
 const _tvPlaneTex = new WeakMap();      /* tv table -> Map(st -> DataTexture): per-room planes (the strip is the room's own) */
 let _tvMvp = null;                      /* the scratch mat4 (created with the meshes) */
@@ -11178,9 +11250,15 @@ function tvEmitQuad(k, wx, wy, wz, u0, u1, v0, v1, tex, vcol, depthM) {
   const pos = mesh.geometry.attributes.position.array;
   const uv = mesh.geometry.attributes.uv.array;
   const bkt = mesh.geometry.attributes.shTvb.array;
-  /* corner order c0..c3: (u0,v0)(u1,v0)(u0,v1)(u1,v1) */
-  uv[0] = u0 / 256; uv[1] = v0;  uv[2] = u1 / 256; uv[3] = v0;
-  uv[4] = u0 / 256; uv[5] = v1;  uv[6] = u1 / 256; uv[7] = v1;
+  /* corner order c0..c3: (u0,v0)(u1,v0)(u0,v1)(u1,v1) — BOTH u and v are
+   * page-texel coords 0..255 over the 256x256 plane (the engine's setUV4
+   * u8 window, func_800D88C8:1284-1287): normalize BOTH by 256 exactly
+   * like the PoC's sh_tvpaint_collect (q->v[c].u/v = value / 256.0f).
+   * v43: the V was left RAW (0..255) — every panel sampled 256 vertical
+   * WRAPS of the plane = the vertically-tiled garbage the owner read as
+   * 'the panels do not show the correct image and is corrupted snow'. */
+  uv[0] = u0 / 256; uv[1] = v0 / 256;  uv[2] = u1 / 256; uv[3] = v0 / 256;
+  uv[4] = u0 / 256; uv[5] = v1 / 256;  uv[6] = u1 / 256; uv[7] = v1 / 256;
   for (let c = 0; c < 4; c++) {
     pos[c * 3] = wx[c]; pos[c * 3 + 1] = wy[c]; pos[c * 3 + 2] = wz[c];
     bkt[c] = depthM;
@@ -12518,7 +12596,7 @@ window.__camtrack = {
     const mode = lightModeOf(m && m.light);
     const spheres = {};
     if (lightHandles && lightHandles.group.visible)
-      for (const k of ['pos', 'aim', 'start', 'end'])
+      for (const k of ['pos', 'aim', 'start', 'end', 'ypos', 'ystart', 'yend'])
         if (lightHandles[k].visible)
           spheres[k] = lightHandles[k].position.toArray();
     return {
