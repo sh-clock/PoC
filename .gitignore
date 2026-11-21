@@ -29,3 +29,7 @@ shots/probe_day.png
 /fog_poc.exe
 __pycache__/
 *.pdb
+
+# CI converter output dir (V41 gate follow-up: poc.yml:112 writes glbs/;
+# never tracked — regenerated per build)
+glbs/
