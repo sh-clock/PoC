@@ -2487,17 +2487,30 @@ static int glb_accessor(Glb *g, int accIdx, AccView *out) {
     if (!bv) return 0;
     int bufIdx = jint(bv, "buffer", -1);
     if (bufIdx != 0) return 0;                          /* GLB: buffer 0 = BIN */
-    size_t bvOff = (size_t)jint(bv, "byteOffset", 0);
-    size_t bvLen = (size_t)jint(bv, "byteLength", 0);
+    /* v43 (E-03-5): negative bufferView byteOffset/byteLength/byteStride
+     * (and accessor count) WRAP size_t and can pass the bounds sums below
+     * — byteOffset -16 + byteLength 16 sums to 0 <= binLen, and the access
+     * sum wraps equally, so out->ptr = g->bin - 16 and acc_get reads
+     * BEFORE the BIN chunk (a negative byteStride likewise flows into
+     * out->byteStride and the acc_get pointer math). Read as long long
+     * and reject the negatives at the source — the bufferView-field
+     * sibling of V42 D-5's accessor byteOffset (#64).                   */
+    long long bvOffLL = (long long)jnum(bv, "byteOffset", 0.0);
+    long long bvLenLL = (long long)jnum(bv, "byteLength", 0.0);
+    long long strideLL = (long long)jnum(bv, "byteStride", 0.0);
+    long long countLL = (long long)jnum(acc, "count", 0.0);
+    if (bvOffLL < 0 || bvLenLL < 0 || strideLL < 0 || countLL < 0) return 0;
+    size_t bvOff = (size_t)bvOffLL;
+    size_t bvLen = (size_t)bvLenLL;
     if (bvOff + bvLen > g->binLen) return 0;
     out->ptr = g->bin + bvOff;
     out->compType = jint(acc, "componentType", 0);
     const char *ty = jstr(acc, "type", "");
     out->comps = !strcmp(ty, "SCALAR") ? 1 : !strcmp(ty, "VEC2") ? 2 :
                  !strcmp(ty, "VEC3") ? 3 : !strcmp(ty, "VEC4") ? 4 : 0;
-    out->count = jint(acc, "count", 0);
+    out->count = (int)countLL;
     size_t accOff = (size_t)jint(acc, "byteOffset", 0);
-    int stride = jint(bv, "byteStride", 0);
+    int stride = (int)strideLL;
     int compSize = out->compType == GL_FLOAT ? 4 : out->compType == GL_UNSIGNED_SHORT ? 2 :
                    out->compType == GL_UNSIGNED_INT ? 4 : 0;
     if (!out->comps || !compSize) return 0;
