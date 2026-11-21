@@ -5157,13 +5157,15 @@ window.SHUI = (function () {
         l.speedMS = Math.max(0.01, +U.lightSpeedMS || 1.0);
         l.loopMode = U.lightLoopMode;
         l.pos = U.lightStart.slice();          /* the stable engine-mode-1 snapshot */
-        l.rot = [-15, 0, 0];
+        l.rot = U.lightRotAuthored ? U.lightRot.slice() : [-15, 0, 0];   /* B-15: keep the authored aim */
       } else if (l.mode === 'rotate') {
         l.pos = U.lightPos.slice();
         l.rot = U.lightRot.slice();
-      } else {                                  /* fixed: the verbatim default aim */
+      } else {                                  /* fixed: the authored aim if one
+                                                  * came in (B-15), the verbatim
+                                                  * -15deg default otherwise */
         l.pos = U.lightPos.slice();
-        l.rot = [-15, 0, 0];
+        l.rot = U.lightRotAuthored ? U.lightRot.slice() : [-15, 0, 0];
       }
     }
     m.light = l;
