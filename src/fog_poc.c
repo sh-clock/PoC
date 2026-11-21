@@ -16337,9 +16337,20 @@ int main(int argc, char **argv) {
                 g_userLightMode = 2;
                 g_userLightAheadM = (float)atof(v + 6);
                 if (g_userLightAheadM < 0) g_userLightAheadM = 0;
+                /* V42 D-3: NaN/Inf accepted here produced a silent dark
+                 * garbage frame (the E-F1 isfinite gates missed these
+                 * sites — atof("nan")/atof("inf") parse fine). */
+                if (!(g_userLightAheadM == g_userLightAheadM) || g_userLightAheadM == (float)HUGE_VAL)
+                    { fprintf(stderr, "--userlight ahead:D: D must be finite\n"); return 1; }
             } else {
                 float fx2, fy2, fz2;
                 if (sscanf(v, "%f,%f,%f", &fx2, &fy2, &fz2) == 3) {
+                    /* V42 D-3: reject NaN/Inf world positions */
+                    if (!(fx2 == fx2 && fy2 == fy2 && fz2 == fz2) ||
+                        fx2 == (float)HUGE_VAL || fx2 == -(float)HUGE_VAL ||
+                        fy2 == (float)HUGE_VAL || fy2 == -(float)HUGE_VAL ||
+                        fz2 == (float)HUGE_VAL || fz2 == -(float)HUGE_VAL)
+                        { fprintf(stderr, "--userlight x,y,z: values must be finite\n"); return 1; }
                     g_userLightMode = 1;
                     g_userLightWorld[0] = fx2; g_userLightWorld[1] = fy2;
                     g_userLightWorld[2] = fz2;
@@ -16358,6 +16369,12 @@ int main(int argc, char **argv) {
             float p2 = 0.0f, y2 = 0.0f, r2 = 0.0f;
             int got = sscanf(argv[++i], "%f,%f,%f", &p2, &y2, &r2);
             if (got == 2 || got == 3) {
+                /* V42 D-3: reject NaN/Inf aim angles */
+                if (!(p2 == p2 && y2 == y2 && r2 == r2) ||
+                    p2 == (float)HUGE_VAL || p2 == -(float)HUGE_VAL ||
+                    y2 == (float)HUGE_VAL || y2 == -(float)HUGE_VAL ||
+                    r2 == (float)HUGE_VAL || r2 == -(float)HUGE_VAL)
+                    { fprintf(stderr, "--userlightrot: values must be finite\n"); return 1; }
                 g_userLightCLI = 1;
                 g_userLightHasRot = 1;
                 g_userLightRot[0] = p2; g_userLightRot[1] = y2;
@@ -16601,7 +16618,7 @@ int main(int argc, char **argv) {
                 tStart = CLI_T_MAX_S;
             }
         }
-        else if (!strcmp(a, "--cam") && i + 7 < argc) {
+        else if (!strcmp(a, "--cam") && i + 6 < argc) {
             ovr.useFixed = 1;
             ovr.eye.x = (float)atof(argv[++i]); ovr.eye.y = (float)atof(argv[++i]);
             ovr.eye.z = (float)atof(argv[++i]);
