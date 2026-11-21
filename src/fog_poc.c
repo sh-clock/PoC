@@ -14253,7 +14253,12 @@ static int r2_in_restricted_zone(const v3 *eye) {
      * transform is identity on xz (v10ipd2gltf preserves the world axes),
      * so the zone test applies directly on the eye xz.                  */
     int32_t x = R2_Q12((double)eye->x), z = R2_Q12((double)eye->z);
-    return x >= R2_Q12(201.8) && x <= R2_Q12(230.0) &&
+    /* v43 (E18-7): the engine's Q12 = TO_FIXED TRUNCATES — (s32)(x*4096),
+     * fixed_point.h:30-31; Q12(201.8f) = (s32)(201.80000305*4096 =
+     * 826572.8125) = 826572. The old R2_Q12(201.8) llround gave 826573 —
+     * the zone edge 1 q3_12 (0.24 mm) narrower than the engine. The other
+     * three edges (230/-92/-68) are exact under both.                    */
+    return x >= (int32_t)(201.8 * 4096.0) && x <= R2_Q12(230.0) &&
            z >= R2_Q12(-92.0) && z <= R2_Q12(-68.0);
 }
 
