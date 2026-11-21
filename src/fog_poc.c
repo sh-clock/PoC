@@ -13086,10 +13086,11 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                 gte_snap_screen(&tsx, &tsy, R->enginePixScale, R->enginePixScaleY),
                 gte_snap_screen(&hsx, &hsy, R->enginePixScale, R->enginePixScaleY);
             /* GTE SZ = Q8 view depth; OTZ (stszotz) = SZ>>2 -> 64/m; the
-             * engine's rain depth comes from the FIRST projection (tail)  */
+             * engine's STREAK/DRIP depth comes from the FIRST projection
+             * (the tail); the SPLASH overrides bucket/clut/depth with its
+             * own corner-0 projection below (particle.c:2907-2932)       */
             int otz = (int)floorf(tDepth * 64.0f + 0.5f);
             int zHalf = otz >> 1;
-            if (!(zHalf > 32 && zHalf < 2047)) continue;
             /* clut: far 0x1A30 (row 104) / mid rows 104+(depth>>5) */
             int clutRow = (zHalf > 63 && zHalf < 256)
                               ? 104 + (zHalf >> 5) : 104;
@@ -13098,6 +13099,8 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             pe.bucket = zHalf; pe.seq = seq++; pe.item = -1; pe.tri0 = -1; pe.ntri = 0;
             if (p->state == 1) {
                 /* ---- falling streak (Particle_RainDraw state 1) ---- */
+                /* engine :2813 — cull on the TAIL depth (first rtps)   */
+                if (!(zHalf > 32 && zHalf < 2047)) continue;
                 int r, g, b;
                 if (S->drawCase == 1 || S->drawCase == 4) {
                     /* color = E325C.r - (func_80055A50(OTZ) >> 5), u8 wrap */
@@ -13129,11 +13132,18 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                  * (x+c,y,z-c) (x+c,y,z+c) — projected                    */
                 int cx[4], cy[4];
                 int ok = 1;
+                float cDepth = 0.0f;   /* corner-0 view depth (1st rtps)  */
                 static const int sgn[4][2] = { {-1,-1}, {-1,1}, {1,-1}, {1,1} };
                 for (int k = 0; k < 4; k++) {
                     float wx = (float)(S->boxX + p->pos[0] + sgn[k][0] * c) * (1.0f / 4096.0f);
                     float wy = hy;   /* the engine uses pos.vy for all 4 */
                     float wz = (float)(S->boxZ + p->pos[2] + sgn[k][1] * c) * (1.0f / 4096.0f);
+                    if (k == 0) {
+                        /* engine :2911-2919 — corner 0 is the FIRST rtps;
+                         * its stszotz is the splash's depth (NOT the tail)*/
+                        float cvz = view.m[2]*wx + view.m[6]*wy + view.m[10]*wz + view.m[14];
+                        cDepth = -cvz;
+                    }
                     float ccx = viewProj.m[0]*wx + viewProj.m[4]*wy + viewProj.m[8]*wz  + viewProj.m[12];
                     float ccy = viewProj.m[1]*wx + viewProj.m[5]*wy + viewProj.m[9]*wz  + viewProj.m[13];
                     float ccw = viewProj.m[3]*wx + viewProj.m[7]*wy + viewProj.m[11]*wz + viewProj.m[15];
@@ -13146,6 +13156,15 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                     cy[k] = (int)psy2;
                 }
                 if (!ok) continue;
+                /* v43 E-11-3/E-16-3: engine :2932+:2993+:2999-3005 — the
+                 * splash's OT bucket, CLUT row and occlusion depth come
+                 * from CORNER 0 (its own first rtps), never the tail     */
+                otz = (int)floorf(cDepth * 64.0f + 0.5f);
+                zHalf = otz >> 1;
+                if (!(zHalf > 32 && zHalf < 2047)) continue;
+                clutRow = (zHalf > 63 && zHalf < 256)
+                              ? 104 + (zHalf >> 5) : 104;
+                pe.bucket = zHalf;   /* engine :3042 — addPrim at corner-0 depth */
                 /* color = 0x80 - (c >> (sp64-3)); drawCase 2/6 + flashlight
                  * -> r = color*2; then the state fade r -= r*state>>4    */
                 int cc = c >> (sp64 - 3);
@@ -13165,11 +13184,13 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                 pe.rfd.x3 = cx[3]; pe.rfd.y3 = cy[3];
                 pe.rfd.clutRow = clutRow;
                 pe.rfd.primR = r; pe.rfd.primG = g; pe.rfd.primB = b;
-                pe.rfd.depth = tDepth;
+                pe.rfd.depth = cDepth;
                 post[nPost++] = pe; nFlake++;
             } else {
                 /* ---- type 3: the roof/puddle DRIP streak ---- */
                 if (p->state >= 49) continue;
+                /* engine :3084 — cull on the TAIL depth (first rtps)    */
+                if (!(zHalf > 32 && zHalf < 2047)) continue;
                 int cc = (p->state < 31) ? (int)p->state : 0x20;
                 pe.kind = 4;
                 pe.rfd.x0 = (int)tsx; pe.rfd.y0 = (int)tsy;  /* tail */
