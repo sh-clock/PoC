@@ -3261,6 +3261,15 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
         t->startAngleDeg = (float)jnum(raw, "startAngleDeg", 0.0);
         t->direction = !strcmp(jstr(raw, "direction", "cw"), "ccw") ? 1 : 0;
         t->speedDegS = (float)jnum(raw, "speedDegS", 6.0);
+        /* v41 audit (B-1): camtrack.html sanitizeTrack clamps the circle
+         * speedDegS to >= 0.001 (Math.max(num(raw.speedDegS, 6), 0.001),
+         * camtrack.html:5874) — the spiral/figure8 parses below already
+         * mirror their editor clamps; the missing circle clamp made a
+         * hand-authored -6 spin 6 deg/s here but near-freeze in the editor
+         * preview (and the editor's export silently rewrote -6 -> 0.001).
+         * Same one-line normalization as the siblings = lockstep on both
+         * sides of the import. */
+        if (t->speedDegS < 0.001f) t->speedDegS = 0.001f;
         /* camtrack.html sanitizeTrack RECONSTRUCTS the bounds flag (the JSON
          * format itself stores only arcMinDeg/arcMaxDeg — trackToJSON never
          * writes an "arcBounds" field):
