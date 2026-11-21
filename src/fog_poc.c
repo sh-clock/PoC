@@ -15409,9 +15409,9 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
                A->R.dither ? "ON" : "OFF");
         break;
     case K_W:
-        /* v12 WEATHER CYCLE — the engine's authentic runtime weather switch
-         * (sharedFunc_800D0B18), now with the FULL argument range 0..8
-         * exposed (v8 only cycled 2/6/0):
+        /* v12 WEATHER CYCLE — the engine's authentic runtime weather EVENT,
+         * now with the FULL argument range 0..8 exposed (v8 only cycled
+         * 2/6/0):
          *   0 = none                     5 = rain, wind 0
          *   1 = snow, wind 0             6 = rain, wind 1 (the game's own
          *   2 = snow, wind 1                 map0_s00/map6_s00 event arg)
@@ -15419,20 +15419,45 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
          *   4 = snow, wind 3             8 = rain, wind 3
          * Wind >= 2 activates the engine's wind machinery (the ramped
          * g_Particle_SpeedX/Z + the windy rest drift + the Unk1 ramp).
-         * v12 VERBATIM (D6): D0B18 is GATED by g_SysWork.field_234A — the
-         * engine's transition lock (particle.c:3870): a switch is REFUSED
-         * while a 512-tick sine cross-fade is in flight; the lock re-arms
-         * at completion (line 551). The count thresholds keep the verbatim
-         * snow-spawn-type (800DD592) switching live during the ramps. */
+         * v43 (E-09-5): the engine's runtime switch is the FULL map6_s00
+         * recipe (map6_s00.c:184-186), NOT D0B18 alone:
+         *   Particle_EnvironmentSet(2, 127);            — re-pack the snow recipe
+         *   WeatherParticle_SystemUpdate(0, mapIdx, 0); — the case-0 re-sync arm
+         *   sharedFunc_800D0B18_0_s00(6);               — the target cross-fade
+         * The case-0 arm (particle.c:188-423; arg3 = 0, NOT NO_VALUE, so
+         * NO field_2349 header re-read): E32D4 = 30, DD592 = 1, DD598 = 0,
+         * PrevPosition = 0, field_234A = true (the lock RE-ARMS — an
+         * in-flight cross-fade is aborted engine-true), E0CB8 = E0CB0>>12,
+         * E0CB6 = E0CB4 = E0CB0, then WeatherParticle_SnowInit re-runs
+         * (the 150-iteration warm-up). Chained presses rebuild
+         * weatherTarget from the RE-SYNCED recipe bits (the D0B18 alchemy
+         * (old|temp)*8 & 0xE38 is old-dependent) and the cross-fade
+         * starts from the fresh warm-up, exactly like the engine's event.
+         * v12 VERBATIM (D6): D0B18 itself is GATED by g_SysWork.field_234A
+         * (particle.c:3870) — always true here (the case-0 arm re-armed it
+         * one call earlier, exactly like map6_s00.c:185-186). The count
+         * thresholds keep the verbatim snow-spawn-type (800DD592)
+         * switching live during the ramps. */
         A->snow.nextWeather = (A->snow.nextWeather + 1) % 9;
+        particle_environment_set(&A->snow, 2, 127);   /* map6_s00.c:184   */
+        A->snow.rainGravity = 30;      /* E32D4 (case-0 arm, particle.c:388) */
+        A->snow.snowTypeEnable = 1;    /* DD592 (case-0 arm, particle.c:393) */
+        A->snow.weatherTick = 0;       /* DD598 = 0 (particle.c:402)         */
+        A->snow.transitionLock = 1;    /* field_234A = true (particle.c:409) */
+        A->snow.weatherSettings = (uint16_t)(A->snow.weatherBits >> 12); /* E0CB8 */
+        A->snow.weatherCurrent = A->snow.weatherBits;   /* E0CB6 = E0CB0  */
+        A->snow.weatherTarget = A->snow.weatherBits;    /* E0CB4 = E0CB0  */
+        snow_reset(&A->snow);          /* PrevPosition=0 + SnowInit (406-418) */
         if (sh_particle_weather_target_set(&A->snow, A->snow.nextWeather)) {
             static const char *WNAMES[9] = {
                 "NONE", "SNOW (wind 0)", "SNOW (wind 1)", "SNOW (wind 2)",
                 "SNOW (wind 3)", "RAIN (wind 0)", "RAIN (wind 1)",
                 "RAIN (wind 2)", "RAIN (wind 3)"
             };
-            printf("[weather] sharedFunc_800D0B18(%d) -> %s (sine cross-fade, "
-                   "512 ticks; 800DD592 type switch live)\n",
+            printf("[weather] map6_s00 event recipe: EnvironmentSet(2,127) + "
+                   "case-0 re-init + SnowInit, then sharedFunc_800D0B18(%d) "
+                   "-> %s (sine cross-fade, 512 ticks; 800DD592 type switch "
+                   "live)\n",
                    A->snow.nextWeather, WNAMES[A->snow.nextWeather]);
         } else {
             printf("[weather] REFUSED — transition lock (g_SysWork.field_234A "
@@ -17631,8 +17656,9 @@ int main(int argc, char **argv) {
     snow_init(&A.snow, &sc, track);
     /* v8: --weather N — the map-load recipe (Particle_EnvironmentSet(N,
      * field_16=1) + the SystemUpdate case-0 sync + SnowInitialize): the
-     * INSTANT boot weather. (The W key uses the runtime event recipe —
-     * sharedFunc_800D0B18 alone — with the sine cross-fade.)             */
+     * INSTANT boot weather. (The W key runs the engine's full runtime
+     * event recipe — map6_s00.c:184-186: EnvironmentSet(2,127) + the
+     * case-0 re-sync + SnowInit + D0B18 — with the sine cross-fade.)   */
     if (bootWeather >= 0 && bootWeather != 2) {
         particle_environment_set(&A.snow, bootWeather, 1);
         A.snow.weatherSettings = (uint16_t)(A.snow.weatherBits >> 12);
