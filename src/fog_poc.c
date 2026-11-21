@@ -6948,9 +6948,18 @@ static void sh_particle_weather_tick(Snow *S) {
  * settingsState-- the bank index drives g_ParticlesAddedCount[bank]). The
  * map0_s00 boot (EnvironmentSet(2, 1) -> E0CB8 = 5) keeps the EXACT v7
  * parameterization — settingsState 1 -> SnowType_Light types, density 3,
- * snowType 1 (Heavy) -> spawnMult 2 — with the byte-identical RNG order. */
-static void snow_reset(Snow *S) {
-    S->rngSeed = SNOW_SEED_DEFAULT;
+ * snowType 1 (Heavy) -> spawnMult 2 — with the byte-identical RNG order.
+ * v41-ENGFX bug 2: the RNG seed is now a PARAMETER (snow_reset_seed).
+ * The engine's WeatherParticle_SnowInit (particle.c:657-799) draws
+ * Rng_Rand16() from the GLOBAL kernel RNG and never touches its seed
+ * (the boot seed is not in the decomp sources); the PoC models every
+ * snow_reset as a FRESH-BOOT stream — the parameter IS that stand-in
+ * boot seed, so --snow-seed N drives the warm-up draws too (the old
+ * `S.rngSeed = snowSeed;` at the three CLI sites landed BEFORE the
+ * reset and was clobbered by SNOW_SEED_DEFAULT at the head — the flag
+ * was dead: --snow-seed 999999 rendered identically to 1). */
+static void snow_reset_seed(Snow *S, unsigned seed) {
+    S->rngSeed = seed;
     int settingsState = (S->weatherSettings & 0xC) >> 2;
     int density;
     for (int i = 0; i < SNOW_COUNT_MAX; i++) {
@@ -7040,6 +7049,13 @@ static void snow_reset(Snow *S) {
     S->prevX = 0; S->prevZ = 0;        /* g_Particle_PrevPosition at load   */
     S->boxX  = 0; S->boxZ = 0;
     S->camMoved = 0;
+}
+
+/* the engine-fresh boot seed everywhere the PoC models a fresh session
+ * (snow_init, the boot-weather recipes, the seek/backward-jump re-sim,
+ * the K_R restart, the B toggle) — identical to the pre-v41 form       */
+static void snow_reset(Snow *S) {
+    snow_reset_seed(S, SNOW_SEED_DEFAULT);
 }
 
 /* g_Particle_Position x/z = viewPos + horizontal-forward*3m (Q12) — the
@@ -17432,9 +17448,13 @@ int main(int argc, char **argv) {
         }
     }
     A.snow.enabled = A.snow.enabled && snowEnabled;
-    /* seed override (engine boot seed not in the decomp sources) */
-    A.snow.rngSeed = snowSeed;
-    snow_reset(&A.snow);
+    /* seed override (engine boot seed not in the decomp sources).
+     * v41-ENGFX bug 2: pass the CLI seed INTO the reset — the old pre-reset
+     * assignment was clobbered by SNOW_SEED_DEFAULT at snow_reset's head
+     * (--snow-seed 999999 rendered identically to the default 1). The
+     * warm-up draws consume the CLI seed from position 0, exactly like a
+     * fresh process booted with that seed. */
+    snow_reset_seed(&A.snow, snowSeed);
     /* the env light anchors to the virtual camera (HERO, per the task
      * spec); establish the initial env state (the engine runs
      * Gfx_EffectsUpdate on the first frame; dt = 0 keeps the flashlight
@@ -17563,8 +17583,9 @@ int main(int argc, char **argv) {
         turn_init(&P.turn);
         Snow Ss = A.snow;
         Ss.ticksDone = 0; Ss.lastTickT = 0;
-        Ss.rngSeed = snowSeed;
-        snow_reset(&Ss);
+        /* v41-ENGFX bug 2: the CLI seed goes INTO the reset (the old
+         * pre-reset assignment was clobbered by the default re-seed) */
+        snow_reset_seed(&Ss, snowSeed);
         ShEnv Es = A.env;
         sh_env_reset(&Es, 0.0);
         Es.envDump = NULL;
@@ -17731,8 +17752,9 @@ int main(int argc, char **argv) {
         turn_init(&P.turn);
         Snow Ss = A.snow;                 /* copy the freshly-reset state  */
         Ss.ticksDone = 0; Ss.lastTickT = 0;
-        Ss.rngSeed = snowSeed;
-        snow_reset(&Ss);
+        /* v41-ENGFX bug 2: the CLI seed goes INTO the reset (the old
+         * pre-reset assignment was clobbered by the default re-seed) */
+        snow_reset_seed(&Ss, snowSeed);
         ShEnv Es = A.env;                 /* fresh env simulation (v4)     */
         sh_env_reset(&Es, 0.0);
         Es.envDump = NULL;                /* per-shot dump not supported   */
