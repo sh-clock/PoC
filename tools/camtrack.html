@@ -6034,9 +6034,26 @@ function sanitizeDoc(raw) {
         entry.bounds = { min: vec3(m.bounds.min, [0, 0, 0]), max: vec3(m.bounds.max, [0, 0, 0]) };
       }
       if (Array.isArray(m.tracks)) {
+        /* v41 audit (B-5): de-duplicate track ids at import. Duplicate ids
+         * collide in the visuals Map (buildVisual's visuals.set(tr.id, ...),
+         * :6823) — the second entry overwrites the first, so the first
+         * group stays parented in trackRoot, is still double-drawn, and is
+         * never reached by clearVisuals -> one orphaned, undisposed
+         * THREE.Group per rebuildVisuals() (unbounded), plus the selTrack
+         * first-match ambiguity. The engine never reads id (index-based
+         * --track N, fog_poc.c:3527-3537), so the least-surprise option:
+         * the FIRST occurrence keeps the authored id, every later
+         * duplicate gets a fresh newId() (editor-authored ids are newId()
+         * timestamps+random — collisions are a hand-edited-file class
+         * only). Per-model scope: visuals/selection are per-model. */
+        const seenIds = new Set();
         for (const rt of m.tracks) {
           const t = sanitizeTrack(rt);
-          if (t) { entry.tracks.push(t); tracks++; } else dropped++;
+          if (t) {
+            while (seenIds.has(t.id)) t.id = newId();
+            seenIds.add(t.id);
+            entry.tracks.push(t); tracks++;
+          } else dropped++;
         }
       }
       doc.models.push(entry);
