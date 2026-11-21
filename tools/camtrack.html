@@ -7354,7 +7354,11 @@ function pathLines() {
   return out.filter(Boolean);
 }
 function castHandles(e) {
-  if (!visuals.size) return null;
+  /* B-12: the guard covered ONLY camera-track handles — the light spheres
+   * (and the pointer marker) must stay grabbable on a TRACKLESS model
+   * (the SPU0401 first-impression flow: dark room, no tracks yet) */
+  if (!visuals.size && !(lightHandles && lightHandles.group.visible) &&
+      !(pointer.on && pointerMarker && pointerMarker.visible)) return null;
   raycaster.setFromCamera(ndcFromEvent(e), orbitCam);
   const hits = raycaster.intersectObjects(handleMeshes(), false);
   return hits[0] || null;
