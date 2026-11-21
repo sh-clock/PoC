@@ -90,10 +90,12 @@ def build_ipd(sh):
     pg_off = struct.unpack_from("<I", block, 20)[0]
     for i, p in enumerate(coll["polygons"]):
         o = pg_off + 10 * i
-        # decomp layout: wx@0 (ox:14|tfiHi:2), wy@2 (oy:14|tfiLo:2), z@4
+        # decomp layout: wx@0 (ox:14|tfiHi:2), wy@2 (oy:14|tfiLo:2), z@4;
+        # engine combines (Hi << 2) | Lo with Hi from wx (collision.c:1066,
+        # ray.c:464) — v43 RIP2-3: the nibbles were swapped.
         tfi = p["triggerFlagIdx"]
-        wx = (p["offsetX"] & 0x3FFF) | ((tfi & 3) << 14)
-        wy = (p["offsetY"] & 0x3FFF) | (((tfi >> 2) & 3) << 14)
+        wx = (p["offsetX"] & 0x3FFF) | (((tfi >> 2) & 3) << 14)
+        wy = (p["offsetY"] & 0x3FFF) | ((tfi & 3) << 14)
         struct.pack_into("<HH", block, o, wx, wy)
         struct.pack_into("<h", block, o + 4, p["offsetZ"])
         block[o + 6] = p["splitVertexIdx0"]
