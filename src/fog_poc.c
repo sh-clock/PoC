@@ -7568,13 +7568,41 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
 
     for (int y = miny; y <= maxy; y++) {
         for (int x = minx; x <= maxx; x++) {
-            float px = (float)x + 0.5f, py = (float)y + 0.5f;
-            /* barycentric */
+            /* v43 E-10-1: GPU-verbatim sample position — the PS1 GPU walks
+             * INTEGER pixel coordinates (swanstation gpu_sw_backend.cpp
+             * DrawSpan: x from x_start to x_bound at row y — no +0.5 center
+             * offset anywhere; the UV DDA below already used this lattice).
+             * The old +0.5f center sampling overfilled every near-horizontal
+             * edge by ~0.5*(dx/dy) px per row (the (0,10),(100,11),(45,30)
+             * wedge: +49 px on row 10 alone, GPU row 10 = 0 px).           */
+            float px = (float)x, py = (float)y;
+            /* barycentric — w2 from its own edge cross product (NOT
+             * 1-w0-w1): the on-edge test below needs w_i == 0 EXACTLY,
+             * and 1-w0-w1 carries an ulp of rounding (area*fl(1/area)
+             * != 1 exactly) that would blur the fill rule.            */
             float w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inv;
             float w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inv;
-            float w2 = 1.0f - w0 - w1;
-            /* top-left-ish fill via edge sign check (area-normalized) */
-            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+            float w2 = ((x0 - px) * (y1 - py) - (x1 - px) * (y0 - py)) * inv;
+            /* v43 E-10-1: the GPU fill rule — top-left INCLUSIVE,
+             * right/bottom EXCLUSIVE (the Mednafen convention swanstation
+             * implements). gpu_sw_backend.cpp:260-263 MakePolyXFP(x) =
+             * (x<<32) + (1 - 2^-21) biases every span boundary, :281-284
+             * GetPolyXFP_Int reads back via >>32, :360-402 DrawSpan draws
+             * x in [x_start, x_bound) over rows [y_top, y_bottom)
+             * (:544-595): an integer point exactly ON the left/top boundary
+             * is drawn, exactly ON the right/bottom boundary is not. In
+             * edge-function terms for the canonicalized positive-area
+             * order (w_i == 0 <-> P on edge V_i->V_j, interior w > 0,
+             * dE/dx = -dy so dy < 0 is the left boundary): accept w == 0
+             * only on TOP (dy == 0 && dx > 0) and LEFT (dy < 0) edges;
+             * reject on RIGHT (dy > 0) and BOTTOM (dy == 0 && dx < 0).
+             * The old all-inclusive test double-drew every shared diagonal
+             * (10 centers on a 10x10 quad split engine-style) — additive
+             * RP_ADD_TEX water double-brightened each one.                    */
+            if (w0 < 0.0f || w1 < 0.0f || w2 < 0.0f) continue;
+            if (w0 == 0.0f && (y2 > y1 || (y2 == y1 && x2 < x1))) continue;
+            if (w1 == 0.0f && (y0 > y2 || (y0 == y2 && x0 < x2))) continue;
+            if (w2 == 0.0f && (y1 > y0 || (y1 == y0 && x1 < x0))) continue;
 
             float z = w0 * z0 + w1 * z1 + w2 * z2;
             size_t pi = (size_t)y * fb->w + x;
