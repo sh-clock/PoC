@@ -5299,6 +5299,11 @@ const state = {
   playing: false,
   playAll: false, playlist: [], plIndex: 0,
   t: 0,                 // seconds inside current cycle
+  sessionT: 0,          // v43 (CT-5-1): monotonic session seconds — the C's
+                        // P->sessionT (fog_poc.c:13973): advances in lockstep
+                        // with t but NEVER wraps (loop/pingPong wrap t only,
+                        // once clamps t at T) and never jumps on scrub — the
+                        // SH1X prop drivers' 30Hz grid keys on it
   rate: 1,
   showGrid: true, showPaths: true, showPip: true,
   lockAxis: null,          /* editor-only: 'x' | 'y' | 'z' | null — never serialized */
@@ -7056,6 +7061,9 @@ function setActiveModel(name) {
     state.selection = (keep && m && m.tracks.some(t => t.id === keep)) ? keep : null;
   }
   state.playing = false; state.playAll = false; state.t = 0;
+  state.sessionT = 0;   /* v43 (CT-5-1): model (re)load boots the session
+                           clock fresh — the C's K_R (fog_poc.c:15268-15270:
+                           sessionT = 0 + sh1x_anims_reset :15326) */
   for (const v of three.loaded.values()) if (v.scene.parent === scene) scene.remove(v.scene);
   const loaded = three.loaded.get(name);
   if (loaded) scene.add(loaded.scene);
@@ -7774,6 +7782,8 @@ function startPlayAll() {
   state.plIndex = 0;
   state.selection = tracks[0].id;
   state.t = 0;
+  state.sessionT = 0;   /* v43 (CT-5-1): play-all restart boots the session
+                           clock fresh (the C's K_R restart discipline) */
   state.playing = true;
   rebuildVisuals();
   renderTrackList();
@@ -7785,6 +7795,8 @@ function tickPlayback(dt) {
   const tr = playTarget();
   if (!tr) { stopPlayback(); return; }
   state.t += dt * state.rate;
+  state.sessionT += dt * state.rate;   /* v43 (CT-5-1): the C's P->sessionT
+     (fog_poc.c:13973) — monotonic, advances in lockstep with t, never wraps */
   const T = playCycle(tr);
   if (state.t >= T) {
     if (state.playAll) {
@@ -7798,9 +7810,14 @@ function tickPlayback(dt) {
       updatePlaybarUI();
     } else if (tr.loopMode === 'once' || cycleDuration(tr) <= 0) {
       state.t = T;
-      setPlaying(false);
+      /* v43 (CT-5-1): the C's once NEVER pauses — playback_step clamps
+       * P->t at T (fog_poc.c:13985) while P->sessionT keeps advancing and
+       * live_advance keeps firing (fog_poc.c:14699 — fires while
+       * !paused), so the prop drivers keep ticking at the held end pose.
+       * The old setPlaying(false) froze them (V-2 CT-5-1); the camera
+       * still holds at the end pose (t stays clamped at T). */
     } else {
-      state.t = state.t % T;
+      state.t = state.t % T;   /* fog_poc.c:13987 — the phase wraps, NOT the session clock */
     }
   }
 }
@@ -10288,7 +10305,6 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
 /*     window.__camtrack.sh1xDebugState() surfaces it);                */
 /*   - waterRipple/waterfall tick their state but the droplet/ripple   */
 /*     paint is an engine-only FX draw (no mesh pose — documented).    */
-const SH1X_MAX_STEPS = 5400;         /* 180 s at 30 Hz */
 const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
 let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
 
@@ -10919,6 +10935,22 @@ function sh1xWaterCamPose(t) {
   return { x: ev.pos[0], y: ev.pos[1], z: ev.pos[2] };
 }
 
+/* v43 (CT-5-1): the PHASE corresponding to a session time — tickPlayback's
+ * own wrap rules. The C's playback_step (fog_poc.c:13968-13988) advances
+ * P->t and P->sessionT in lockstep, wrapping ONLY t: once clamps t at T
+ * (:13985), loop/pingPong take t % T (:13987 — the pingPong mirror lives
+ * in phase01/tri01), while sessionT stays monotonic (:13973). The
+ * waterfall's per-tick camera rides this phase exactly like the C's
+ * per-tick playback_step pose. */
+function sh1xSessionPhase(s) {
+  const tr = playTarget() || selTrack();
+  if (!tr) return s;
+  const T = playCycle(tr);
+  if (!(isFinite(T) && T > 0)) return s;
+  if (tr.loopMode === 'once' || cycleDuration(tr) <= 0) return Math.min(s, T);
+  return s % T;
+}
+
 /* v39.1 THE ROOM TRUE-DEPTH REFERENCE PASS — the C's water gate
  * (fog_poc.c:11218-11219 `fb->z[pi] < depthM -> skip`) compares the prim's
  * plain avg depth against the room's covering depth. The C's fb->z holds
@@ -11395,7 +11427,7 @@ function sh1xTvPaintUpdate() {
   }
 }
 
-function applySh1xPropAnims(t) {
+function applySh1xPropAnims(sessionT) {
   const rec = three.loaded.get(state.activeFile);
   if (!rec || !rec.scene || !rec.sh1xAnims || !rec.sh1xAnims.length) {
     if (sh1xSunLight) sh1xSunLight.intensity = SH1X_SUN_BASE_INTENSITY;
@@ -11403,10 +11435,23 @@ function applySh1xPropAnims(t) {
   }
   if (!rec.sh1xItems) rec.sh1xItems = sh1xBuildMeshRecords(rec);
   if (!rec.sh1xSt) sh1xDriverReset(rec);
-  let want = Math.floor((t + 1e-9) * 30);
+  /* v43 (CT-5-1): the 30Hz grid keys on the SESSION clock (state.sessionT —
+   * monotonic, never wraps), NOT the wrapping phase. The C's dt derives
+   * from the session clock only (sh1x_anims_sync, fog_poc.c:10409-10417:
+   * dt = sessionT - last, clamped [0, 0.1]; P->sessionT advances in
+   * lockstep with the phase but never wraps — fog_poc.c:13973), so a
+   * loop/pingPong wrap, a scrub or a once-end must NOT move the grid:
+   * the old phase-keyed grid reset the ENTIRE driver set (fans/ferris/
+   * TV/binSpin + the waterfall RNG re-seed) on every wrap and every
+   * backward scrub, froze at once-end and capped at 180 s (SH1X_MAX_
+   * STEPS — the C has no cap). NO step cap: catch-up stays unbounded
+   * (the shot fast-forward discipline, fog_poc.c:16974-16993). */
+  let want = Math.floor((sessionT + 1e-9) * 30);
   if (want < 0) want = 0;
-  if (want > SH1X_MAX_STEPS) want = SH1X_MAX_STEPS;
-  if (want < rec.sh1xSt.steps) sh1xDriverReset(rec);   /* seek back: re-run from t=0 */
+  if (want < rec.sh1xSt.steps) sh1xDriverReset(rec);  /* the session clock
+     jumped BACKWARD (play-all restart / model re-load — the C's K_R boots
+     the drivers fresh, fog_poc.c:15326). Unreachable on wrap/scrub/
+     once-end: the session clock is monotonic through all of them. */
   const S = rec.sh1xSt;
   /* v39: the school waterfall tick — the C engine calls sh1x_waterfall_tick
    * next to sh1x_anims_tick at every FIRED 30Hz tick (fog_poc.c:13977,
@@ -11428,11 +11473,11 @@ function applySh1xPropAnims(t) {
    * is bit-identical to the engine discipline). */
   while (S.steps < want) {
     sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
-    const stepT = (S.steps + 1) / 30;
-    sh1xWaterfallTick(S, sh1xWaterCamPose(stepT), stepT);
+    const stepT = (S.steps + 1) / 30;   /* this tick's SESSION time */
+    sh1xWaterfallTick(S, sh1xWaterCamPose(sh1xSessionPhase(stepT)), stepT);
     S.steps++;
   }
-  S.lastT = t;
+  S.lastT = sessionT;
   /* apply the live pose per bound NODE (all its primitive items share the
    * bind group's animIdx/animInst — one pose per node) */
   const on = state.sh1xAnimPreview !== false;
@@ -11507,7 +11552,7 @@ function startRenderLoop() {
     tickFly(dt);
     controls.update();
     tickPlayback(dt);
-    applySh1xPropAnims(state.t);   /* v13.2/v13.4: the full SH1X driver-set preview */
+    applySh1xPropAnims(state.sessionT);   /* v13.2/v13.4/v43 (CT-5-1): the full SH1X driver-set preview — session clock */
     updateLightGizmo();            /* v13.5 (T7): the user-light pose gizmo */
     updateLightHandles();          /* v41 (fix 4): the draggable light spheres */
     lightResolveForView();         /* v41 (fix 4): the authored light -> ShEnv.updatePose (mode 1) */
@@ -12548,7 +12593,7 @@ window.__camtrack = {
   get sh1xAnimPreview() { return state.sh1xAnimPreview !== false; },
   setSh1xAnimPreview(on) {
     state.sh1xAnimPreview = !!on;
-    applySh1xPropAnims(state.t);
+    applySh1xPropAnims(state.sessionT);
   },
   /* v13.4 (T2): the live SH1X driver state of the ACTIVE model (the TV
    * state machine — the paint now exists (v41) — the raw swing/ferris/
