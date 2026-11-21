@@ -1296,7 +1296,17 @@ typedef struct {
     int mvPend[4], mvPendVel[4];    /* ferrisWheel cabin pendulum states    */
     int mvVel;                      /* gravityScatter fall velocity          */
     int mvState;                    /* stoneChoreo state / cutscene sub-state */
-    int mvTimer;                    /* stoneChoreo/translate accum           */
+    float mvTimer;                  /* the discrete-step accumulator (v43:
+                                     * was INT — the per-tick += (float)
+                                     * (dt*30.0) with dt=1/30 adds 0.9999
+                                     * -> TRUNCATES TO +0 EVERY TICK, so the
+                                     * while (mvTimer >= 1.0f) step loops of
+                                     * doorRattle/kickSwing/gravityScatter/
+                                     * fallOnce NEVER RAN (the rattle never
+                                     * kicked, the kick never stepped; only
+                                     * the 0.1-clamped seek ticks ever
+                                     * fired). FLOAT restores the engine's
+                                     * one-step-per-30Hz-frame discipline)   */
     int posPerInstN;                /* fanArray posed positions (glTF m)     */
     float posPerInst[16][3];
     int rotY180From;                /* fanArray: i>=this gets +180 deg y     */
@@ -9791,6 +9801,23 @@ static void sh1x_waterfall_tick(Sh1x *sx, const CamPose *cam,
 }
 
 static void sh1x_anims_tick(Sh1x *sx, double dt) {
+    /* FOGPOC_ANIMDBG (S20): the per-tick driver-state proof — one line per
+     * anim whenever the state MOVED (rawVy/rwVy/cur/master differ from the
+     * last print). The camera-independent animation evidence. */
+    static double lastPrint = -1;
+    if (getenv("FOGPOC_ANIMDBG") && sx->animsLastSessionT != lastPrint) {
+        lastPrint = sx->animsLastSessionT;
+        for (int ai = 0; ai < sx->nAnims; ai++) {
+            const Sh1xPropAnim *a = &sx->anims[ai];
+            fprintf(stderr, "ANIMDBG t=%.3f drv=%d obj=%s rawVy=%d rawVel=%d "
+                    "cur=(%.3f,%.3f,%.3f) master=%d kick=%d gated=%d "
+                    "fl=(%d,%.0f,%d,%.0f)\n",
+                    sx->animsLastSessionT, a->driver, a->object,
+                    a->rawVy, a->rawVel, a->cur[0], a->cur[1], a->cur[2],
+                    a->mvMaster, a->kickPhase, a->gated,
+                    a->flAmp, a->flT0, a->flPer0, a->flT1);
+        }
+    }
     const int dtRaw = (int)(dt * 4096.0);
     for (int i = 0; i < sx->nAnims; i++) {
         Sh1xPropAnim *a = &sx->anims[i];
