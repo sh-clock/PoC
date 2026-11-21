@@ -16395,6 +16395,7 @@ int main(int argc, char **argv) {
                         "bound — capping\n", tt, CLI_T_MAX_S);
                 tt = CLI_T_MAX_S;
             }
+            if (c3) { if (sscanf(c3 + 4, "%lf,%lf", &py, &pp) != 2) py = atof(c3 + 4); }
             /* v41 audit (E-4, pr_25): cli_time_kv already rejects inf/nan
              * (its !isfinite(v) guard); the pan= pair feeds
              * llround(deg/360*4096) — non-finite pan is UB there. */
