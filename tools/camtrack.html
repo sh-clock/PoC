@@ -3607,7 +3607,9 @@ window.SHView = (function () {
     for (let i = 0; i < n; i++) {
       const s = splashes[i];
       iPos.setXYZ(i, s.x, s.y, s.z);
-      iScale.setX(i, s.cM);
+      iScale.setX(i, s.cM * 2);   /* x2: PlaneGeometry(1,1) spans ±0.5 — corner
+                                     offset must be ±c/4096 m like the C
+                                     (fog_poc.c:12978-12986: sgn[k]*c/4096) */
       iClut.setX(i, s.clutRow ? (s.clutRow - 104) : 0);
       iCol.setXYZ(i, s.r, s.g, s.b);
     }
