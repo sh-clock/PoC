@@ -1388,7 +1388,7 @@ typedef struct {
 /*   tvPaint emission). The corner cross-wiring is func_800D761C        */
 /*   VERBATIM (c1 takes (B.x, A.y, B.z), c2 (A.x, B.y, A.z)).           */
 /* The 3 TV TIMs (TV1/TV2/TV3) upload via func_800D7450 +              */
-/* Fs_QueuePostLoadTim: TV1 pixels (832..863, 256..511) CLUT rows 0..2; */
+/* Fs_QueuePostLoadTim: TV1 pixels (832..895, 256..511) CLUT rows 0..2; */
 /* TV2 pixels (800..863, 0..255) CLUT rows 5..6; TV3 pixels             */
 /* (768..831, 384..511) CLUT rows 10..11 — the CLUT bank at x 448.      */
 /* Sampling is SwanStation's Palette4Bit path VERBATIM (gpu_sw_backend.  */
@@ -1437,7 +1437,11 @@ static void sh_tvpaint_free(TvPaint *tvp) {
 /* the modeled VRAM halfwords the paint's UV windows can touch — the TV
  * TIM uploads (everything else = 0: fresh-boot stale VRAM) */
 static unsigned short sh_tvpaint_vram(int x, int y) {
-    if (x >= 832 && x < 864 && y >= 256 && y < 512) {
+    /* TV1: tpage 29 -> x = ((29 & 0xF) << 6) = 832, y = ((29 << 4) & 0x100)
+     * = 256 (fs_queue.c:657); the TIM's pixel rect is 64 halfwords wide
+     * -> the upload spans x 832..895 (the FULL row — g_tv1Idx[256][128]
+     * already carries it; only the clip was halved). */
+    if (x >= 832 && x < 896 && y >= 256 && y < 512) {
         int k = (x - 832) * 2;
         return (unsigned short)(g_tv1Idx[y - 256][k] |
                                 (g_tv1Idx[y - 256][k + 1] << 8));
