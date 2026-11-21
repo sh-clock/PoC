@@ -2756,12 +2756,21 @@ static int scene_load_glb_q(Scene *s, const char *path, int quiet) {
     const JValue *sceneDef = jat(jarr(g.json, "scenes"), sceneIdx);
     const JValue *roots = jarr(sceneDef, "nodes");
     int nRoots = jcount(roots);
-    if (nRoots == 0) { fprintf(stderr, "GLB has no scene nodes\n"); glb_close(&g); return 0; }
+    if (nRoots == 0) {
+        /* v43 (E-03-3): present-but-invalid neighbor GLBs are a SILENT
+         * no-op (the scene_load_glb_q contract) — gate like 2731-2734    */
+        if (!quiet) fprintf(stderr, "GLB has no scene nodes\n");
+        glb_close(&g); return 0;
+    }
     mat4 ident = mat4_identity();
     for (int i = 0; i < nRoots; i++)
         glb_walk_node(&g, nodes, (int)jat(roots, i)->num, ident, &sb, meshes);
 
-    if (sb.itn == 0) { fprintf(stderr, "GLB has no drawable meshes\n"); free(sb.v); free(sb.i); free(sb.it); glb_close(&g); return 0; }
+    if (sb.itn == 0) {
+        /* v43 (E-03-3): same quiet contract as above                  */
+        if (!quiet) fprintf(stderr, "GLB has no drawable meshes\n");
+        free(sb.v); free(sb.i); free(sb.it); glb_close(&g); return 0;
+    }
 
     /* ---- materials ---- */
     int nMats = jcount(materials);
@@ -2813,7 +2822,10 @@ static int scene_load_glb_q(Scene *s, const char *path, int quiet) {
         int w = 0, h = 0;
         uint8_t *rgba = png_decode_rgba(g.bin + off, len, &w, &h);
         if (!rgba) {
-            fprintf(stderr, "warning: image %d failed to decode\n", i);
+            /* v43 (E-03-3): image decode warnings go to stderr only for
+             * the MAIN load — a neighbor probe with one corrupt PNG is a
+             * silent no-op for that texture (tex w/h -1, skipped)       */
+            if (!quiet) fprintf(stderr, "warning: image %d failed to decode\n", i);
             s->tex[i].w = s->tex[i].h = -1;
             continue;
         }
