@@ -7909,11 +7909,51 @@ static void fx_blit_sprite_quad(
     if (minY < 0) minY = 0;
     if (maxX >= fb->w) maxX = fb->w - 1;
     if (maxY >= fb->h) maxY = fb->h - 1;
-    /* bilinear-free affine: UV corners map (u0,v0)->v0 ... (u3,v3)->v3 */
-    /* solve the affine map from the 3 first corners (parallelogram      */
-    /* sprites: the 4th is consistent)                                     */
-    double du_dx = (double)(sw - 0) / (double)(x1 - x0 + 0.0001);
-    double dv_dy = (double)(sh - 0) / (double)(y2 - y0 + 0.0001);
+    /* V42 A-2: the general 2D affine UV solve — the engine's POLY_FT4
+     * rule. The GPU (swanstation gpu_sw_backend.cpp:28-38) splits the
+     * quad (v0,v1,v2)+(v2,v1,v3) and CalcIDeltas (:287-322) derives a
+     * FULL 2D affine map per triangle — du_dx AND du_dy, dv_dx AND dv_dy
+     * — from the corner UVs; for the engine's parallelogram quads with
+     * the window (0,0),(sw,0),(0,sh),(sw,sh) both triangles interpolate
+     * the SAME map: u = sw*a, v = sh*b where (a,b) are the quad's own
+     * parallelogram coordinates P = P0 + a*(P1-P0) + b*(P2-P0) — u
+     * follows the V0->V1 EDGE, v the V0->V2 edge, whatever the screen
+     * heading (the streaks' setUV4, lens_flare.c:424: u along V0->V1,
+     * v along V0->V2 at every rotation angle). The old solve took u
+     * from screen-x and v from screen-y alone — correct only for
+     * upright quads: the 16 STREAK kites (rotated, lens_flare.c:304-
+     * 309) sheared their texture (u pinned to screen-x) and collapsed
+     * to 0 painted px whenever an edge went screen-vertical (the
+     * 0.0001 epsilon: x1-x0 or y2-y0 = 0 -> du_dx ~ sw/eps -> every
+     * sample lands outside the u window — a ~20-degree dead window
+     * per streak around the -45deg/135deg headings). Same sampling
+     * semantics as before: the pixel-center (ax,ay) sample, the (int)
+     * truncation, the [0,sw) x [0,sh) window reject — so upright
+     * cores/ghosts sample the same texels as the axis solve. det = 0
+     * (P0,P1,P2 collinear — every reachable quad here is a
+     * parallelogram, so the whole quad is zero-area) rasterizes
+     * NOTHING on the GPU (CalcIDeltas returns false on denom 0,
+     * gpu_sw_backend.cpp:295-296; the zero-area early-out :449-450)
+     * -> skip the quad, like fx_blit_water_quad's degenerate guard.  */
+    double ax1 = (double)x1 - x0, ay1 = (double)y1 - y0;
+    double ax2 = (double)x2 - x0, ay2 = (double)y2 - y0;
+    double det = ax1 * ay2 - ax2 * ay1;
+    /* A2c CONTROL VARIANT (byte-identity proof): an EXACTLY axis-
+     * aligned quad (edge 0->1 horizontal AND edge 0->2 vertical — the
+     * cores/ghosts) keeps the LEGACY solve verbatim, bit-identical
+     * including the 0.0001 epsilon's integer-boundary quirks; every
+     * other quad (the rotated streak kites) takes the affine solve.
+     * This variant byte-identical to main + the pure affine variant
+     * not => the delta is PROVEN to be the dropped epsilon on the
+     * axis quads alone.                                              */
+    int axisAligned = (y1 == y0 && x2 == x0);
+    double du_dx = 0.0, dv_dy = 0.0;
+    if (axisAligned) {
+        du_dx = (double)(sw - 0) / (double)(x1 - x0 + 0.0001);
+        dv_dy = (double)(sh - 0) / (double)(y2 - y0 + 0.0001);
+    } else if (fabs(det) < 1e-9) {
+        return;                     /* zero-area quad: GPU paints 0 */
+    }
     for (int py = minY; py <= maxY; py++) {
         for (int px = minX; px <= maxX; px++) {
             /* point-in-quad via two triangle tests — the fx_blit_gouraud_tri
@@ -7955,8 +7995,19 @@ static void fx_blit_sprite_quad(
                 if (!(neg && pos)) inside = 1;
             }
             if (!inside) continue;
-            int u = (int)((ax - x0) * du_dx);
-            int v = (int)((ay - y0) * dv_dy);
+            /* the parallelogram coordinates of the sample (the inverse
+             * 2x2 solve; u along the P0->P1 edge, v along P0->P2)      */
+            double rx = ax - x0, ry = ay - y0;
+            int u, v;
+            if (axisAligned) {
+                u = (int)(rx * du_dx);      /* legacy axis solve       */
+                v = (int)(ry * dv_dy);
+            } else {
+                double ua = (ay2 * rx - ax2 * ry) / det;
+                double vb = (ax1 * ry - ay1 * rx) / det;
+                u = (int)(ua * sw);
+                v = (int)(vb * sh);
+            }
             if (u < 0 || u >= sw || v < 0 || v >= sh) continue;
             unsigned idxv = idx_plane[(size_t)v * sw + u];
             unsigned short entry = clut[idxv];
