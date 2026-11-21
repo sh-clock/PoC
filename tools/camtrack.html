@@ -8301,9 +8301,27 @@ function sh1xDriverInit(propAnims, header, opts) {
   for (let k = 0; k < S.anims.length; k++) {
     const sh = sh1xJs(list[k], 'sharedRot', '');
     if (sh) {
-      for (let m = 0; m < S.anims.length; m++) {
-        if (m !== k && S.anims[m].object === sh) { S.anims[k].sharedLeader = m; break; }
+      /* v43 (E-02-1): the '#N' duplicate suffix — stem + copy index; skip
+       * the first N-1 same-stem matches, a missing Nth match falls back to
+       * the FIRST same-stem entry (the C parse's convention, fog_poc.c) */
+      let stem = sh, copyN = 1;
+      const hi = sh.lastIndexOf('#');
+      if (hi >= 0) {
+        const suf = sh.slice(hi + 1);
+        const ms = suf.match(/^\s*([+-]?[0-9]+)/);
+        if (ms && ms[0].length === suf.length) {
+          const n = +ms[1];
+          if (n >= 1) { stem = sh.slice(0, hi); copyN = n; }
+        }
       }
+      let leader = -1, seen = 0;
+      for (let m = 0; m < S.anims.length; m++) {
+        if (m !== k && S.anims[m].object === stem) {
+          if (leader < 0) leader = m;   /* fallback: first stem */
+          if (++seen === copyN) { leader = m; break; }
+        }
+      }
+      if (leader >= 0) S.anims[k].sharedLeader = leader;
     }
   }
   for (let k = 0; k < S.anims.length; k++) {        /* cycle break */

@@ -2358,12 +2358,41 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
             sh_name = e2 ? jstr(e2, "sharedRot", "") : NULL;
         }
         if (sh_name && *sh_name) {
-            for (int m = 0; m < sx->nAnims; m++) {
-                if (m != k && !strcmp(sx->anims[m].object, sh_name)) {
-                    sx->anims[k].sharedLeader = m;
-                    break;
+            /* v43 (E-02-1): sharedRot targets may carry the ripper's '#N'
+             * duplicate suffix (ipd2gltf.py MAP2_S00 drawbridge pair 2
+             * emits "AXIS2_BA#2" — the SECOND same-name catalog entry; the
+             * same '#' convention the item binder's name match honors).
+             * Parse the trailing '#N' into stem + copy index, compare the
+             * stem and skip the first N-1 same-stem matches; if the Nth
+             * match does not exist, fall back to the FIRST same-stem entry
+             * (THRFE08's in-room anims are the pair-2 set only, so the
+             * fallback yields AXIS1_HI <-> AXIS2_BA mutual -> the cycle
+             * break below gives the engine's one-shared-vector semantics
+             * for deterministic drivers, exactly as pair 1 behaves). */
+            char stem[64];
+            int copyN = 1;
+            const char *hash = strrchr(sh_name, '#');
+            if (hash) {
+                char *end = NULL;
+                long n = strtol(hash + 1, &end, 10);
+                if (n >= 1 && end && *end == '\0') {
+                    size_t sl = (size_t)(hash - sh_name);
+                    if (sl >= sizeof(stem)) sl = sizeof(stem) - 1;
+                    memcpy(stem, sh_name, sl);
+                    stem[sl] = '\0';
+                    sh_name = stem;
+                    copyN = (int)n;
                 }
             }
+            int leader = -1, seen = 0;
+            for (int m = 0; m < sx->nAnims; m++) {
+                if (m != k && !strcmp(sx->anims[m].object, sh_name)) {
+                    if (leader < 0) leader = m;   /* fallback: first stem */
+                    if (++seen == copyN) { leader = m; break; }
+                }
+            }
+            if (leader >= 0)
+                sx->anims[k].sharedLeader = leader;
         }
     }
     /* cycle break: A->B and B->A would infinitely recurse in the pose fn
