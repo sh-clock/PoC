@@ -14150,7 +14150,10 @@ static int32_t r2_ratan2(int32_t y, int32_t x) {
  * [0,20480] radian circle); t = vcSelfViewTimer in Q12 SECONDS.        */
 static int32_t r2_cam_mat_noise(int32_t noise_w, int32_t ang_spd1,
                                 int32_t ang_spd2, int32_t tQ12) {
-    int32_t n = sh_math_sin(R2_MUL(ang_spd1, tQ12)) +
+    /* v43 (E18-2): the engine is Math_Cos + Math_Cos (vc_main.c:2938) —
+     * the first term was sin, a 90-deg phase shift (sin x = cos(x-1024)
+     * on the 4096 circle) of every channel's first oscillator.         */
+    int32_t n = sh_math_cos(R2_MUL(ang_spd1, tQ12)) +
                 sh_math_cos(R2_MUL(ang_spd2, tQ12));
     n >>= 1;
     return R2_MUL(noise_w, n);
