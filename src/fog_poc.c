@@ -6948,9 +6948,18 @@ static void sh_particle_weather_tick(Snow *S) {
  * settingsState-- the bank index drives g_ParticlesAddedCount[bank]). The
  * map0_s00 boot (EnvironmentSet(2, 1) -> E0CB8 = 5) keeps the EXACT v7
  * parameterization — settingsState 1 -> SnowType_Light types, density 3,
- * snowType 1 (Heavy) -> spawnMult 2 — with the byte-identical RNG order. */
-static void snow_reset(Snow *S) {
-    S->rngSeed = SNOW_SEED_DEFAULT;
+ * snowType 1 (Heavy) -> spawnMult 2 — with the byte-identical RNG order.
+ * v41-ENGFX bug 2: the RNG seed is now a PARAMETER (snow_reset_seed).
+ * The engine's WeatherParticle_SnowInit (particle.c:657-799) draws
+ * Rng_Rand16() from the GLOBAL kernel RNG and never touches its seed
+ * (the boot seed is not in the decomp sources); the PoC models every
+ * snow_reset as a FRESH-BOOT stream — the parameter IS that stand-in
+ * boot seed, so --snow-seed N drives the warm-up draws too (the old
+ * `S.rngSeed = snowSeed;` at the three CLI sites landed BEFORE the
+ * reset and was clobbered by SNOW_SEED_DEFAULT at the head — the flag
+ * was dead: --snow-seed 999999 rendered identically to 1). */
+static void snow_reset_seed(Snow *S, unsigned seed) {
+    S->rngSeed = seed;
     int settingsState = (S->weatherSettings & 0xC) >> 2;
     int density;
     for (int i = 0; i < SNOW_COUNT_MAX; i++) {
@@ -7040,6 +7049,13 @@ static void snow_reset(Snow *S) {
     S->prevX = 0; S->prevZ = 0;        /* g_Particle_PrevPosition at load   */
     S->boxX  = 0; S->boxZ = 0;
     S->camMoved = 0;
+}
+
+/* the engine-fresh boot seed everywhere the PoC models a fresh session
+ * (snow_init, the boot-weather recipes, the seek/backward-jump re-sim,
+ * the K_R restart, the B toggle) — identical to the pre-v41 form       */
+static void snow_reset(Snow *S) {
+    snow_reset_seed(S, SNOW_SEED_DEFAULT);
 }
 
 /* g_Particle_Position x/z = viewPos + horizontal-forward*3m (Q12) — the
@@ -7900,18 +7916,42 @@ static void fx_blit_sprite_quad(
     double dv_dy = (double)(sh - 0) / (double)(y2 - y0 + 0.0001);
     for (int py = minY; py <= maxY; py++) {
         for (int px = minX; px <= maxX; px++) {
-            /* point-in-quad via two triangle tests (cheap, engine-ish) */
+            /* point-in-quad via two triangle tests — the fx_blit_gouraud_tri
+             * edge-function convention (v41-ENGFX bug 1). The old d1/d2/d3
+             * were cross products evaluated at the TRIANGLE VERTICES, not
+             * at the sample point: d1 = cross(B−A, V0−A) is NEGATIVE for
+             * every interior point while d2/d3 are the constant quad
+             * orientation, so !(neg&&pos) accepted only the outside strip
+             * past edge V0→V1 — which the UV bounds then discarded, and
+             * the axis-aligned core quads/ghosts painted 0 texels (GATE-C;
+             * the PoC flare had been streaks-only since v26). The GPU-
+             * correct test (swanstation gpu_sw_backend.cpp:36-38 rasterizes
+             * a quad as (v0,v1,v2)+(v2,v1,v3); the PoC's own caustic-ring
+             * inside-test does it right): the three edge functions AT the
+             * sample point, all three same sign = inside. tsel split, UV
+             * bounds and the blit body are unchanged.                     */
             double ax = px + 0.5, ay = py + 0.5;
-            /* tri (x0,y0)(x1,y1)(x2,y2) then (x0,y0)(x2,y2)(x3,y3)      */
+            /* swanstation gpu_sw_backend.cpp:36-38 rasterizes a quad as
+             * (v0,v1,v2)+(v2,v1,v3) — the SHARED EDGE is v1-v2. The
+             * v41-ENGFX first cut used (V0,V2,V3) for the second
+             * triangle — every FT4-order quad missed its right quarter
+             * (AUD-FX numeric harness: 76.25% coverage, the
+             * TR-BR-center triangle hole). The audit fix: the second
+             * triangle is (V2,V1,V3) — anchor V2, B stays V1, C V3. */
             int inside = 0;
             for (int tsel = 0; tsel < 2 && !inside; tsel++) {
-                double bx = xs[1 + tsel], by = ys[1 + tsel];
-                double cx = xs[2 + tsel], cy = ys[2 + tsel];
-                double d1 = (bx - ax) * (ys[0] - ay) - (xs[0] - ax) * (by - ay);
-                double d2 = (cx - bx) * (ys[0 + tsel] - by) - (xs[0 + tsel] - bx) * (cy - by);
-                double d3 = (xs[0] - cx) * (ys[1 + tsel] - cy) - (xs[1 + tsel] - cx) * (ys[0] - cy);
-                int neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                int pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                const int ai = (tsel == 0) ? 0 : 2;
+                const int ci = (tsel == 0) ? 2 : 3;
+                double axv = xs[ai], ayv = ys[ai];
+                double bx = xs[1], by = ys[1];
+                double cx = xs[ci], cy = ys[ci];
+                /* edge functions at (ax,ay) for triangle (A,B,C) — the
+                 * same three forms as fx_blit_gouraud_tri's e0/e1/e2    */
+                double e0 = (cx - bx) * (ay - by) - (cy - by) * (ax - bx);
+                double e1 = (axv - cx) * (ay - cy) - (ayv - cy) * (ax - cx);
+                double e2 = (bx - axv) * (ay - ayv) - (by - ayv) * (ax - axv);
+                int neg = (e0 < 0) || (e1 < 0) || (e2 < 0);
+                int pos = (e0 > 0) || (e1 > 0) || (e2 > 0);
                 if (!(neg && pos)) inside = 1;
             }
             if (!inside) continue;
@@ -15044,8 +15084,61 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         A->play.t = 0;
         A->play.sessionT = 0;         /* v10: restart the session clock too */
         A->tickPending = 0;           /* v20: restart the tick grid too      */
+        /* v41-ENGFX bug 3a: the room-reload weather sync — the engine's
+         * WeatherParticle_SystemUpdate case 0 / NO_VALUE arm (particle.c:
+         * 396-418, run at every map load): 800DD598 = 0, g_SysWork.field_234A
+         * = true, E0CB8 = E0CB0>>12, E0CB6 = E0CB4 = E0CB0 (the room
+         * recipe), then WeatherParticle_SnowInit. The PoC's K_R called only
+         * snow_reset (which never touches the transition state), so a live
+         * cross-fade (the W key / --weather-target) was carried deeper
+         * into the restarted session than any fresh boot — the engine
+         * reload DROPS the transition and re-syncs to the room recipe
+         * (the map event re-arms D0B18 as scripted). weatherBits is the
+         * boot recipe and nothing mutates it during a session, so this
+         * re-sync also restores the fresh boot's current==target.       */
+        A->snow.weatherTick = 0;
+        A->snow.transitionLock = 1;
+        A->snow.weatherCurrent = A->snow.weatherBits;
+        A->snow.weatherTarget = A->snow.weatherBits;
+        A->snow.weatherSettings = (uint16_t)(A->snow.weatherBits >> 12);
+        /* v41-AUDFX: the arm's first hunk (particle.c:396-400) — the
+         * density selector re-syncs to the ROOM's own recipe on reload
+         * (field_2349/2348 = MapOverlayHdr.field_17; the PoC's GLB
+         * SH1X.env.field17). The fresh-boot site above does the same,
+         * so restart==fresh holds. */
+        {
+            Sh1x *sh1xr = (Sh1x *)&A->R.sc->sh1x;
+            if (sh1xr->hasEnv && sh1xr->envField17 >= 0)
+                A->snow.snowDensitySel = sh1xr->envField17;
+            else
+                A->snow.snowDensitySel = 0;
+        }
         snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
+        /* v41-ENGFX bug 3b: the fresh-session flashlight fade + the boot
+         * dt=0 prime. The restart had been carrying the env's converged
+         * flashlightIntensity (4096) while a fresh session ramps 0->4096
+         * over its first 8 ticks — and sh_env_reset only zeroes the tick
+         * grid, so the post-restart env ticked on tick 1 where a fresh
+         * boot had already consumed that slot with its dt=0 first-frame
+         * Gfx_EffectsUpdate (main's boot site runs sh_env_tick(&A.env, 0)
+         * right after the fade starts at the memset-zero value). The
+         * carried fade made the water-gated D_800AFDAC counter advance on
+         * every post-restart tick (91 vs a fresh boot's 87 at t=3 on
+         * DRU0100) — the RESTARTTEST restart-final vs fresh md5 mismatch
+         * GATE-A probed. Mirror the boot exactly: the fade back at its
+         * boot value 0 + the identity-pose dt=0 prime (ticksDone=1, no
+         * ramp). NOTE: the engine has no R key — the PoC's R models the
+         * v38/v41-E2/E3 restart == fresh-session contract, NOT a decomp
+         * room-reload of the (persistent-game-state) flashlight; the env's
+         * user choices (pair/night/flashlight on-off) still survive R —
+         * only the boot-time RAMP re-runs.                              */
+        A->env.flashlightIntensity = 0;
         sh_env_reset(&A->env, 0.0);      /* restart the env simulation    */
+        {
+            Quat q0 = quat_id();
+            v3 p0 = { 0.0f, 0.0f, 0.0f };
+            sh_env_tick(&A->env, 0, p0, q0);   /* the boot dt=0 prime */
+        }
         sh1x_anims_reset((Sh1x *)&A->R.sc->sh1x); /* v38: drivers fresh    */
         sh1x_anims_bind_invalidate();      /* v38-audit-A1: re-seed drvr 9 */
         A->animsPrimed = 0;               /* v38: re-prime the gate state */
@@ -17406,6 +17499,18 @@ int main(int argc, char **argv) {
                "map-load recipe (SH1X.env.field17)\n", sc.sh1x.envField17);
     }
     A.snow.nextWeather = 2;    /* the W-key cycle starts at snow          */
+    /* v41-AUDFX: the SystemUpdate case-0/NO_VALUE arm's FIRST hunk
+     * (particle.c:396-400) — field_2349/2348 = MapOverlayHdr.field_17 —
+     * runs at EVERY map load (a fresh boot included), not just reloads:
+     * the density selector syncs to the ROOM's own recipe. The PoC boot
+     * had never set it (snow_reset's 0 persisted), so recipe-1 rooms
+     * ran density 3 instead of the engine's light 1. The decomp reads
+     * the map overlay header — the PoC's equivalent is the GLB's
+     * SH1X.env.field17 (the boot's recipe conveniences do not replace
+     * the arm's own header read, exactly like the engine). */
+    if (sc.sh1x.hasEnv && sc.sh1x.envField17 >= 0) {
+        A.snow.snowDensitySel = sc.sh1x.envField17;
+    }
     /* v12: --weather-target N — the RUNTIME transition recipe at boot
      * (sharedFunc_800D0B18(N); the field_234A lock is armed at map load,
      * so the boot call is accepted exactly like the engine's map event).
@@ -17418,9 +17523,13 @@ int main(int argc, char **argv) {
         }
     }
     A.snow.enabled = A.snow.enabled && snowEnabled;
-    /* seed override (engine boot seed not in the decomp sources) */
-    A.snow.rngSeed = snowSeed;
-    snow_reset(&A.snow);
+    /* seed override (engine boot seed not in the decomp sources).
+     * v41-ENGFX bug 2: pass the CLI seed INTO the reset — the old pre-reset
+     * assignment was clobbered by SNOW_SEED_DEFAULT at snow_reset's head
+     * (--snow-seed 999999 rendered identically to the default 1). The
+     * warm-up draws consume the CLI seed from position 0, exactly like a
+     * fresh process booted with that seed. */
+    snow_reset_seed(&A.snow, snowSeed);
     /* the env light anchors to the virtual camera (HERO, per the task
      * spec); establish the initial env state (the engine runs
      * Gfx_EffectsUpdate on the first frame; dt = 0 keeps the flashlight
@@ -17549,8 +17658,9 @@ int main(int argc, char **argv) {
         turn_init(&P.turn);
         Snow Ss = A.snow;
         Ss.ticksDone = 0; Ss.lastTickT = 0;
-        Ss.rngSeed = snowSeed;
-        snow_reset(&Ss);
+        /* v41-ENGFX bug 2: the CLI seed goes INTO the reset (the old
+         * pre-reset assignment was clobbered by the default re-seed) */
+        snow_reset_seed(&Ss, snowSeed);
         ShEnv Es = A.env;
         sh_env_reset(&Es, 0.0);
         Es.envDump = NULL;
@@ -17717,8 +17827,9 @@ int main(int argc, char **argv) {
         turn_init(&P.turn);
         Snow Ss = A.snow;                 /* copy the freshly-reset state  */
         Ss.ticksDone = 0; Ss.lastTickT = 0;
-        Ss.rngSeed = snowSeed;
-        snow_reset(&Ss);
+        /* v41-ENGFX bug 2: the CLI seed goes INTO the reset (the old
+         * pre-reset assignment was clobbered by the default re-seed) */
+        snow_reset_seed(&Ss, snowSeed);
         ShEnv Es = A.env;                 /* fresh env simulation (v4)     */
         sh_env_reset(&Es, 0.0);
         Es.envDump = NULL;                /* per-shot dump not supported   */
