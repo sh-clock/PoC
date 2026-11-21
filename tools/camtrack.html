@@ -5806,13 +5806,17 @@ function sanitizeLight(raw) {
   const l = {};
   if (typeof raw.on === 'boolean') l.on = raw.on;
   if (raw.follow === 'world' || raw.follow === 'camera') l.follow = raw.follow;
-  if (Array.isArray(raw.pos) && raw.pos.length >= 3 && raw.pos.slice(0, 3).every(x => isFinite(+x)))
-    l.pos = [+raw.pos[0], +raw.pos[1], +raw.pos[2]];
-  if (Array.isArray(raw.rot) && raw.rot.length >= 3 && raw.rot.slice(0, 3).every(x => isFinite(+x)))
-    l.rot = [+raw.rot[0], +raw.rot[1], +raw.rot[2]];
-  if (Array.isArray(raw.offset) && raw.offset.length >= 3 && raw.offset.slice(0, 3).every(x => isFinite(+x)))
-    l.offset = [+raw.offset[0], +raw.offset[1], +raw.offset[2]];
-  if (raw.ahead != null && isFinite(+raw.ahead)) l.ahead = Math.max(0, +raw.ahead);
+  /* v41 audit (B-3): typeof-number gates on every element (the C's
+   * all-three-JV_NUM rule, fog_poc.c:3493-3495) — the old isFinite(+x)
+   * coerced "1.5"->1.5 and true->1; ahead likewise (the C's jnum,
+   * fog_poc.c:3518). ±Infinity remains B-4's domain. */
+  if (Array.isArray(raw.pos) && raw.pos.length >= 3 && raw.pos.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
+    l.pos = [raw.pos[0], raw.pos[1], raw.pos[2]];
+  if (Array.isArray(raw.rot) && raw.rot.length >= 3 && raw.rot.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
+    l.rot = [raw.rot[0], raw.rot[1], raw.rot[2]];
+  if (Array.isArray(raw.offset) && raw.offset.length >= 3 && raw.offset.slice(0, 3).every(x => typeof x === 'number' && isFinite(x)))
+    l.offset = [raw.offset[0], raw.offset[1], raw.offset[2]];
+  if (raw.ahead != null && typeof raw.ahead === 'number' && isFinite(raw.ahead)) l.ahead = Math.max(0, raw.ahead);
   return Object.keys(l).length ? l : null;
 }
 /* v40 audit (B-B4): jvec3 parity (fog_poc.c:587-594) — ANY array with
@@ -5839,14 +5843,22 @@ function sanitizeTrack(raw) {
   tr.enabled = raw.enabled !== false;
   tr.fovDeg = clamp(num(raw.fovDeg, 60), 5, 140);
   /* v12: the per-track weather — strict number clamped to the D0B18 range
-   * 0..8; absent/null/invalid = inherit the model env default */
-  tr.weatherTarget = raw.weatherTarget != null && isFinite(+raw.weatherTarget)
+   * 0..8; absent/null/invalid = inherit the model env default.
+   * v41 audit (B-3): strict = typeof-number (the C's JV_NUM gate,
+   * fog_poc.c:3219-3225) — the old isFinite(+v) coerced "6"->6 and
+   * true->1 where the C rejects both (no D0B18 boot). ±Infinity stays
+   * B-4's domain (isFinite rejects it; the C's JV_NUM inf flows to the
+   * jint clamp) — unchanged here by design. */
+  tr.weatherTarget = raw.weatherTarget != null && typeof raw.weatherTarget === 'number' && isFinite(raw.weatherTarget)
       ? Math.max(0, Math.min(8, raw.weatherTarget | 0)) : null;
   /* v13: the per-track day/night env overrides — strict numbers clamped
-   * to the 0..20 preset range; absent/null/invalid = inherit the model */
-  tr.envDay = raw.envDay != null && isFinite(+raw.envDay)
+   * to the 0..20 preset range; absent/null/invalid = inherit the model.
+   * v41 audit (B-3): the same typeof-number discipline (latent class —
+   * fog_poc has no envDay/envNight consumer today, but the wallpaper
+   * twin must see the same strictness the C's jint would apply). */
+  tr.envDay = raw.envDay != null && typeof raw.envDay === 'number' && isFinite(raw.envDay)
       ? Math.max(0, Math.min(20, raw.envDay | 0)) : null;
-  tr.envNight = raw.envNight != null && isFinite(+raw.envNight)
+  tr.envNight = raw.envNight != null && typeof raw.envNight === 'number' && isFinite(raw.envNight)
       ? Math.max(0, Math.min(20, raw.envNight | 0)) : null;
   tr.loopMode = pick(raw.loopMode, ['loop', 'pingPong', 'once'],
     (type === 'line' || type === 'polyline' || type === 'spiral' || type === 'zigzag') ? 'pingPong' : 'loop');
