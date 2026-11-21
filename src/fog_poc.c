@@ -8595,10 +8595,25 @@ static void rain_blit_splash_tri(Frame *fb,
     if (minx > maxx || miny > maxy) return;
     long area = (long)(x1 - x0) * (y2 - y0) - (long)(x2 - x0) * (y1 - y0);
     if (area == 0) return;
+    /* v43 (E-11-1): the PS1 GPU has NO backface cull — swanstation's
+     * rasterizer walks BOTH windings (gpu_sw_backend.cpp right_facing
+     * only swaps the left/right x slots, nothing is culled), so the
+     * engine's splash POLY_FT4 (particle.c:2995 setPolyFT4 + setSemiTrans)
+     * always paints. The splash corners (engine order x0=(x-c,z-c),
+     * x1=(x-c,z+c), x2=(x+c,z-c), x3=(x+c,z+c), particle.c:2907-2927)
+     * project with NEGATIVE screen winding for every above-ground camera
+     * (ground-plane signed area -4c^2 per triangle; the ground->screen
+     * map is orientation-preserving), so a positive-only acceptance test
+     * rasterized ZERO pixels — the splashes never appeared. Fix: accept
+     * both windings — flip a negative-area triangle's edge functions.
+     * The UV/prim math is invariant: numerator and area flip together. */
+    int flip = area < 0;
+    if (flip) area = -area;
     for (int y = miny; y <= maxy; y++) {
         for (int x = minx; x <= maxx; x++) {
             long w0 = (long)(x1 - x) * (y2 - y) - (long)(x2 - x) * (y1 - y);
             long w1 = (long)(x2 - x) * (y0 - y) - (long)(x0 - x) * (y2 - y);
+            if (flip) { w0 = -w0; w1 = -w1; }
             long w2 = area - w0 - w1;
             if (w0 < 0 || w1 < 0 || w2 < 0) continue;
             int64_t numU = (int64_t)w0 * u0 + (int64_t)w1 * u1 + (int64_t)w2 * u2;
@@ -8639,13 +8654,18 @@ static void rain_blit_splash_tri(Frame *fb,
 
 static void rain_blit_splash(Frame *fb, const RainFlakeDraw *rd) {
     /* the engine FT4: x0..x3 corners with UV (16,112) (16,127) (31,112)
-     * (31,127) — sprite-space u,v 0..15 within kRainSplash. Two tris.    */
+     * (31,127) — sprite-space u,v 0..15 within kRainSplash. The GPU
+     * rasterizes an FT4 as (v0,v1,v2)+(v2,v1,v3) — shared edge v1-v2
+     * (swanstation gpu_sw_backend.cpp:36-38 DrawPolygon) — so the affine
+     * seam runs along x1-x2, NOT the old x0-x3 diagonal (v43 E-11-1:
+     * the old split also put the engine's corner UVs on the wrong
+     * tris). Corner UV map: x0=(0,0) x1=(0,15) x2=(15,0) x3=(15,15). */
     rain_blit_splash_tri(fb, rd->x0, rd->y0, 0, 0,
                          rd->x1, rd->y1, 0, 15,
-                         rd->x3, rd->y3, 15, 15,
+                         rd->x2, rd->y2, 15, 0,
                          rd->primR, rd->primG, rd->primB,
                          rd->clutRow, rd->depth);
-    rain_blit_splash_tri(fb, rd->x0, rd->y0, 0, 0,
+    rain_blit_splash_tri(fb, rd->x1, rd->y1, 0, 15,
                          rd->x3, rd->y3, 15, 15,
                          rd->x2, rd->y2, 15, 0,
                          rd->primR, rd->primG, rd->primB,
