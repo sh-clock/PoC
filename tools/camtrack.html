@@ -1265,8 +1265,8 @@ const SHCore = (function () {
     }
     const llm = [
       [lp[0], lp[1], lp[2]],
-      [-(lp[2] >> 4), lp[1] >> 4, lp[0] >> 4],   /* (-lZ, lY, lX) >> 4 */
-      [lp[2] >> 4, lp[1] >> 4, -(lp[0] >> 4)]    /* (lZ, lY, -lX) >> 4 */
+      [(-lp[2]) >> 4, lp[1] >> 4, lp[0] >> 4],   /* Q12_TO_Q8(-lZ) etc: (-x)>>4 — negation INSIDE (billboard.c:239) */
+      [lp[2] >> 4, lp[1] >> 4, (-lp[0]) >> 4]    /* JS >> is arithmetic (floor) like gcc/MIPS, NOT -(x>>4) */
     ];
     /* the color matrix (colorMat): row i = worldTintQ12[i] everywhere */
     const tintQ = env.cur.effectsInfo.tint;

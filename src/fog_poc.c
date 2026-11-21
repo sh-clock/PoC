@@ -5611,12 +5611,15 @@ static void sh_billboard_colors(const ShEnv *env, const int anchorQ8[3],
     int16_t llm[3][3];
     llm[0][0] = (int16_t)lp[0]; llm[0][1] = (int16_t)lp[1];
     llm[0][2] = (int16_t)lp[2];
-    llm[1][0] = (int16_t)(-(lp[2] >> 4));         /* Q12_TO_Q8(-lZ) */
+    llm[1][0] = (int16_t)((-lp[2]) >> 4);         /* Q12_TO_Q8(-lZ): (-x)>>4 —
+                                                   * the negation is INSIDE the macro arg (billboard.c:239,
+                                                   * fixed_point.h:399-400); gcc/MIPS >> is arithmetic
+                                                   * (floor), NOT -(x>>4) */
     llm[1][1] = (int16_t)(lp[1] >> 4);            /* Q12_TO_Q8(lY)  */
     llm[1][2] = (int16_t)(lp[0] >> 4);            /* Q12_TO_Q8(lX)  */
     llm[2][0] = (int16_t)(lp[2] >> 4);            /* Q12_TO_Q8(lZ)  */
     llm[2][1] = (int16_t)(lp[1] >> 4);            /* Q12_TO_Q8(lY)  */
-    llm[2][2] = (int16_t)(-(lp[0] >> 4));         /* Q12_TO_Q8(-lX) */
+    llm[2][2] = (int16_t)((-lp[0]) >> 4);         /* Q12_TO_Q8(-lX): (-x)>>4, as row 1 above */
     /* engine rows 1-2 from the SCALED row0 components (billboard_draw.c:
      * 232-238): row1 = (-lZ>>4, lY>>4, lX>>4); row2 = (lZ>>4, lY>>4, -lX>>4) */
 
