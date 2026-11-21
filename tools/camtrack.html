@@ -9249,31 +9249,62 @@ function sh1xDriverBind(S, items) {
     }
     /* selection: count==1 -> the nearest group; count>1 -> fill slots.
      * POSED groups bind first with their own posedInst index; unposed
-     * groups only fill the remaining slots (clamped to want-1). */
+     * groups only fill the remaining slots (clamped to want-1).
+     * v43 (E-12-2, twin of the C fix): the ripper's B-F4 per-object
+     * numbering — same-object catalog entries number their posed nodes
+     * contiguously (animInst = i + base, base accumulating each
+     * same-name entry's count), each entry's own instance index 0-based.
+     * Track the per-object running base over the anims array and accept
+     * posed groups in [base, base+count); animInst = posed - base. */
     {
       const want = (a.count > 1) ? a.count : 1;
+      let base = 0;                  /* E-12-2: per-object running base */
+      for (let j = 0; j < k; j++)
+        if (S.anims[j].object === a.object)
+          base += S.anims[j].count > 0 ? S.anims[j].count : 1;
       let posedAvail = 0;
       for (let q = 0; q < grps.length; q++)
-        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) posedAvail++;
+        if (grps[q].n && grps[q].posed >= base &&
+            grps[q].posed < base + a.count) posedAvail++;
       /* pass 1: every valid posed group */
       if (posedAvail > 0) {
         for (let q = 0; q < grps.length && posedAvail > 0; q++) {
           if (grps[q].n === 0 || grps[q].posed < 0) continue;
-          if (grps[q].posed >= a.count) continue;
+          if (grps[q].posed < base || grps[q].posed >= base + a.count)
+            continue;
           for (let j = 0; j < grps[q].n; j++) {
             const it = items[grps[q].items[j]];
             it.animIdx = k;
-            it.animInst = grps[q].posed;
+            it.animInst = grps[q].posed - base;
           }
           grps[q].n = 0;                  /* mark used */
           posedAvail--;
+        }
+      } else if (a.count <= 1) {
+        /* E-12-2 malformed-data fallback (the finder's clamp-to-0):
+         * a posed group fitting NO same-name entry window would render
+         * static and lose rot0 + the event gate — bind the NEAREST posed
+         * group with animInst clamped to 0. */
+        let bg = -1, bd = 1e30;
+        for (let q = 0; q < grps.length; q++) {
+          if (grps[q].n === 0 || grps[q].posed < 0) continue;
+          if (grps[q].cx < bd) { bd = grps[q].cx; bg = q; }
+        }
+        if (bg >= 0) {
+          for (let j = 0; j < grps[bg].n; j++) {
+            const it = items[grps[bg].items[j]];
+            it.animIdx = k;
+            it.animInst = 0;
+          }
+          grps[bg].n = 0;                 /* mark used */
         }
       }
       /* pass 2: unposed groups fill the remaining slots by distance
        * (verbatim: the took-loop guard leaves took at 0 — fill = want) */
       let took = 0;
       for (let q = 0; q < grps.length && posedAvail > 0; q++) {
-        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) took++;
+        if (grps[q].n && grps[q].posed >= base &&
+            grps[q].posed < base + a.count) took++;
       }
       const fill = want - took;
       let nth = 0;

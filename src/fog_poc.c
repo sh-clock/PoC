@@ -8852,32 +8852,70 @@ static void sh1x_anims_bind(Scene *sc) {
          * remaining slots, clamped to want-1 (the v33 first cut could mint
          * inst == count from the nth counter after a posed gap and could
          * double-bind an index alongside a posed group — both runtime-
-         * proven by the audit on ER02FC). */
+         * proven by the audit on ER02FC).
+         * v43 (E-12-2): the ripper's B-F4 numbering — same-object catalog
+         * entries number their posed nodes CONTIGUOUSLY per object name
+         * (ipd2gltf.py's _emitted_inst counter: entry j's nodes carry
+         * animInst = i + base_j, base_j accumulating each same-name
+         * entry's count), while each entry's own per-instance index is
+         * 0-based. The old `posed < a->count` check rejected every group
+         * of a SECOND same-name entry (posed >= count) in BOTH passes —
+         * those nodes never bound: statics lost rot0 AND their event gate
+         * (fog_poc.c:13302 gated-statics requires animIdx >= 0). Track
+         * the per-object running base over the anims array (same object
+         * name, k order) and accept posed groups in [base, base+count);
+         * animInst = posed - base (the entry's own instance index). */
         {
             int want = (a->count > 1) ? a->count : 1;
+            int base = 0;               /* E-12-2: per-object running base */
+            for (int j = 0; j < k; j++)
+                if (strcmp(sc->sh1x.anims[j].object, a->object) == 0)
+                    base += sc->sh1x.anims[j].count > 0
+                                ? sc->sh1x.anims[j].count : 1;
             int posedAvail = 0;
             for (int q = 0; q < ngrp; q++)
-                if (grps[q].n && grps[q].posed >= 0 &&
-                    grps[q].posed < a->count) posedAvail++;
+                if (grps[q].n && grps[q].posed >= base &&
+                    grps[q].posed < base + a->count) posedAvail++;
             /* pass 1: every valid posed group */
             if (posedAvail > 0) {
                 for (int q = 0; q < ngrp && posedAvail > 0; q++) {
                     if (grps[q].n == 0 || grps[q].posed < 0) continue;
-                    if (grps[q].posed >= a->count) continue;
+                    if (grps[q].posed < base ||
+                        grps[q].posed >= base + a->count) continue;
                     for (int j = 0; j < grps[q].n; j++) {
                         DrawItem *it = &sc->item[grps[q].items[j]];
                         it->animIdx = k;
-                        it->animInst = grps[q].posed;
+                        it->animInst = grps[q].posed - base;
                     }
                     grps[q].n = 0;                 /* mark used */
                     posedAvail--;
+                }
+            } else if (a->count <= 1) {
+                /* E-12-2 malformed-data fallback (the finder's clamp-to-0
+                 * option): a posed group that fits NO same-name entry
+                 * window (hand-edited / pre-B-F4 multi-entry GLBs) would
+                 * render static and lose rot0 + the event gate — for a
+                 * count<=1 anim bind the NEAREST posed group with animInst
+                 * clamped to 0, exactly the posed-0 case. */
+                int bg = -1; float bd = 1e30f;
+                for (int q = 0; q < ngrp; q++) {
+                    if (grps[q].n == 0 || grps[q].posed < 0) continue;
+                    if (grps[q].cx < bd) { bd = grps[q].cx; bg = q; }
+                }
+                if (bg >= 0) {
+                    for (int j = 0; j < grps[bg].n; j++) {
+                        DrawItem *it = &sc->item[grps[bg].items[j]];
+                        it->animIdx = k;
+                        it->animInst = 0;
+                    }
+                    grps[bg].n = 0;                /* mark used */
                 }
             }
             /* pass 2: unposed groups fill the remaining slots by distance */
             int took = 0;
             for (int q = 0; q < ngrp && posedAvail > 0; q++) {
-                if (grps[q].n && grps[q].posed >= 0 &&
-                    grps[q].posed < a->count) took++;
+                if (grps[q].n && grps[q].posed >= base &&
+                    grps[q].posed < base + a->count) took++;
             }
             int fill = want - took;
             int nth = 0;
