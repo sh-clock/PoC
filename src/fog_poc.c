@@ -7931,16 +7931,25 @@ static void fx_blit_sprite_quad(
              * sample point, all three same sign = inside. tsel split, UV
              * bounds and the blit body are unchanged.                     */
             double ax = px + 0.5, ay = py + 0.5;
-            /* tri (x0,y0)(x1,y1)(x2,y2) then (x0,y0)(x2,y2)(x3,y3)      */
+            /* swanstation gpu_sw_backend.cpp:36-38 rasterizes a quad as
+             * (v0,v1,v2)+(v2,v1,v3) — the SHARED EDGE is v1-v2. The
+             * v41-ENGFX first cut used (V0,V2,V3) for the second
+             * triangle — every FT4-order quad missed its right quarter
+             * (AUD-FX numeric harness: 76.25% coverage, the
+             * TR-BR-center triangle hole). The audit fix: the second
+             * triangle is (V2,V1,V3) — anchor V2, B stays V1, C V3. */
             int inside = 0;
             for (int tsel = 0; tsel < 2 && !inside; tsel++) {
-                double bx = xs[1 + tsel], by = ys[1 + tsel];
-                double cx = xs[2 + tsel], cy = ys[2 + tsel];
-                /* edge functions at (ax,ay) for triangle (V0,B,C) — the
+                const int ai = (tsel == 0) ? 0 : 2;
+                const int ci = (tsel == 0) ? 2 : 3;
+                double axv = xs[ai], ayv = ys[ai];
+                double bx = xs[1], by = ys[1];
+                double cx = xs[ci], cy = ys[ci];
+                /* edge functions at (ax,ay) for triangle (A,B,C) — the
                  * same three forms as fx_blit_gouraud_tri's e0/e1/e2    */
                 double e0 = (cx - bx) * (ay - by) - (cy - by) * (ax - bx);
-                double e1 = (xs[0] - cx) * (ay - cy) - (ys[0] - cy) * (ax - cx);
-                double e2 = (bx - xs[0]) * (ay - ys[0]) - (by - ys[0]) * (ax - xs[0]);
+                double e1 = (axv - cx) * (ay - cy) - (ayv - cy) * (ax - cx);
+                double e2 = (bx - axv) * (ay - ayv) - (by - ayv) * (ax - axv);
                 int neg = (e0 < 0) || (e1 < 0) || (e2 < 0);
                 int pos = (e0 > 0) || (e1 > 0) || (e2 > 0);
                 if (!(neg && pos)) inside = 1;
@@ -15092,6 +15101,18 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         A->snow.weatherCurrent = A->snow.weatherBits;
         A->snow.weatherTarget = A->snow.weatherBits;
         A->snow.weatherSettings = (uint16_t)(A->snow.weatherBits >> 12);
+        /* v41-AUDFX: the arm's first hunk (particle.c:396-400) — the
+         * density selector re-syncs to the ROOM's own recipe on reload
+         * (field_2349/2348 = MapOverlayHdr.field_17; the PoC's GLB
+         * SH1X.env.field17). The fresh-boot site above does the same,
+         * so restart==fresh holds. */
+        {
+            Sh1x *sh1xr = (Sh1x *)&A->R.sc->sh1x;
+            if (sh1xr->hasEnv && sh1xr->envField17 >= 0)
+                A->snow.snowDensitySel = sh1xr->envField17;
+            else
+                A->snow.snowDensitySel = 0;
+        }
         snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
         /* v41-ENGFX bug 3b: the fresh-session flashlight fade + the boot
          * dt=0 prime. The restart had been carrying the env's converged
@@ -17477,6 +17498,18 @@ int main(int argc, char **argv) {
                "map-load recipe (SH1X.env.field17)\n", sc.sh1x.envField17);
     }
     A.snow.nextWeather = 2;    /* the W-key cycle starts at snow          */
+    /* v41-AUDFX: the SystemUpdate case-0/NO_VALUE arm's FIRST hunk
+     * (particle.c:396-400) — field_2349/2348 = MapOverlayHdr.field_17 —
+     * runs at EVERY map load (a fresh boot included), not just reloads:
+     * the density selector syncs to the ROOM's own recipe. The PoC boot
+     * had never set it (snow_reset's 0 persisted), so recipe-1 rooms
+     * ran density 3 instead of the engine's light 1. The decomp reads
+     * the map overlay header — the PoC's equivalent is the GLB's
+     * SH1X.env.field17 (the boot's recipe conveniences do not replace
+     * the arm's own header read, exactly like the engine). */
+    if (sc.sh1x.hasEnv && sc.sh1x.envField17 >= 0) {
+        A.snow.snowDensitySel = sc.sh1x.envField17;
+    }
     /* v12: --weather-target N — the RUNTIME transition recipe at boot
      * (sharedFunc_800D0B18(N); the field_234A lock is armed at map load,
      * so the boot call is accepted exactly like the engine's map event).
