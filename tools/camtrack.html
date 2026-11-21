@@ -85,12 +85,12 @@ body {
 #brand { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 #brand h1 { margin: 0; font-size: 16px; font-weight: 650; color: var(--head); letter-spacing: .2px; }
 #brand h1 .accent { color: var(--accent); }
-#brand .sub { color: var(--text-dim); font-size: 11.5px; margin-top: 3px; }
+#brand .sub { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
 #brand .sub b { color: var(--accent); font-family: var(--mono); font-weight: 500; }
 
 .panel { padding: 12px 16px 4px; }
 .panel-title {
-  font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
   color: var(--text-dim); margin-bottom: 8px;
   display: flex; align-items: center; justify-content: space-between;
 }
@@ -109,12 +109,12 @@ body {
 .btn.primary:hover { background: #3385ba; border-color: #3385ba; }
 .btn.ghost { background: transparent; }
 .btn.danger:hover { background: #5a2b2b; border-color: #7a3a3a; color: #ffd6d6; }
-.btn.tiny { padding: 2px 8px; font-size: 11.5px; border-radius: 5px; }
+.btn.tiny { padding: 2px 8px; font-size: 12px; border-radius: 5px; }
 .btn.wide { width: 100%; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 #file-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-#save-row { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 11.5px; color: var(--text-dim); }
+#save-row { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 12px; color: var(--text-dim); }
 #save-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: 0 0 auto; }
 #save-dot.dirty { background: var(--amber); }
 
@@ -129,7 +129,7 @@ body {
 .model-row.active { border-color: var(--accent-dim); background: #1b2733; }
 .mr-main { flex: 1; min-width: 0; }
 .mr-name { color: var(--head); font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mr-sub { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+.mr-sub { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
 .mr-sub .ok { color: var(--green); }
 
 /* per-glTF flag rows — fogon / nighton / flashlighton (Models panel) */
@@ -143,12 +143,21 @@ body {
 #fog-row:hover, #night-row:hover, #flash-row:hover { border-color: var(--border2); }
 #fog-row input, #night-row input, #flash-row input { accent-color: var(--accent); flex: 0 0 auto; }
 #fog-row.disabled, #night-row.disabled, #flash-row.disabled { opacity: .45; pointer-events: none; }
-#fog-file, #night-file, #flash-file { flex: 1; min-width: 0; text-align: right; color: var(--text-dim); font-family: var(--mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#fog-file, #night-file, #flash-file { flex: 1; min-width: 0; text-align: right; color: var(--text-dim); font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.hint { color: var(--text-dim); font-size: 11.5px; padding: 6px 2px 8px; line-height: 1.5; }
+.hint { color: var(--text-dim); font-size: 12px; padding: 6px 2px 8px; line-height: 1.5; }
 
 /* track add row */
-#track-add { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 9px; }
+#track-add { position: relative; margin-bottom: 9px; }
+#track-add-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+  background: var(--panel); border: 1px solid var(--border2); border-radius: 8px;
+  box-shadow: 0 10px 32px #000000a0; padding: 4px; }
+#track-add-menu .ta-item { display: block; width: 100%; text-align: left;
+  background: none; border: 0; color: var(--text); padding: 7px 10px;
+  border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; }
+#track-add-menu .ta-item:hover:not(:disabled) { background: var(--bg2); color: var(--head); }
+#track-add-menu .ta-item:disabled { opacity: .45; cursor: default; }
+#track-add-menu .ta-item .d { display: block; color: var(--text-dim); font-size: 12px; }
 
 /* track rows */
 .track-row {
@@ -163,7 +172,7 @@ body {
 .chip { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .tr-main { flex: 1; min-width: 0; }
 .tr-name { color: var(--head); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tr-sub { color: var(--text-dim); font-size: 10.5px; font-family: var(--mono); margin-top: 2px; }
+.tr-sub { color: var(--text-dim); font-size: 12px; font-family: var(--mono); margin-top: 2px; }
 .tr-btn {
   appearance: none; border: 1px solid transparent; background: transparent; color: var(--text-dim);
   font-size: 13px; padding: 2px 6px; border-radius: 5px; cursor: pointer; line-height: 1;
@@ -172,15 +181,15 @@ body {
 .tr-btn.on { color: var(--accent); }
 
 /* properties panel */
-#props-empty { color: var(--text-dim); font-size: 11.5px; padding: 4px 2px 10px; line-height: 1.55; }
+#props-empty { color: var(--text-dim); font-size: 12px; padding: 4px 2px 10px; line-height: 1.55; }
 .group-h {
-  font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   color: var(--accent); margin: 10px 0 6px; padding-top: 8px; border-top: 1px dashed var(--border);
 }
 .group-h:first-child { margin-top: 2px; border-top: none; padding-top: 0; }
 .frow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.frow label { flex: 0 0 118px; color: var(--text-dim); font-size: 11.5px; }
-.frow .u { color: var(--text-dim); font-size: 10.5px; font-family: var(--mono); flex: 0 0 auto; margin-left: -4px; }
+.frow label { flex: 0 0 118px; color: var(--text-dim); font-size: 12px; }
+.frow .u { color: var(--text-dim); font-size: 12px; font-family: var(--mono); flex: 0 0 auto; margin-left: -4px; }
 input.num, input.txt, select.sel {
   font-family: var(--mono); font-size: 12px; color: var(--head);
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 5px;
@@ -199,7 +208,7 @@ select.sel { font-family: var(--sans); }
 .seg .btn.on { background: var(--accent-dim); border-color: var(--accent-dim); color: #eaf6ff; font-weight: 650; }
 .props-actions { display: flex; gap: 7px; margin: 12px 0 16px; }
 .props-actions .btn { flex: 1; }
-#track-note { color: var(--text-dim); font-size: 11px; margin: 2px 0 10px; line-height: 1.5; }
+#track-note { color: var(--text-dim); font-size: 12px; margin: 2px 0 10px; line-height: 1.5; }
 
 /* ================= viewport ================= */
 #viewport { flex: 1; position: relative; background: var(--bg2); min-width: 0; }
@@ -212,7 +221,7 @@ select.sel { font-family: var(--sans); }
 }
 .vp-btn {
   appearance: none; border: 1px solid var(--border2); background: #1a1e26dd; color: var(--text-dim);
-  font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .6px;
+  font: inherit; font-size: 12px; font-weight: 600; letter-spacing: .6px;
   padding: 5px 10px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(4px);
 }
 .vp-btn:hover { color: var(--head); }
@@ -221,7 +230,7 @@ select.sel { font-family: var(--sans); }
 #model-note {
   position: absolute; top: 12px; left: 12px; z-index: 5;
   background: #1a1e26dd; border: 1px solid var(--border2); border-radius: 7px;
-  padding: 6px 11px; font-size: 11.5px; color: var(--text-dim);
+  padding: 6px 11px; font-size: 12px; color: var(--text-dim);
   max-width: 46%; backdrop-filter: blur(4px);
 }
 #model-note b { color: var(--head); font-family: var(--mono); font-weight: 500; }
@@ -229,7 +238,7 @@ select.sel { font-family: var(--sans); }
 #drag-hint {
   position: fixed; z-index: 40; display: none; pointer-events: none;
   background: #10131add; border: 1px solid var(--accent-dim); color: var(--head);
-  font-family: var(--mono); font-size: 11px; border-radius: 5px; padding: 3px 8px;
+  font-family: var(--mono); font-size: 12px; border-radius: 5px; padding: 3px 8px;
 }
 
 /* PiP frame (canvas is rendered underneath via scissor) */
@@ -249,7 +258,7 @@ select.sel { font-family: var(--sans); }
 #pip-tools { position: absolute; top: 7px; right: 7px; display: flex; gap: 5px; }
 .pip-btn {
   appearance: none; border: 1px solid #53b9ff88; background: #16303fdd; color: #bfe2ff;
-  font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .6px;
+  font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .6px;
   line-height: 1; padding: 5px 9px; border-radius: 6px;
   cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px);
 }
@@ -258,7 +267,7 @@ select.sel { font-family: var(--sans); }
 #nav-hud {
   position: absolute; left: 12px; bottom: 12px; z-index: 5;
   background: #1a1e26dd; border: 1px solid var(--border2); border-radius: 7px;
-  padding: 7px 11px; font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  padding: 7px 11px; font-family: var(--mono); font-size: 12px; color: var(--text-dim);
   pointer-events: none; line-height: 1.6; white-space: pre; backdrop-filter: blur(4px);
 }
 /* v9 FIX — THE PLAYBAR OVERLAP: the centered playbar (z6, up to 620px wide)
@@ -271,7 +280,7 @@ select.sel { font-family: var(--sans); }
 #pip-label {
   position: absolute; top: -1px; left: 10px; transform: translateY(-50%);
   background: #16303f; border: 1px solid var(--accent-dim); color: #bfe2ff;
-  font-size: 9.5px; font-weight: 700; letter-spacing: 1px;
+  font-size: 12px; font-weight: 700; letter-spacing: 1px;
   padding: 2px 8px; border-radius: 999px;
   max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -286,11 +295,11 @@ select.sel { font-family: var(--sans); }
 }
 #playbar.show { display: flex; }
 #btn-play { width: 74px; }
-#btn-playall { font-size: 11.5px; }
-.pb-lab { color: var(--text-dim); font-size: 11px; user-select: none; white-space: nowrap; }
-#turn-rate { width: 56px; background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 11.5px; }
+#btn-playall { font-size: 12px; }
+.pb-lab { color: var(--text-dim); font-size: 12px; user-select: none; white-space: nowrap; }
+#turn-rate { width: 56px; background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
 #pb-name { color: var(--head); font-size: 12px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#pb-time { color: var(--text-dim); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+#pb-time { color: var(--text-dim); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
 #pb-time b { color: var(--text); font-weight: 500; }
 #scrub { flex: 1; accent-color: var(--accent); height: 18px; cursor: pointer; min-width: 80px; }
 #rate { width: 74px; }
@@ -308,7 +317,7 @@ select.sel { font-family: var(--sans); }
 }
 @keyframes rot { to { transform: rotate(360deg); } }
 #boot-msg { color: var(--text-dim); font-size: 13px; text-align: center; line-height: 1.6; max-width: 460px; padding: 0 20px; }
-#boot-msg .dim { color: #5a6274; font-size: 11.5px; font-family: var(--mono); }
+#boot-msg .dim { color: #5a6274; font-size: 12px; font-family: var(--mono); }
 
 /* toasts */
 #toast-root {
@@ -343,13 +352,13 @@ select.sel { font-family: var(--sans); }
 #modal-body { padding: 14px 18px 18px; overflow-y: auto; line-height: 1.6; font-size: 12.5px; }
 #modal-body h3 { color: var(--accent); font-size: 12px; letter-spacing: .8px; text-transform: uppercase; margin: 16px 0 6px; }
 #modal-body h3:first-child { margin-top: 0; }
-#modal-body code { font-family: var(--mono); font-size: 11.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #bfe2ff; }
+#modal-body code { font-family: var(--mono); font-size: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: #bfe2ff; }
 #modal-body pre {
-  font-family: var(--mono); font-size: 11px; line-height: 1.55; color: #c4d6ee;
+  font-family: var(--mono); font-size: 12px; line-height: 1.55; color: #c4d6ee;
   background: var(--bg2); border: 1px solid var(--border); border-radius: 7px;
   padding: 10px 12px; overflow-x: auto; margin: 6px 0;
 }
-#modal-body table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 11.5px; }
+#modal-body table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
 #modal-body th, #modal-body td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top; }
 #modal-body th { color: var(--text-dim); font-weight: 600; background: var(--bg2); }
 #modal-body td code { background: transparent; border: none; padding: 0; color: #bfe2ff; }
@@ -360,7 +369,7 @@ select.sel { font-family: var(--sans); }
 <div id="app">
   <aside id="sidebar">
     <div id="brand">
-      <h1>CamTrack <span class="accent">Editor</span> <span style="font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:.8px">v13 · day/night env</span></h1>
+      <h1>CamTrack <span class="accent">Editor</span> <span style="font-size: 12px;color:var(--text-dim);font-weight:400;letter-spacing:.8px">v13 · day/night env</span></h1>
       <div class="sub">fixed camera-track recorder &middot; writes <b>camdat.json</b></div>
     </div>
 
@@ -392,14 +401,8 @@ select.sel { font-family: var(--sans); }
     <div class="panel">
       <div class="panel-title">Camera tracks</div>
       <div id="track-add">
-        <button class="btn" id="btn-add-line" title="Straight-line move">+ Line</button>
-        <button class="btn" id="btn-add-circle" title="Circle / oval orbit">+ Circle</button>
-        <button class="btn" id="btn-add-fixed" title="Fixed position, rotating view">+ Fixed</button>
-        <button class="btn" id="btn-add-curve" title="Curved path — PowerPoint-style anchor points">+ Curve</button>
-        <button class="btn" id="btn-add-polyline" title="Line with multiple turns — corridor-style navigation through the whole map">+ Polyline</button>
-        <button class="btn" id="btn-add-spiral" title="Spiral in or out around a center while changing height — dramatic reveal">+ Spiral</button>
-        <button class="btn" id="btn-add-zigzag" title="Auto lawnmower sweep across a rectangle — full map coverage">+ Zigzag</button>
-        <button class="btn" id="btn-add-fig8" title="Figure-8 (lemniscate) loop around the center">+ Fig 8</button>
+        <button class="btn primary" id="btn-add-track" title="Add a camera track — line, polyline, circle, spiral, zigzag, figure 8, curve or fixed">+ Add track</button>
+        <div id="track-add-menu" hidden></div>
       </div>
       <div id="track-list"></div>
       <div class="hint" id="tracks-hint">Lines, multi-turn polylines, circles, spirals, zigzag sweeps, figure-8s, curves or fixed cameras. Drag the handles (Shift-drag or the cyan Y handle = height; X/Y/Z = axis lock); numbers below.</div>
@@ -3816,33 +3819,35 @@ window.SHUI = (function () {
   const CSS = `
 /* ---- World & Weather panel (smart hierarchical UI) ---- */
 #world-panel { padding: 12px 16px 4px; }
+/* v41 (CT-IMPL fix 5): the hidden DEV groups (the toggle row governs) */
+.wgroup.dev-hidden { display: none; }
 .wgroup { border: 1px solid var(--border); border-radius: 8px;
           background: var(--bg2); margin-bottom: 8px; overflow: hidden; }
 .wgroup-h { display: flex; align-items: center; gap: 7px; padding: 7px 10px;
-            cursor: pointer; user-select: none; font-size: 11px;
+            cursor: pointer; user-select: none; font-size: 12px;
             font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
             color: var(--text-dim); }
 .wgroup-h:hover { color: var(--head); }
-.wgroup-h .chev { margin-left: auto; color: var(--text-dim); font-size: 10px;
+.wgroup-h .chev { margin-left: auto; color: var(--text-dim); font-size: 12px;
                   transition: transform .15s; }
 .wgroup.open .chev { transform: rotate(90deg); }
 .wgroup-body { display: none; padding: 4px 10px 10px; }
 .wgroup.open .wgroup-body { display: block; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .chip2 { appearance: none; border: 1px solid var(--border2); background: var(--panel2);
-         color: var(--text); font: inherit; font-size: 11px; padding: 4px 9px;
+         color: var(--text); font: inherit; font-size: 12px; padding: 4px 9px;
          border-radius: 999px; cursor: pointer; white-space: nowrap; }
 .chip2:hover { border-color: var(--accent-dim); color: var(--head); }
 .chip2.on { background: var(--accent-dim); border-color: var(--accent-dim);
             color: #eaf6ff; font-weight: 650; }
 .wsel { width: 100%; margin-bottom: 7px; }
 .wrow { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
-.wrow label { flex: 0 0 92px; color: var(--text-dim); font-size: 11px; }
+.wrow label { flex: 0 0 92px; color: var(--text-dim); font-size: 12px; }
 .wgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 4px 0 8px; }
 .wcell { appearance: none; border: 1px solid var(--border2); background: var(--panel2);
-         color: var(--text); font: inherit; font-size: 11px; padding: 6px 4px;
+         color: var(--text); font: inherit; font-size: 12px; padding: 6px 4px;
          border-radius: 6px; cursor: pointer; text-align: center; line-height: 1.25; }
-.wcell small { display: block; color: var(--text-dim); font-size: 9.5px; }
+.wcell small { display: block; color: var(--text-dim); font-size: 12px; }
 .wcell:hover { border-color: var(--accent-dim); }
 .wcell.on { background: #16303fdd; border-color: var(--accent); color: #bfe2ff; }
 .wcell.game { border-style: dashed; }
@@ -3851,19 +3856,19 @@ window.SHUI = (function () {
 .tgl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
            cursor: pointer; user-select: none; font-size: 12px; }
 .tgl-row input { accent-color: var(--accent); }
-.tgl-row .sub { color: var(--text-dim); font-size: 10.5px; margin-left: auto; text-align: right; }
-#world-cmd { font-family: var(--mono); font-size: 10.5px; color: #bfe2ff;
+.tgl-row .sub { color: var(--text-dim); font-size: 12px; margin-left: auto; text-align: right; }
+#world-cmd { font-family: var(--mono); font-size: 12px; color: #bfe2ff;
              background: #10131a; border: 1px solid var(--border); border-radius: 6px;
              padding: 7px 9px; word-break: break-all; line-height: 1.5; }
-#world-state { font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
+#world-state { font-family: var(--mono); font-size: 12px; color: var(--text-dim);
                background: #10131a; border: 1px solid var(--border); border-radius: 6px;
                padding: 7px 9px; white-space: pre; line-height: 1.6; }
-.lock-note { font-size: 10.5px; margin: 2px 0 8px; padding: 4px 8px;
+.lock-note { font-size: 12px; margin: 2px 0 8px; padding: 4px 8px;
              border-radius: 5px; display: none; }
 .lock-note.show { display: block; }
 .lock-note.busy { background: #3a2d10; border: 1px solid #7a5a2a; color: #ffd9a0; }
 .lock-note.ok { background: #12301a; border: 1px solid #2a6f3a; color: #b8ffc8; }
-.wlegend { color: var(--text-dim); font-size: 10px; margin: 2px 0 8px; line-height: 1.5; }
+.wlegend { color: var(--text-dim); font-size: 12px; margin: 2px 0 8px; line-height: 1.5; }
 /* ---- temporary Effects-Off override (session-only view assist) ---- */
 #world-panel.fxoff #wg-env, #world-panel.fxoff #wg-weather,
 #world-panel.fxoff #wg-atmo { opacity: .4; pointer-events: none; }
@@ -3889,9 +3894,13 @@ window.SHUI = (function () {
     const host = document.createElement('div');
     host.className = 'panel';
     host.id = 'world-panel';
-    /* insert after the File panel (before Models) */
-    const filePanel = document.querySelector('#file-actions').closest('.panel');
-    filePanel.parentNode.insertBefore(host, filePanel.nextSibling);
+    /* v41 (CT-IMPL fix 5): the World & Weather panel sits AFTER the four
+     * authoring panels (File, Models, Camera tracks, Track options) — the
+     * LAST child of the sidebar. The old insertion BETWEEN File and Models
+     * buried every authoring panel 3 screens down the 3125px sidebar
+     * scroll (RC-G finding 3). */
+    const sidebar = document.querySelector('#sidebar');
+    if (sidebar) sidebar.appendChild(host);
 
     const g = pairGroups();
     const pairOptions = [];
@@ -3912,7 +3921,11 @@ window.SHUI = (function () {
 
     host.innerHTML = `
 <div class="panel-title">World &amp; Weather <span style="letter-spacing:0;font-weight:400">SH1 engine · PoC port · v13</span></div>
-<div class="wgroup open" id="wg-fxoff">
+<label class="tgl-row" id="dev-toggle-row" style="margin:8px 16px 0" title="Show the developer groups (the PoC CLI mirror + the live engine state)">
+  <input type="checkbox" id="tgl-dev">
+  <span>Dev groups</span>
+  <span class="sub">PoC backend · Live state</span></label>
+<div class="wgroup" id="wg-fxoff">
   <div class="wgroup-h">View assist<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <label class="tgl-row fxoff-row" id="fxoff-row">
@@ -3927,7 +3940,7 @@ window.SHUI = (function () {
       state is <b>never written to camdat.json</b>. Key: <b>0</b>.</div>
   </div>
 </div>
-<div class="wgroup open" id="wg-env">
+<div class="wgroup" id="wg-env">
   <div class="wgroup-h">Scene environment<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <div class="chips" id="env-chips">
@@ -3949,7 +3962,7 @@ window.SHUI = (function () {
       <button class="chip2" id="glb-env-orig" type="button" style="flex:none">use original</button></div>
   </div>
 </div>
-<div class="wgroup open" id="wg-daynight">
+<div class="wgroup" id="wg-daynight">
   <div class="wgroup-h">Day / Night environments — v13<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <div class="chips" id="phase-chips">
@@ -3979,7 +3992,7 @@ window.SHUI = (function () {
       app override &gt; track &gt; model &gt; app custom mapping &gt; authentic default.</div>
   </div>
 </div>
-<div class="wgroup open" id="wg-light">
+<div class="wgroup" id="wg-light">
   <div class="wgroup-h">Light — v41 sphere authoring<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <label class="tgl-row"><input type="checkbox" id="tgl-lighton">
@@ -4026,7 +4039,7 @@ window.SHUI = (function () {
     <div class="lock-note" id="light-note"></div>
   </div>
 </div>
-<div class="wgroup open" id="wg-weather">
+<div class="wgroup" id="wg-weather">
   <div class="wgroup-h">Weather — per track<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <div class="wlegend"><b>v12:</b> every track carries its own weather (the
@@ -4034,7 +4047,7 @@ window.SHUI = (function () {
       cross-fade; the ENGINE (wallpaper app / Fog PoC) cross-fades the same change
       over 512 ticks (~17 s at 30 Hz), the authentic runtime path.</div>
     <div class="wrow"><label>Track</label>
-      <span id="weather-track-name" style="flex:1;font-size:11.5px;color:var(--text)">—</span></div>
+      <span id="weather-track-name" style="flex:1;font-size: 12px;color:var(--text)">—</span></div>
     <div class="wgrid" id="weather-grid">
       <button class="wcell inherit" data-w="-1" title="clear the track's own weather — inherit the model default">Inherit<small>model default</small></button>
       <button class="wcell" data-w="0">None</button>
@@ -4075,7 +4088,7 @@ window.SHUI = (function () {
       default itself. Boot recipe = Particle_EnvironmentSet at load (instant).</div>
   </div>
 </div>
-<div class="wgroup open" id="wg-atmo">
+<div class="wgroup" id="wg-atmo">
   <div class="wgroup-h">Atmosphere<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <div class="wrow" style="margin-bottom:8px">
@@ -4094,7 +4107,7 @@ window.SHUI = (function () {
       ({2,2} interior day) and enum-2 blends.</div>
   </div>
 </div>
-<div class="wgroup open" id="wg-render">
+<div class="wgroup" id="wg-render">
   <div class="wgroup-h">Rendering<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <label class="tgl-row"><input type="checkbox" id="tgl-flash">
@@ -4111,7 +4124,7 @@ window.SHUI = (function () {
       <span>Engine effects</span><span class="sub">master (--nofog look off)</span></label>
   </div>
 </div>
-<div class="wgroup open" id="wg-cmd">
+<div class="wgroup" id="wg-cmd">
   <div class="wgroup-h">PoC v12 backend<span class="chev">&#9654;</span></div>
   <div class="wgroup-body">
     <div id="world-cmd"></div>
@@ -4123,15 +4136,52 @@ window.SHUI = (function () {
       compare this preview against the byte-exact C++ renderer.</div>
   </div>
 </div>
-<div class="wgroup open" id="wg-state">
+<div class="wgroup" id="wg-state">
   <div class="wgroup-h">Live state<span class="chev">&#9654;</span></div>
   <div class="wgroup-body"><div id="world-state">loading…</div></div>
 </div>`;
 
-    /* collapse toggles */
+    /* v41 (CT-IMPL fix 5): the collapse toggles PERSIST (localStorage) —
+     * the 9 World & Weather groups default COLLAPSED (the 3125px sidebar
+     * scroll / 3-screens-down finding); the user's open set survives the
+     * reload. Collapse, never remove: every control stays reachable. */
     host.querySelectorAll('.wgroup-h').forEach(h =>
-      h.addEventListener('click', () =>
-        h.parentNode.classList.toggle('open')));
+      h.addEventListener('click', () => {
+        h.parentNode.classList.toggle('open');
+        try {
+          const st = {};
+          host.querySelectorAll('.wgroup').forEach(g => { st[g.id] = g.classList.contains('open'); });
+          localStorage.setItem('camtrack.wgroups.v1', JSON.stringify(st));
+        } catch (e) { }
+      }));
+    try {
+      const raw = localStorage.getItem('camtrack.wgroups.v1');
+      if (raw) {
+        const st = JSON.parse(raw);
+        host.querySelectorAll('.wgroup').forEach(g => {
+          if (g.id in st) g.classList.toggle('open', st[g.id] === true);
+        });
+      }
+    } catch (e) { }
+    /* v41 (CT-IMPL fix 5): the DEV toggle (default OFF) — the two developer
+     * groups (PoC v12 backend + Live state) hide behind it; persisted */
+    {
+      const devRow = host.querySelector('#dev-toggle-row');
+      const devEl = host.querySelector('#tgl-dev');
+      const devGroups = [host.querySelector('#wg-cmd'), host.querySelector('#wg-state')];
+      const applyDev = on => {
+        devGroups.forEach(g => { if (g) g.classList.toggle('dev-hidden', !on); });
+        if (devEl) devEl.checked = !!on;
+      };
+      let devOn = false;
+      try { devOn = localStorage.getItem('camtrack.dev.v1') === '1'; } catch (e) { }
+      applyDev(devOn);
+      if (devEl) devEl.addEventListener('change', () => {
+        applyDev(devEl.checked);
+        try { localStorage.setItem('camtrack.dev.v1', devEl.checked ? '1' : '0'); } catch (e) { }
+      });
+      if (devRow) devRow.addEventListener('click', e => { if (e.target === devRow) devEl.click(); });
+    }
 
     U.cmdEl = host.querySelector('#world-cmd');
     U.stateEl = host.querySelector('#world-state');
@@ -11474,14 +11524,8 @@ function renderTrackList() {
   const tracks = activeTracks();
   $('#tracks-hint').style.display = tracks.length ? 'none' : '';
   const noModel = !state.activeFile;
-  $('#btn-add-line').disabled = noModel;
-  $('#btn-add-circle').disabled = noModel;
-  $('#btn-add-fixed').disabled = noModel;
-  $('#btn-add-curve').disabled = noModel;
-  $('#btn-add-polyline').disabled = noModel;
-  $('#btn-add-spiral').disabled = noModel;
-  $('#btn-add-zigzag').disabled = noModel;
-  $('#btn-add-fig8').disabled = noModel;
+  $('#btn-add-track').disabled = noModel;
+  $('#track-add-menu').querySelectorAll('.ta-item').forEach(b => { b.disabled = noModel; });
   tracks.forEach(tr => {
     const row = h('div', 'track-row' + (tr.id === state.selection ? ' sel' : '') + (tr.enabled === false ? ' off' : ''));
     const T = cycleDuration(tr);
@@ -11743,7 +11787,7 @@ function renderProps() {
 
   {
     const note = h('div', null, esc(TYPE_NOTES[tr.type]));
-    note.style.cssText = 'color:var(--text-dim);font-size:11px;line-height:1.5;margin:0 0 4px';
+    note.style.cssText = 'color:var(--text-dim);font-size: 12px;line-height:1.5;margin:0 0 4px';
     add(note);
   }
 
@@ -12005,14 +12049,36 @@ $('#btn-preview-json').addEventListener('click', () => {
    the model fields directly (backward compatible, then recomputed on the
    next env change — the new panel governs). */
 
-$('#btn-add-line').addEventListener('click', () => addTrack('line'));
-$('#btn-add-circle').addEventListener('click', () => addTrack('circle'));
-$('#btn-add-fixed').addEventListener('click', () => addTrack('fixed'));
-$('#btn-add-curve').addEventListener('click', () => addTrack('curve'));
-$('#btn-add-polyline').addEventListener('click', () => addTrack('polyline'));
-$('#btn-add-spiral').addEventListener('click', () => addTrack('spiral'));
-$('#btn-add-zigzag').addEventListener('click', () => addTrack('zigzag'));
-$('#btn-add-fig8').addEventListener('click', () => addTrack('figure8'));
+/* v41 (CT-IMPL fix 5): ONE "+ Add track" menu for the 8 track types (the
+ * eight always-on buttons -> one button + a dropdown; the menu carries
+ * the same titles and addTrack(type) handlers). */
+{
+  const TRACK_ADD_TYPES = [
+    { t: 'line', label: 'Line', d: 'Straight-line move' },
+    { t: 'polyline', label: 'Polyline', d: 'Multi-turn corridor navigation through the whole map' },
+    { t: 'circle', label: 'Circle', d: 'Circle / oval orbit' },
+    { t: 'spiral', label: 'Spiral', d: 'Spiral in or out around a center while changing height — dramatic reveal' },
+    { t: 'zigzag', label: 'Zigzag', d: 'Auto lawnmower sweep across a rectangle — full map coverage' },
+    { t: 'figure8', label: 'Figure 8', d: 'Figure-8 (lemniscate) loop around the center' },
+    { t: 'curve', label: 'Curve', d: 'Curved path — PowerPoint-style anchor points' },
+    { t: 'fixed', label: 'Fixed', d: 'Fixed position, rotating view' }
+  ];
+  const menu = $('#track-add-menu');
+  const btn = $('#btn-add-track');
+  TRACK_ADD_TYPES.forEach(({ t, label, d }) => {
+    const b = document.createElement('button');
+    b.className = 'ta-item';
+    b.dataset.type = t;
+    b.title = d;
+    b.innerHTML = '<b>' + label + '</b><span class="d">' + d + '</span>';
+    b.addEventListener('click', () => { addTrack(t); menu.hidden = true; });
+    menu.appendChild(b);
+  });
+  btn.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+  document.addEventListener('pointerdown', e => {
+    if (!menu.hidden && !$('#track-add').contains(e.target)) menu.hidden = true;
+  });
+}
 
 /* pointer mode + axis locks */
 $('#btn-pointer').addEventListener('click', () => setPointerMode(!pointer.on));
