@@ -2778,14 +2778,21 @@ window.SHView = (function () {
     void main() {
       vec4 texel = texture2D(map, vUvS);
       if (texel.a < 0.5) discard;
-      vec3 t5 = floor(texel.rgb * 255.0 / 8.0 + 0.5);
+      vec3 t5 = floor(texel.rgb * 255.0 / 8.0);   /* trunc — exact repl5 inverse */
+      vec3 p5 = floor(vColS / 8.0 + 0.5);
       /* v43 (CT-2#6): the prim modulates at FULL 8 bits — the engine/C
          rain_blit_splash_tri computes fr = (t5r * primR) >> 7 with the
          collect's full-u8 primR/G/B (fog_poc.c:8608-8610, prim from
          :13004-13011), NOT pre-quantized to 5 bits: the old
          floor(t5*round(prim/8)/16) diverged whenever prim%8 != 0|4
          (t5=20, prim=100: 16 vs the C's 15; t5=15, prim=255: 30 vs 29).
-         (The t5 recovery line above is CT-5-2's — branch ct-frag-floor.) */
+         V-2 7c: the fix includes the t5 trunc recovery (CT-5-2 class) —
+         the t5 line above is BYTE-IDENTICAL to ct-frag-floor's SPLASH
+         hunk (PR #72), so both branches carry it and compose. p5 above
+         is now DEAD (the modulate reads vColS), kept VERBATIM as the
+         one unchanged line separating this hunk from PR #72's context —
+         deleting it would conflict textually; drop it once both
+         branches have landed. */
       vec3 f5 = min(vec3(31.0), floor(t5 * vColS / 128.0));
       gl_FragColor = vec4(floor(f5 * 255.0 / 31.0 + 0.5) / 255.0, 1.0);
     }`;
