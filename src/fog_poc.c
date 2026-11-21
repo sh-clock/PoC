@@ -10974,8 +10974,18 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
      * shipped sewer/TV ahead-light (engine-true 27.07deg < 75deg) show
      * NO flare — engine-true (the tile is never drawn there).      */
     {
-        int px = g_flaresys.scrLPos[0] + fb->w / 2;
-        int py = g_flaresys.scrLPos[1] + fb->h / 2;
+        /* V42 A-3: scale the probe into PoC px — the SAME FX_TO_PX/
+         * FX_TO_PY mapping the sprites below draw with (scrLPos is
+         * ENGINE px, screen-centered, from the 224-geom projection
+         * above; `scale' = fb->w/320). The old unscaled scrLPos[i] +
+         * fb->w/2 read a pixel (scale-1)·scrLPos away from the drawn
+         * flare center at any --res != 320x224 — at 640x448 the probe
+         * tested scrX+320 while the sprites paint at 2*scrX+320, so
+         * the occlusion answer (and the nowRate easing it drives)
+         * belonged to a different screen point than the flare.  At
+         * the default 320x224 (scale=1) this is bit-identical.     */
+        int px = g_flaresys.scrLPos[0] * scale + (int)(fb->w / 2);
+        int py = g_flaresys.scrLPos[1] * scale + (int)(fb->h / 2);
         int visible = 0;
         if (px >= 0 && px < (int)fb->w && py >= 0 && py < (int)fb->h) {
             float lightDepth = (float)g_flaresys.scrLPos[2] / 256.0f;
