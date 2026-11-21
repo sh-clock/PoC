@@ -4823,12 +4823,16 @@ static int gte_dpcs_fc0(int c, int k) {
     int64_t inMac = (int64_t)c << 16;
     int IR = clamp16((int)(((int64_t)0 - inMac) >> 12));   /* FC = 0 */
     int64_t mac = ((int64_t)IR * k + inMac) >> 12;
-    /* v12 VERBATIM FIX (D8): DuckStation PushRGBFromMAC -> TruncateRGB:
-     *   r = (u32)(MAC1 >> 4); if (r > 0xFF) r = 0xFF;
-     * a NEGATIVE MAC reinterpreted unsigned saturates to 255 (not 0).
-     * Unreachable for k <= 4096, but byte-exact now. */
-    unsigned u = (unsigned)(mac >> 4);
-    return u > 0xFFu ? 0xFF : (int)u;
+    /* V42 C-1 (the v12 D8 comment misquoted DuckStation): swanstation
+     * gte.cpp:145-160 TruncateRGB takes the value SIGNED —
+     *   if (value < 0 || value > 0xFF) return (value < 0) ? 0 : 0xFF;
+     * (the uint32_t cast at the call site :404 is reinterpreted by the
+     * int32_t parameter — two's complement, negative stays negative).
+     * A NEGATIVE MAC>>4 therefore saturates to 0 on the hardware — NOT
+     * 255. psx-spx: "saturated to +00h..+FFh". Unreachable for k <=
+     * 4096 (IR0 <= 4096 keeps MAC >= 0), kept engine-exact anyway. */
+    int v = (int)(mac >> 4);
+    return v < 0 ? 0 : (v > 0xFF ? 0xFF : v);
 }
 
 /* GTE DPCL(RGB=tint, IR1=IR2=IR3=light<<5, IR0=fog<<4, FC=(0,0,0)) —
@@ -4841,9 +4845,17 @@ static int gte_dpcl_fc0(int tint, int lightIR, int fogIR0) {
     int64_t inMac = (int64_t)((int64_t)tint * lightIR) << 4;
     int IR = clamp16((int)(((int64_t)0 - inMac) >> 12));   /* FC = 0 */
     int64_t mac = ((int64_t)IR * fogIR0 + inMac) >> 12;
-    /* v12 VERBATIM FIX (D8): DuckStation TruncateRGB unsigned semantics */
-    unsigned u = (unsigned)(mac >> 4);
-    return u > 0xFFu ? 0xFF : (int)u;
+    /* V42 C-1: the SIGNED saturation (negative -> 0) — swanstation
+     * gte.cpp:145-160 TruncateRGB(int32_t) / psx-spx +00h..+FFh; the
+     * old unsigned form returned 255 on the negative-MAC path.
+     * REACHABLE (finder C): during the authentic night fade wLI
+     * sweeps low while fog is still ON (flips off only at w=4096)
+     * and the light's geoTerm has no lower clamp — 17,639/16.7M
+     * (tint, light, fog) triples diverge; runtime DRU0100 9,724/
+     * 16,074 DPCL calls/frame (all fog=255, delta <= 2/255 — sub-
+     * visual on the shipped battery but engine-true). */
+    int v = (int)(mac >> 4);
+    return v < 0 ? 0 : (v > 0xFF ? 0xFF : v);
 }
 
 /* LoadAverageCol(c0, c1, aFrom, aTo) — libgte gte_LoadAverageCol:
