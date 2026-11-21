@@ -8089,6 +8089,8 @@ function sh1xDriverInit(propAnims, header, opts) {
     const drv = sh1xJs(e, 'driver', '');
     a.driver = (drv in SH1X_DRIVER_IDS) ? SH1X_DRIVER_IDS[drv] : -1;
     if (a.driver < 0) continue;              /* unknown driver: not played */
+    a.jsonIdx = k;    /* v43 (E-02-2): the source JSON entry index (the
+                        anims array is compacted by the skips above) */
     const p = Array.isArray(e.pos) && e.pos.length >= 3 ? e.pos : null;
     if (p) { a.pos = [+p[0], +p[1], +p[2]]; }
     a.manifestLevel = p ? 0 : 1;             /* non-numeric pos = overlay manifest */
@@ -8299,7 +8301,10 @@ function sh1xDriverInit(propAnims, header, opts) {
   }
   /* v27: sharedRot leader resolution (one-way; mutual pairs broken) */
   for (let k = 0; k < S.anims.length; k++) {
-    const sh = sh1xJs(list[k], 'sharedRot', '');
+    /* v43 (E-02-2): index the JSON by the anim's SOURCE entry index —
+     * S.anims is compacted (the !e / unknown-driver skips), so list[k]
+     * read the WRONG entry's sharedRot after any skip */
+    const sh = sh1xJs(list[S.anims[k].jsonIdx], 'sharedRot', '');
     if (sh) {
       for (let m = 0; m < S.anims.length; m++) {
         if (m !== k && S.anims[m].object === sh) { S.anims[k].sharedLeader = m; break; }

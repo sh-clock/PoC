@@ -1286,6 +1286,12 @@ typedef struct {
     int kickPhase;                  /* kickSwing: 0 armed 1 kick 2 bounce    */
     int gated;                      /* v27: driver currently gated OFF       */
     int sharedLeader;               /* v27: index of the sharedRot leader anim */
+    int jsonIdx;                    /* v43 (E-02-2): the SOURCE propAnims JSON
+                                     * entry index — the anims array is
+                                     * COMPACTED (null/unknown-driver entries
+                                     * skip without nAnims++), so the
+                                     * sharedRot re-walk must index the JSON
+                                     * by this, not by the compacted k      */
     int count;                      /* v27: multi-instance count             */
     /* lightFlicker (map1_s05.c:371-396 verbatim, raw Q12 state) */
     int flT0, flT1, flPer0, flPer1, flAmp;
@@ -1989,6 +1995,7 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                     WorldObjects catalog — pose at rot0/pos (the pose fn's
                     default), no tick; the gate hides un-added objects. */
         else continue;                    /* unknown driver: not played */
+        a->jsonIdx = k;      /* v43 (E-02-2): the source JSON entry index */
         const JValue *p = jarr(e, "pos");
         if (p && p->count >= 3) {
             a->pos[0] = (float)jat(p, 0)->num;
@@ -2350,11 +2357,16 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
      * shared-vector behavior for deterministic drivers. */
     for (int k = 0; k < sx->nAnims; k++) {
         const char *sh_name = NULL;
-        /* re-walk the JSON to find sharedRot of entry k */
+        /* re-walk the JSON to find sharedRot of entry k — by its SOURCE
+         * JSON index (v43 E-02-2: sx->anims[] is COMPACTED, the null and
+         * unknown-driver entries at 1959/1991 skip without nAnims++, so
+         * indexing the JSON by the compacted k desynced by the number of
+         * skipped predecessors and read the WRONG entry's sharedRot) */
         const JValue *pa2 = jarr(sh, "propAnims");
         int npa2 = jcount(pa2);
-        if (k < npa2 && k < 64) {
-            const JValue *e2 = jat(pa2, k);
+        int jk = sx->anims[k].jsonIdx;
+        if (jk >= 0 && jk < npa2 && jk < 64) {
+            const JValue *e2 = jat(pa2, jk);
             sh_name = e2 ? jstr(e2, "sharedRot", "") : NULL;
         }
         if (sh_name && *sh_name) {
