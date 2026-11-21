@@ -15075,8 +15075,49 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
         A->play.t = 0;
         A->play.sessionT = 0;         /* v10: restart the session clock too */
         A->tickPending = 0;           /* v20: restart the tick grid too      */
+        /* v41-ENGFX bug 3a: the room-reload weather sync — the engine's
+         * WeatherParticle_SystemUpdate case 0 / NO_VALUE arm (particle.c:
+         * 396-418, run at every map load): 800DD598 = 0, g_SysWork.field_234A
+         * = true, E0CB8 = E0CB0>>12, E0CB6 = E0CB4 = E0CB0 (the room
+         * recipe), then WeatherParticle_SnowInit. The PoC's K_R called only
+         * snow_reset (which never touches the transition state), so a live
+         * cross-fade (the W key / --weather-target) was carried deeper
+         * into the restarted session than any fresh boot — the engine
+         * reload DROPS the transition and re-syncs to the room recipe
+         * (the map event re-arms D0B18 as scripted). weatherBits is the
+         * boot recipe and nothing mutates it during a session, so this
+         * re-sync also restores the fresh boot's current==target.       */
+        A->snow.weatherTick = 0;
+        A->snow.transitionLock = 1;
+        A->snow.weatherCurrent = A->snow.weatherBits;
+        A->snow.weatherTarget = A->snow.weatherBits;
+        A->snow.weatherSettings = (uint16_t)(A->snow.weatherBits >> 12);
         snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
+        /* v41-ENGFX bug 3b: the fresh-session flashlight fade + the boot
+         * dt=0 prime. The restart had been carrying the env's converged
+         * flashlightIntensity (4096) while a fresh session ramps 0->4096
+         * over its first 8 ticks — and sh_env_reset only zeroes the tick
+         * grid, so the post-restart env ticked on tick 1 where a fresh
+         * boot had already consumed that slot with its dt=0 first-frame
+         * Gfx_EffectsUpdate (main's boot site runs sh_env_tick(&A.env, 0)
+         * right after the fade starts at the memset-zero value). The
+         * carried fade made the water-gated D_800AFDAC counter advance on
+         * every post-restart tick (91 vs a fresh boot's 87 at t=3 on
+         * DRU0100) — the RESTARTTEST restart-final vs fresh md5 mismatch
+         * GATE-A probed. Mirror the boot exactly: the fade back at its
+         * boot value 0 + the identity-pose dt=0 prime (ticksDone=1, no
+         * ramp). NOTE: the engine has no R key — the PoC's R models the
+         * v38/v41-E2/E3 restart == fresh-session contract, NOT a decomp
+         * room-reload of the (persistent-game-state) flashlight; the env's
+         * user choices (pair/night/flashlight on-off) still survive R —
+         * only the boot-time RAMP re-runs.                              */
+        A->env.flashlightIntensity = 0;
         sh_env_reset(&A->env, 0.0);      /* restart the env simulation    */
+        {
+            Quat q0 = quat_id();
+            v3 p0 = { 0.0f, 0.0f, 0.0f };
+            sh_env_tick(&A->env, 0, p0, q0);   /* the boot dt=0 prime */
+        }
         sh1x_anims_reset((Sh1x *)&A->R.sc->sh1x); /* v38: drivers fresh    */
         sh1x_anims_bind_invalidate();      /* v38-audit-A1: re-seed drvr 9 */
         A->animsPrimed = 0;               /* v38: re-prime the gate state */
