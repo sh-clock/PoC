@@ -15791,6 +15791,18 @@ static int run_window_sdl(LiveApp *A, int winW, int winH) {
         double t0 = now_sec();
         double dt = t0 - prev;
         prev = t0;
+        /* V42 D-2: clamp the accumulated output time to --duration so the
+         * window's --save-final lands EXACTLY at the requested track time
+         * — run_benchmark's final-dt clamp mirrored here. Without it, a
+         * real frame straddling the boundary (33.4 ms frame times) let
+         * live_advance's V_BLANKS_MAX catch-up fire ONE EXTRA tick: 181
+         * ticks at D=6 vs the shot/benchmark's exact 180 — the saved
+         * final frame sat a whole tick off the shot grid (DRU0100 13.9%
+         * px, THRF9FD 10.8%; --shot t=D == --benchmark --duration D was
+         * already bit-exact — only the window path diverged). */
+        if (A->duration > 0 && A->play.sessionT + dt > A->duration)
+            dt = A->duration - A->play.sessionT;
+        if (dt <= 0) break;
         /* v20: whole-tick 30 Hz lockstep — same as the Win32 loop above */
         CamPose cp = live_advance(A, dt);
         if (live_done(A)) break;
