@@ -2446,3 +2446,58 @@ t=3 vs t=6 = **0.00% pixels changed** (a completely static scene); the
 `SU0203_fan_windowloop_v38.gif` — 13 consecutive captured window-loop
 frames (FOGPOC_HUDSNAP k, fixed cam): the fan spinning in the REAL
 interactive loop, not the deterministic path.
+
+---
+
+## Session T10 (2026-11-21) — THE V41 PR GATE (sole-merger review of the audit agents' 32 PRs) + the camtrack complaint fixes + the gate-found engine bugs
+
+### The gate (user directive: I am the ONLY merger; verify everything; reject wrong/duplicate; reimplement correct-bug/wrong-fix)
+- 7 verification agents (V41-A..F + RC root-cause) audited all 32 open PRs (PoC #24-#50, wallpaper #2-#6)
+  against decomp/swanstation + probed on main; every claim re-derived.
+- MERGED 24 PoC PRs as-is (#24-#33, #35-#49: the E parser/restart/multishot batch, the A ripple/water group,
+  the C lens-flare group, the D TV-noise/TIM group, the B camtrack editor group, the E build hygiene) —
+  conflict resolutions documented in the merge commits (pr_49's strict parse subsumes pr_25's isfinite;
+  pr_26's five resets precede pr_29's ripple spawn in K_R — the fresh-load order).
+- REIMPLEMENTED: #28 (tim_load bounds — the branch left a ph=0 OOB; the residual !w||!h guard added, fe9a034),
+  #50 (findings map — its headline counts contradicted its own table; corrected recount 2C/10M/28m/1doc/9I,
+  c5631de). REJECTED: #34 (C-2 — inert on main: the core quads rasterized 0 texels due to the sprite-quad
+  bug below; re-land after that fix). All three closed with documented evidence comments.
+- Wallpaper: #2-#6 all verified faithful (13/13 + 23/23 + code-identical twins) and merged; then the FULL V41
+  engine sync ported to the twin (622+/118-, hunk-fidelity table in the sandbox GATE_WORKLOG).
+- MY OWN merge-resolution bug caught by the port audit and fixed (8dc4565): the --r2shot pan= sscanf line
+  dropped in the eb9b588 conflict resolution.
+
+### The gate-found engine bugs (fixed on fx-v41-gate + audited by AUD-FX + merged e575600)
+1. fx_blit_sprite_quad rejected the quad INTERIOR — the flare cores/ghosts painted 0 texels since v26
+   (streaks-only PoC). Fixed with the fx_blit_gouraud_tri edge-function convention + the AUD-FX-corrected
+   swanstation split (v0,v1,v2)+(v2,v1,v3). Cores now paint 1474/374/3924 texels (battery cam).
+2. --snow-seed was dead (snow_reset clobbered it) — snow_reset_seed + the 3 CLI sites.
+3. R-restart carried the weather transition + the converged flashlight fade — the K_R room-reload arm
+   (particle.c:396-418 verbatim) + the density hunk (field_2349 = room recipe) at boot AND K_R.
+   restart==fresh md5 now MATCHES.
+4. camtrack Ctrl/Cmd+F collision (the pr_47 variant).
+
+### The owner's four camtrack complaints (fixed on camtrack-v41 + merged eb69666; probes re-run by maintainer)
+1. NIGHT-ONLY: SPU+DR join the night-only family — dayEnv=nightEnv=6 ({6,3} verbatim). SPU0401/DRU0100 verified.
+2. SPU0401 SHOWS NOTHING: auto Effects-Off for dark trackless rooms + camera framed INSIDE the room AABB —
+   76.7% non-background on load (was 0.34%); key 0 restores night + fog 14m; the exported camdat stays {6,3}/6/6.
+3. NO TV EFFECTS: the tvPaint port — the engine's sh_tv_paint VERBATIM (swanstation 4bpp sampler, 16-entry
+   CLUT strip, TV1 x<896, byte-identical TV1/2/3 TIMs, g_tvpaint_pad, RT hook) — the TV static ANIMATES
+   (54.4% A/B diff, 13/13 quads, kill switch, 0 errors).
+4. LIGHT SOURCE: the LIGHT SPHERES — authoring exactly like the camera path spheres, THREE modes only
+   (fixed / static rotation / line; start/end/speedMS/loopMode); ShEnv honors the authored light
+   (env light pos == authored world != camPos); legacy follow:'camera'+ahead round-trips intact.
+5. NAVIGATION: -69% sidebar scroll (3.47 -> 1.07 pages), File/Models/Tracks/Options first, 9 groups collapsed
+   (+localStorage), dev behind a toggle, ONE +Add-track menu, >=12px fonts.
+Regression: the user's 3-map camdat loads + plays, the fan animates, 0 console errors.
+
+### Wallpaper
+- The twin got the full V41 engine sync + the fx port (sprite-quad, snow-seed, K_R arm) + the corpus
+  re-derivation (the 7 SPU/DR models dayEnv 1->6, via the FIXED derive script). Pushed 9d42961.
+
+### Open follow-ups (honest)
+- pr_34 re-land after the sprite-quad fix (the occluded-branch depth-place diff is correct-as-written).
+- The camtrack F-5 flare-sprite preview remains a feature decision; B-4 Infinity round-trip design;
+  the altKey guard + the g/l/c/t/z/h ctrl-collision house-wide sweep (AUD-FX nits).
+- The V41 evidence dir (download/v41_evidence) is in the AUDIT fleet's sandbox — re-mirror if needed.
+- The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE ALL ELSE).
