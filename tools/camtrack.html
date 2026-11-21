@@ -8196,6 +8196,12 @@ function sh1xDriverInit(propAnims, header, opts) {
     }
     a.slideIdx = sh1xJi(e, 'slideIdx', 0);
     a.eventGateAlt = sh1xJi(e, 'eventGateAlt', 0);
+    /* v43 (CT-4-1): the plain gate parse moved ABOVE the OR-block — the
+     * C parse order (fog_poc.c: jint first, the OR-string overwrite
+     * second). The old parse at the BOTTOM of the block re-read the
+     * OR-STRING as a number (NaN -> 0) and clobbered the B-F6 OR fix
+     * back to 0, so OR-list statics were ungated when animsDemo is off. */
+    a.eventGate = sh1xJi(e, 'eventGate', 0);
     a.cutsceneOnly = sh1xJb(e, 'cutsceneOnly', false);
     /* v40 (statics): the eventGate OR-string + the AND second flag */
     a.eventGateOr = [0, 0, 0, 0];
@@ -8203,7 +8209,20 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.eventGate2 = sh1xJi(e, 'eventGate2', 0);
     a.eventGate2Pol = 0;
     if (typeof e.eventGate === 'string' && e.eventGate.indexOf('|') >= 0) {
-      const parts = e.eventGate.split('|').map(Number).filter(n => n > 0);
+      /* v43 (CT-4-1): strtol-equivalent tokens (fog_poc.c:2246-2256) —
+         * the first 4 numeric tokens, KEEPING 0/negative flags, stopping
+         * at the first non-numeric one (the old .map(Number).filter
+         * (n => n > 0) silently DROPPED 0/negative list entries). */
+      const parts = [];
+      let egp = e.eventGate;
+      for (let q = 0; q < 4; q++) {
+        const m = egp.match(/^\s*([+-]?[0-9]+)/);
+        if (!m) break;
+        parts.push(Math.trunc(+m[1]) | 0);
+        egp = egp.slice(m[0].length);
+        if (egp[0] === '|') egp = egp.slice(1);
+        if (!egp) break;
+      }
       for (let q = 0; q < Math.min(4, parts.length); q++) a.eventGateOr[q] = parts[q];
       a.eventGateOrN = Math.min(4, parts.length);
       if (a.eventGateOrN) a.eventGate = a.eventGateOr[0];   /* v40 audit B-F6: mirror the C parse (fog_poc.c) so OR-list statics stay gated when animsDemo is off */
@@ -8243,7 +8262,6 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.lcgXorB = sh1xJi(e, 'lcgXorB', 0xC65A4B97) >>> 0;
     a.durationShift = sh1xJi(e, 'durationShift', 5);
     a.durationBase = sh1xJi(e, 'durationBase', 0x555);
-    a.eventGate = sh1xJi(e, 'eventGate', 0);
     {
       const cg = Array.isArray(e.chunkGate) && e.chunkGate.length >= 2 ? e.chunkGate : null;
       a.hasChunkGate = 0;
