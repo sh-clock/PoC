@@ -122,10 +122,10 @@ What the engine ACTUALLY does (no geometry mirroring!):
   the sprite screen culls |x3|>200 |y3|>160 + the OT bucket bound
   (map5_s00.c:135-143 — W1-11, added v37).
 - WATER.TIM/DR_WAVE.TIM VRAM: NTSC (0,13)+CLUT(224,0) (screen/data.c
-  descriptors). DR_WAVE.TIM is now embedded (dr_wave_data.h — verbatim).
-  WATER.TIM (map1_s02/s03's effect tile) is NOT yet embedded — no corpus
-  room pairs it with a DWAVE floor (checked v37: SU rooms have no
-  envEffects/DWAVE); add water_tim_data.h when such a room ships.
+  descriptors). Both sheets are embedded: DR_WAVE.TIM (dr_wave_data.h,
+  v32) and WATER.TIM (water_tim_data.h, v39 — the 128x128 4bpp sheet +
+  2 CLUT rows, extracted by tools/extract_water_tim.py). The waterTex
+  EXTRAs (v39 ripper) OVERRIDE the compiled-in defaults at load.
   Consumers without the TIM resolve it by name through the standard
   resolver; without it the feature no-ops (same ladder as BG_ETC).
 
