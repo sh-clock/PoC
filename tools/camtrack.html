@@ -2384,7 +2384,7 @@ window.SHView = (function () {
     /* scratch */
     _m4: null, _m4b: null, _v3: null, _col: null,
     camPos: [0, 0, 0], camAxes: null, camFwd: [0, 0, -1],
-    farCullM: 30.47,
+    farCullM: 60.875,
     stats: {}
   };
 
@@ -2970,7 +2970,7 @@ window.SHView = (function () {
         uniforms: {
           map: { value: map },
           uAlphaTest: { value: alphaMode },
-          uFarCullM: { value: 30.47 },
+          uFarCullM: { value: 60.875 },
           uPsx: { value: V.psxWobble ? 1 : 0 },
           uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) }    /* v40: NTSC 224 */
         },
@@ -3067,7 +3067,7 @@ window.SHView = (function () {
     const fogIntensity = fog.fogIntensity;
     const tintEff = fog.tintEff;
     const tint = env.worldTintColor;
-    let farCullQ8 = 0x79C << 2;
+    let farCullQ8 = 0x79C << 3;      /* 15584 Q8 = 60.875 m — WorldGfx_Draw(1), otShift 1 (fog_poc.c v21) */
     if (V.enabled && fog.isFogEnabled && fog.farQ8 < farCullQ8) farCullQ8 = fog.farQ8;
     V.farCullM = farCullQ8 / 256;
 
