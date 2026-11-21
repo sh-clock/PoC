@@ -2565,17 +2565,20 @@ window.SHView = (function () {
   const SH_VERT = `
     attribute vec3 shVcol;
     attribute vec3 shOcol;
+    attribute float shQcull;   /* v43 (CT-2#4): per-QUAD far-cull flag (1 = skip) */
     varying vec3 vVcol;
     varying vec3 vOcol;
     varying vec2 vUv;
     varying float vDepth;
     varying float vW;      /* v5: the noperspective (affine) unwrap weight */
+    varying float vQcull;  /* v43 (CT-2#4): flat per quad — constant under any interpolation */
     uniform float uPsx;
     uniform vec2 uPixScale;     /* (RT_W/320, RT_H/224) — the GTE grid (v40: NTSC gsScreenHeight=224; the old 240 was the PAL/SCREEN_HEIGHT reading — see the PoC v21/v40 engine-truth grid) */
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       float depth = -mvPosition.z;
       vec4 clip = projectionMatrix * mvPosition;
+      vQcull = shQcull;
       if (uPsx > 0.5 && clip.w > 0.0) {
         /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
            (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor)          */
@@ -2639,6 +2642,7 @@ window.SHView = (function () {
     varying vec2 vUv;
     varying float vDepth;
     varying float vW;      /* v5: the noperspective (affine) unwrap weight */
+    varying float vQcull;  /* v43 (CT-2#4): the per-QUAD far-cull flag */
     void main() {
       float iw = 1.0 / vW;         /* v5: unwrap the affine (PSX) varyings */
       float depth = vDepth * iw;
@@ -2646,7 +2650,15 @@ window.SHView = (function () {
       vec3 vcolf = vVcol * iw;
       vec3 ocolf = vOcol * iw;
       if (depth <= 0.05) discard;                 /* engine near discard  */
-      if (depth > uFarCullM) discard;             /* engine far cull      */
+      /* v43 (CT-2#4): the engine's per-QUAD far cull — Gfx_MeshDraw skips
+         the WHOLE quad when its MAX vertex SZ (Q8) exceeds field_1C
+         (bodyprog_80056D8C.c:720-733; fog_poc.c:13416-13423); MASK
+         (billboard leaf) quads cull on the CENTER depth, strict '<' with
+         the low 2 bits cleared (billboard.c:263-266, fog_poc.c:13405-13413).
+         Decided CPU-side in perVertexPass (exact Q8 integer math) — a
+         quad straddling the cull plane no longer keeps its near fragments.
+         uFarCullM is now informational only (kept in sync per frame). */
+      if (vQcull > 0.5) discard;
       vec4 texel = texture2D(map, uvf);
       /* v3 engine-exact per-texel rule (DuckStation gpu_sw_rasterizer.inl:
          texture_color == 0 -> return; the engine draws BOTH classes'
@@ -2938,6 +2950,11 @@ window.SHView = (function () {
       const ocol = new three.BufferAttribute(new Float32Array(n * 3), 3);
       geo.setAttribute('shVcol', vcol);
       geo.setAttribute('shOcol', ocol);
+      /* v43 (CT-2#4): the per-quad far-cull flag (written per frame by
+         perVertexPass' index walk) + the reusable per-vertex depth scratch */
+      const qcull = new three.BufferAttribute(new Float32Array(n), 1);
+      const depths = new Float32Array(n);
+      geo.setAttribute('shQcull', qcull);
 
       /* CLONE the texture (read-only asset discipline: the source texture
          and its sRGB decode stay untouched for the editor view; the clone
@@ -3009,7 +3026,7 @@ window.SHView = (function () {
       }
       rec.meshes.push(o);
       rec.shMats.push(shMat);
-      rec.attrs.set(o, { vcol, ocol, n, isMaskBB, srcMat });
+      rec.attrs.set(o, { vcol, ocol, n, isMaskBB, srcMat, qcull, depths });
     });
 
     /* the ground probe grid (one-time; the walkable surface under the
@@ -3172,6 +3189,7 @@ window.SHView = (function () {
         const wz = me[2]*x + me[6]*y + me[10]*z + me[14];
         const vz = viewE[2]*wx + viewE[6]*wy + viewE[10]*wz + viewE[14];
         const depth = -vz;
+        a.depths[i] = depth;   /* v43 (CT-2#4): the per-quad cull walk below */
         const o3 = i * 3;
 
         if (fogEnabled) {
@@ -3258,6 +3276,72 @@ window.SHView = (function () {
           vcol[o3] = vcol[o3 + 1] = vcol[o3 + 2] = 128;
           ocol[o3] = ocol[o3 + 1] = ocol[o3 + 2] = 0;
         }
+      }
+
+      /* v43 (CT-2#4) — THE ENGINE'S PER-QUAD FAR CULL, CPU-side.
+       * The C applies it at OT-entry creation (fog_poc.c:13405-13423,
+       * the comment :13060-13069): OPAQUE+BLEND quads are skipped when
+       * their MAX vertex SZ (Q8) fails `mz > 0 && mz <= farCullQ8`
+       * (Gfx_MeshDraw, bodyprog_80056D8C.c:720-733); MASK (billboard
+       * leaf) quads are skipped when the CENTER depth fails the strict
+       * `(cq8 & ~3) < farCullQ8` (billboard.c:263-266). Quads are
+       * reconstructed from the converter's (v0,v2,v1)+(v2,v3,v1) index
+       * pattern exactly like the C's walk (fog_poc.c:13345-13362); a
+       * pattern miss is a lone triangle (nv=3, the same rule). The
+       * decision ships to SH_FRAG as the flat shQcull flag — the old
+       * per-fragment discard at the interpolated depth kept the near
+       * fragments of a straddling quad the engine drops entirely.
+       * Corners shared between quads (the converter's vertex cache)
+       * resolve KEEP — never drop a quad the engine keeps. */
+      {
+        const qcull = a.qcull.array;
+        qcull.fill(0);
+        const depths = a.depths;
+        const idxA = geo.index ? geo.index.array : null;
+        const ic = idxA ? idxA.length : (n - (n % 3));
+        const dropQ = [], keepQ = [];
+        for (let k = 0; k + 2 < ic;) {
+          let vi0, vi1, vi2, vi3 = -1;
+          if (idxA) {
+            vi0 = idxA[k]; vi1 = idxA[k + 1]; vi2 = idxA[k + 2];
+            if (k + 5 < ic && idxA[k + 3] === vi1 && idxA[k + 5] === vi2)
+              vi3 = idxA[k + 4];                       /* the quad's 4th corner */
+          } else {          /* non-indexed fallback: consecutive triples */
+            vi0 = k; vi1 = k + 1; vi2 = k + 2;
+          }
+          if (vi0 >= n || vi1 >= n || vi2 >= n || vi3 >= n) break;
+          const nv = vi3 >= 0 ? 4 : 3;
+          let drop;
+          if (a.isMaskBB) {
+            /* MASK: the quad CENTER depth, strict '<', low 2 bits cleared */
+            let cz = depths[vi0] + depths[vi1] + depths[vi2];
+            if (nv === 4) cz += depths[vi3];
+            cz /= nv;
+            const cq8 = Math.floor(cz * 256 + 0.5) | 0;
+            drop = !((cq8 & ~3) < farCullQ8);
+          } else {
+            /* OPAQUE+BLEND: the MAX vertex SZ Q8 */
+            let mz = 0;
+            let q8 = Math.floor(depths[vi0] * 256 + 0.5) | 0;
+            if (q8 > mz) mz = q8;
+            q8 = Math.floor(depths[vi1] * 256 + 0.5) | 0;
+            if (q8 > mz) mz = q8;
+            q8 = Math.floor(depths[vi2] * 256 + 0.5) | 0;
+            if (q8 > mz) mz = q8;
+            if (nv === 4) {
+              q8 = Math.floor(depths[vi3] * 256 + 0.5) | 0;
+              if (q8 > mz) mz = q8;
+            }
+            drop = !(mz > 0 && mz <= farCullQ8);
+          }
+          const out = drop ? dropQ : keepQ;
+          out.push(vi0, vi1, vi2);
+          if (nv === 4) out.push(vi3);
+          k += nv === 4 ? 6 : 3;
+        }
+        for (let q = 0; q < dropQ.length; q++) qcull[dropQ[q]] = 1;
+        for (let q = 0; q < keepQ.length; q++) qcull[keepQ[q]] = 0;
+        a.qcull.needsUpdate = true;
       }
       a.vcol.needsUpdate = true;
       a.ocol.needsUpdate = true;
