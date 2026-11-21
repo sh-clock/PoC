@@ -7344,8 +7344,13 @@ function handleMeshes() {
   if (pointer.on && pointerMarker && pointerMarker.visible) out.push(pointerMarker.userData.sphere);
   /* v41 (CT-IMPL fix 4): the LIGHT SPHERES join the camera-handle drag
    * machinery (draggable exactly like the path spheres) */
-  if (lightHandles && lightHandles.group.visible)
-    out.push(lightHandles.pos, lightHandles.aim, lightHandles.start, lightHandles.end);
+  if (lightHandles && lightHandles.group.visible) {
+    /* B-13: three.js r170's Raycaster ignores .visible — push only the
+     * spheres the CURRENT mode actually shows (the hidden aim/start/end
+     * would otherwise intercept clicks as phantom grabs) */
+    for (const k of ['pos', 'aim', 'start', 'end'])
+      if (lightHandles[k].visible) out.push(lightHandles[k]);
+  }
   return out.filter(o => o.isMesh);            /* rail lines are not grabbable */
 }
 function pathLines() {
