@@ -11125,8 +11125,24 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
         int py = g_flaresys.scrLPos[1] + fb->h / 2;
         int visible = 0;
         if (px >= 0 && px < (int)fb->w && py >= 0 && py < (int)fb->h) {
-            float lightDepth = (float)g_flaresys.scrLPos[2] / 256.0f;
-            visible = fb->z[(size_t)py * fb->w + px] >= lightDepth &&
+            /* V43 E-14-4: the engine OT-sorts the 1x1 white TILE at
+             * bucket B = (scr_l_pos->vz + 2) >> 3 (lens_flare.c:117) and
+             * it is covered by ANY opaque mesh in a NEARER bucket AND by
+             * same-bucket meshes (AddPrim'd before it, drawn after it —
+             * draw.c order objects -> chunks -> 2dEffects). Engine-true
+             * visible <=> the nearest opaque occluder at that pixel is
+             * at depth >= the bucket's FAR EDGE 8*(B+1) Q8 — the same
+             * principle merged #35 (V41 C-3) applied to the fixed
+             * 641/639 water gates (20.0625 = 642*8/256 below). The old
+             * raw-light-depth gate accepted occluders in [vz, 8*(B+1)) —
+             * a window of up to 10 Q8 (3.9 cm; vz in [8B-2, 8B+6) =>
+             * window (2,10]) in which the engine decays the flare but
+             * the PoC brightened it. (Residual: per-pixel fb->z cannot
+             * model the per-quad MAX-corner OT rule — finder Uncertain
+             * #1; this closes only the looser direction.)              */
+            float gateDepth =
+                (float)((((g_flaresys.scrLPos[2] + 2) >> 3) + 1) * 8) / 256.0f;
+            visible = fb->z[(size_t)py * fb->w + px] >= gateDepth &&
                       g_flaresys.scrLAngZ >= fx_q12_angle(75.0f);
         }
         g_flaresys.centerVisible = visible;
