@@ -6796,6 +6796,10 @@ static void particle_environment_set(Snow *S, int arg0, uint32_t arg1) {
  *                                ? Q12(0.0005f) : Q12(0.0f)
  *   field_234A = false when the target differs (transition started)
  * Returns 1 when the switch was accepted, 0 when the lock refused it. */
+/* V42 D-1: the resolved boot weatherTarget (CLI --weather-target > the
+ * camdat track/env weatherTarget; -1 = none) — the K_R restart must
+ * re-arm the same cross-fade a fresh boot arms, else restart != fresh. */
+static int g_bootWeatherTarget = -1;
 static int sh_particle_weather_target_set(Snow *S, int arg0) {
     if (!S->transitionLock) {
         /* engine line 3946: `return false` — the whole body is skipped */
@@ -15307,6 +15311,17 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
                 A->snow.snowDensitySel = 0;
         }
         snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
+        /* V42 D-1: re-arm the boot/camdat weatherTarget cross-fade — the
+         * fresh boot's sharedFunc_800D0B18 (CLI --weather-target > the
+         * camdat track/env weatherTarget) was never re-applied here, so
+         * the restarted session locked at the room recipe (restart !=
+         * fresh: THRF9FD --duration 6 745 px stable 3/3, gone when the
+         * camdat carries no weatherTarget). The boot order is recipe
+         * load THEN the event arm — mirrored here (the re-sync above,
+         * then this). transitionLock was just set to 1, so the arm is
+         * accepted exactly like the boot call. */
+        if (g_bootWeatherTarget >= 0)
+            sh_particle_weather_target_set(&A->snow, g_bootWeatherTarget);
         /* v41-ENGFX bug 3b: the fresh-session flashlight fade + the boot
          * dt=0 prime. The restart had been carrying the env's converged
          * flashlightIntensity (4096) while a fresh session ramps 0->4096
@@ -17726,6 +17741,7 @@ int main(int argc, char **argv) {
      * so the boot call is accepted exactly like the engine's map event).
      * The full 0..8 argument range is exposed (the shipped game only ever
      * calls D0B18(6) — its snow->rain street event). */
+    g_bootWeatherTarget = bootWeatherTarget;   /* V42 D-1: for the K_R re-arm */
     if (bootWeatherTarget >= 0) {
         if (sh_particle_weather_target_set(&A.snow, bootWeatherTarget)) {
             printf("[weather] boot sharedFunc_800D0B18(%d) — sine cross-fade "
