@@ -2477,8 +2477,16 @@ static int glb_accessor(Glb *g, int accIdx, AccView *out) {
     if (!bv) return 0;
     int bufIdx = jint(bv, "buffer", -1);
     if (bufIdx != 0) return 0;                          /* GLB: buffer 0 = BIN */
-    size_t bvOff = (size_t)jint(bv, "byteOffset", 0);
-    size_t bvLen = (size_t)jint(bv, "byteLength", 0);
+    /* V42 D-5: negative JSON integers cast to size_t WRAP to huge values
+     * and the sum checks below can overflow past the bound (a crafted
+     * accessor byteOffset -1200000 read 1.2 MB before the BIN — SEGV,
+     * ASan-proven by finders D+F). Reject the negatives at the source. */
+    int bvOffI = jint(bv, "byteOffset", 0);
+    int bvLenI = jint(bv, "byteLength", 0);
+    int strideI = jint(bv, "byteStride", 0);
+    if (bvOffI < 0 || bvLenI < 0 || strideI < 0) return 0;
+    size_t bvOff = (size_t)bvOffI;
+    size_t bvLen = (size_t)bvLenI;
     if (bvOff + bvLen > g->binLen) return 0;
     out->ptr = g->bin + bvOff;
     out->compType = jint(acc, "componentType", 0);
@@ -2486,11 +2494,13 @@ static int glb_accessor(Glb *g, int accIdx, AccView *out) {
     out->comps = !strcmp(ty, "SCALAR") ? 1 : !strcmp(ty, "VEC2") ? 2 :
                  !strcmp(ty, "VEC3") ? 3 : !strcmp(ty, "VEC4") ? 4 : 0;
     out->count = jint(acc, "count", 0);
-    size_t accOff = (size_t)jint(acc, "byteOffset", 0);
-    int stride = jint(bv, "byteStride", 0);
+    int accOffI = jint(acc, "byteOffset", 0);
+    int stride = strideI;
     int compSize = out->compType == GL_FLOAT ? 4 : out->compType == GL_UNSIGNED_SHORT ? 2 :
                    out->compType == GL_UNSIGNED_INT ? 4 : 0;
     if (!out->comps || !compSize) return 0;
+    if (accOffI < 0 || out->count < 0) return 0;        /* V42 D-5 */
+    size_t accOff = (size_t)accOffI;
     out->byteStride = stride ? stride : out->comps * compSize;
     out->ptr += accOff;
     if (bvOff + accOff + (size_t)out->count * (size_t)out->byteStride > g->binLen) return 0;
