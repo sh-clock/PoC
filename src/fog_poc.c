@@ -13513,8 +13513,18 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                      * near-plane guard: corners closer than 0.875 m or
                      * behind the camera get region-flagged for the
                      * near-plane span test instead; v40: NTSC 224 not the
-                     * PAL 240).                                    */
-                    if (szQ8 > 6400) nOutNear++;    /* all-beyond-25m cull  */
+                     * PAL 240).
+                     * V45 audit (E-1): RotTransPers returns OTZ = SZ>>2
+                     * (libgte smp_02.o: mfc2 $2,$19; sra $2,$2,2), so the
+                     * engine's *4 re-quantizes to SZ & ~3 — the corner is
+                     * outside-near iff 6400 < (SZ & ~3), i.e. SZ >= 6404:
+                     * the raw SZ 6401-6403 window (1.17 cm at 25 m) was
+                     * counted by the old `szQ8 > 6400` but NOT by the
+                     * engine. Mirrors the MASK site's (cq8 & ~3) idiom
+                     * (billboard.c:263-266). The far test is unaffected
+                     * (224 is a multiple of 4: szQ8 < 224 iff (szQ8 & ~3)
+                     * < 224 — both readings agree at every value).       */
+                    if ((szQ8 & ~3) > 6400) nOutNear++;  /* all-beyond-25m cull */
                     if (szQ8 < 224) nOutFar++;     /* v40: farPlane = SCREEN_GEOM_DIST = 224 (map.c:1479) */
                     else {
                         /* on-screen region flags (screen center +/- 160/120
