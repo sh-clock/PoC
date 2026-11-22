@@ -15566,6 +15566,30 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
                                           * six-globals list also resets
                                           * the flare easing accumulator
                                           * (restart == fresh session) */
+        /* V45 audit (E-9): the R2 (self) view RUNTIME state — the restart
+         * == fresh-session contract extends to the R2 feature (the engine
+         * has no R key; the PoC's R models the v38/v41-E2/E3 contract, see
+         * the note above). The carried state broke it two ways: (1) the
+         * entry edge (WARP_WATCH, vc_main.c:769-787) never re-fired
+         * post-restart — active stayed 1 — so the view resumed mid-
+         * dynamics instead of the fresh entry snap, and (2) selfViewTimer
+         * — the noise timebase of r2view_pose's vcSetDataToVwSystem angle
+         * noise — kept counting across the restart, so every post-restart
+         * frame carried the pre-restart noise phase (t=1.97+3.00 vs a
+         * fresh 3.00 s at the boundary). Reset the RUNTIME state via the
+         * boot reset; the session's CONFIG (featureOn / viewCtrl /
+         * viewKey — the --r2view/--no-r2view + Y toggle, --r2ctrl, --r2-key
+         * CLI choices) survives R exactly like the env's user choices
+         * (pair/night/flashlight, the note at the flashlight arm above). */
+        {
+            int cfgFeatureOn = A->r2.featureOn;
+            int cfgViewCtrl = A->r2.viewCtrl;
+            char cfgViewKey = A->r2.viewKey;
+            r2view_reset(&A->r2);
+            A->r2.featureOn = cfgFeatureOn;
+            A->r2.viewCtrl = cfgViewCtrl;
+            A->r2.viewKey = cfgViewKey;
+        }
         /* v41 (audit A-3): the room-reload WorldObjectsInit — the engine
          * re-enters Map_WorldObjectsInit -> func_800CB0D8 on every map
          * load, so the restart re-runs the ripple spawn AFTER the fresh
