@@ -3617,11 +3617,16 @@ class TextureResolver:
                 "engine clut 140 row - refusing to guess")
             return None
         # ---- decode the engine window with palette row `row` ------------
-        # OPAQUE-primitive punch-through, engine-literal: texel INDEX 0 is
-        # fully transparent, every other texel opaque (code 0x3C, ST clear;
-        # the GPU rule is index-based, NOT color-based - indices 9-15 whose
-        # colors are 0x0000 would draw BLACK; the real window happens to
-        # reference indices 0-8 only, so both readings coincide - verified).
+        # OPAQUE-primitive punch-through, engine-literal (W1-x47 audit fix):
+        # the discard is on the FETCHED 16-bit CLUT COLOR, NOT the 4bpp
+        # index — swanstation gpu_sw_backend.cpp:124 `if (texture_color.bits
+        # == 0) return;` (all texture modes; the same rule the room-texture
+        # decode applies, see the v40 note at the TimFile.decode path).  An
+        # index whose color is 0x0000 is transparent regardless of its value;
+        # index 0 happens to be color 0x0000 in the real row-2 palette, but
+        # indices 9-15 (also 0x0000 here) would punch through too under the
+        # hardware rule — the old index-0-only reading coincided on this
+        # asset only because the window references indices 0-8.
         h, w = tim.height, tim.width
         img = np.frombuffer(tim.img_data, dtype=np.uint8)
         if img.size < w // 2 * h:
@@ -3639,7 +3644,7 @@ class TextureResolver:
         rgb = np.stack([rep(c & 0x1F), rep((c >> 5) & 0x1F),
                         rep((c >> 10) & 0x1F)], axis=-1)
         alpha = np.full(win_idx.shape, 255, dtype=np.uint8)
-        alpha[win_idx == 0] = 0            # PS1 4bpp index-0 punch-through
+        alpha[c == 0] = 0    # texture_color.bits == 0 -> not drawn
         variant = np.concatenate([rgb, alpha[..., None]], axis=-1)
         if not HAS_PIL:
             raise RuntimeError("Pillow required for texture embedding")
@@ -5084,8 +5089,13 @@ class GltfBuilder:
         self._image_hashes[h] = idx
         return idx
 
-    def add_texture(self, image_idx):
-        self.json["samplers"].append({"magFilter": 9729, "minFilter": 9729,
+    def add_texture(self, image_idx, nearest=False):
+        # v46-2: NEAREST (9728) optional — the engine samples textures
+        # texel-1:1 (no filtering); the default LINEAR stays for room sheets
+        # (the established corpus look), but the 32x32 DWAVE live tile MUST
+        # be nearest or stock bilinear viewers smear the dapple.
+        filt = 9728 if nearest else 9729
+        self.json["samplers"].append({"magFilter": filt, "minFilter": filt,
                                       "wrapS": 10497, "wrapT": 10497})
         sidx = len(self.json["samplers"]) - 1
         self.json["textures"].append({"sampler": sidx, "source": image_idx})
@@ -5093,7 +5103,8 @@ class GltfBuilder:
 
     def add_material(self, key, name, tex_idx=None, has_alpha=False,
                      base_color=(0.5, 0.5, 0.5, 1.0), double_sided=False,
-                     alpha_mode=None, alpha_cutoff=None, extras=None):
+                     alpha_mode=None, alpha_cutoff=None, extras=None,
+                     tex_base_color=None):
         if key in self._material_keys:
             return self._material_keys[key]
         mat = {"name": name,
@@ -5101,6 +5112,16 @@ class GltfBuilder:
                "extensions": {"KHR_materials_unlit": {}}}
         if tex_idx is not None:
             mat["pbrMetallicRoughness"]["baseColorTexture"] = {"index": tex_idx}
+            if tex_base_color is not None:
+                # v46-2: the glTF-native carrier of the ENGINE's flat-color
+                # modulate (e.g. the water floor's 0x2E383838 -> 56/128) —
+                # multiplies the sampled texel in stock viewers WITHOUT
+                # touching the extras contract or the texture image itself.
+                # (The PoC consumes baseColorFactor only for UNEXTURED
+                # materials — fog_poc.c:3119 — so its engine-exact water
+                # path is unaffected; no double-modulation.)
+                mat["pbrMetallicRoughness"]["baseColorFactor"] = \
+                    list(tex_base_color)
         else:
             mat["pbrMetallicRoughness"]["baseColorFactor"] = list(base_color)
         if alpha_mode:
@@ -5804,7 +5825,27 @@ def build_instance_meshes(room, inst, lib, resolver, builder, report,
                 tex_w = tex_h = None
             else:
                 tex_name = lib.tex_names[pack.tex_num]
-                mat_key = ("TEX", tex_name, pack.cba, pack.stp)
+                # v46-2 (S24/V47 water audit — the field_B_4==2 class): the
+                # engine dispatches field_B_4 2 to func_80059D50(2) ->
+                # func_80059E34 case 2 (bodyprog_80056D8C.c:1469-1471):
+                # packedColor 0x2E808080 — SEMI ALWAYS ON (the pack's own
+                # stp bit is NOT consulted on this path; the standard
+                # 0x3E/0x34 selection of func_8005AC50 never runs), flat
+                # (128,128,128) = UNITY modulate, tpage = own bits 0..4 |
+                # 0x20 (4bpp CLUT, ABR-1 ADDITIVE, page Y=0), z-sorted OT
+                # bucket.  The per-texel blend gate is the CLUT-entry STP
+                # bit (swanstation gpu_sw_backend.cpp:139-156 —
+                # `color.bits & 0x8000u` after the modulate) — exactly the
+                # _STP texture variant's alpha.  So the class export = the
+                # stp=1 decode + the waterAdd extras + BLEND, even for
+                # packs whose own stp bit is 0 (the engine draws them semi
+                # regardless).  Corpus: APU0002 DRL2_ILI, RSU01FF FLOOR4_I,
+                # SC00FF G_HIDE_I/R_HIDE_I, SPU0401 REF_NEAR.
+                water_add_class = (obj.flag_b4 == 2)
+                stp_eff = 1 if water_add_class else pack.stp
+                mat_key = ("TEXA", tex_name, pack.cba, stp_eff) \
+                    if water_add_class else \
+                    ("TEX", tex_name, pack.cba, pack.stp)
                 tex_w = tex_h = None
                 # v45: the waterLive packs' UVs are live-tile page-texel
                 # coords (the note at the tex_w assignment below); flips
@@ -5821,9 +5862,12 @@ def build_instance_meshes(room, inst, lib, resolver, builder, report,
                     report["tex_referenced"].add(tex_name)
                     try:
                         pal, pal_y = tim.palette(pack.cba)
-                        variant = tim.decode(pal, pack.stp)
+                        variant = tim.decode(pal, stp_eff)
                         report["tex_variants"].setdefault(
-                            (tex_name, pal_y, pack.stp), variant)
+                            (tex_name, pal_y, stp_eff), variant)
+                        if water_add_class:
+                            report["water_add_class_packs"] = \
+                                report.get("water_add_class_packs", 0) + 1
                     except Exception as e:
                         report["problems"].append(
                             f"{inst.obj_name} mesh{mi}: texture {tex_name}: {e}")
@@ -6053,7 +6097,7 @@ def _material_for(builder, gk, report):
                                     base_color=(0.5, 0.45, 0.45, 1.0))
     _tag, tex_name, cba, stp = gk
     pal_y = (cba & 0x7FC0) >> 6
-    key = ("TEX", tex_name, pal_y, stp)
+    key = ("TEXA" if _tag == "TEXA" else "TEX", tex_name, pal_y, stp)
     # texture/sampler entries are created ONLY when a new material is created:
     # previously every primitive group added a texture even when the material
     # already existed, leaving orphaned glTF texture objects (47 textures for
@@ -6074,7 +6118,7 @@ def _material_for(builder, gk, report):
     # from the GLB alone.  The static PNG view = the first-frame tile: a
     # naive viewer shows approximately the right water; the waterLive
     # extras below carries the exact engine contract.
-    if tex_name == "DWAVE":
+    if _tag == "TEX" and tex_name == "DWAVE":
         tile_png = report.get("water_tile_png")
         if tile_png is None:
             tim = report.get("tim_cache", {}).get("DWAVE")
@@ -6101,7 +6145,15 @@ def _material_for(builder, gk, report):
         png = tile_png
         iname = "DWAVE_TILE0"
         img_idx = builder.add_image(png, iname)
-        tex_idx = builder.add_texture(img_idx)
+        # v46-2: NEAREST sampler + baseColorFactor 56/128 — the two glTF-
+        # native carriers of the engine's water-floor look (texel-1:1
+        # sampling + the 0x2E383838 flat modulate) so STOCK viewers show
+        # the dark dapple (the actual subtract-term brightness), not a
+        # bright gray plane.  The PNG stays the documented ctr=0 composite;
+        # the extras contract is untouched; the PoC/camtrack/wallpaper
+        # consumers render from the extras (fog_poc.c ignores
+        # baseColorFactor for textured materials).
+        tex_idx = builder.add_texture(img_idx, nearest=True)
         mname = f"{tex_name}_pal{pal_y}" + ("_STP" if stp else "")
         extras = {"SH1X": {
             "waterLive": True,
@@ -6147,6 +6199,62 @@ def _material_for(builder, gk, report):
                    "WorldMap_ChunkPropertiesSet map.c:1181 (the DWAVE "
                    "material redirect to tpage 13) + func_80059E34 "
                    "bodyprog_80056D8C.c:1435-1560 (the floor draw)",
+        }}
+        return builder.add_material(key, mname, tex_idx=tex_idx,
+                                    has_alpha=has_alpha, extras=extras,
+                                    tex_base_color=(0.4375, 0.4375, 0.4375, 1.0))
+    # ---- v46-2 (S24/V47): the field_B_4==2 additive-water class --------
+    # (func_80059E34 case 2 — the same draw family as the subtractive water
+    # floor, but ADDITIVE: packedColor 0x2E808080 semi-always, flat UNITY,
+    # 4bpp CLUT tpage own|0x20, z-sorted bucket.)
+    if _tag == "TEXA":
+        img = Image.fromarray(variant)
+        import io as _io
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG", optimize=False)
+        png = buf.getvalue()
+        iname = f"{tex_name}_pal{pal_y}" + ("_stp" if stp else "") + "_WADD"
+        img_idx = builder.add_image(png, iname)
+        tex_idx = builder.add_texture(img_idx)
+        mname = iname
+        extras = {"SH1X": {
+            "waterAdd": True,
+            "floor": {
+                "draw": "func_80059E34 arg0==2 (the field_B_4==2 models; "
+                        "bodyprog_80056D8C.c:1435-1560 via func_80059D50 "
+                        "dispatched by func_80057090:136-164); the z-sorted "
+                        "otBucket below is the arg0==2/3 shared branch — "
+                        "NOT the arg0==1 fixed 640 (:1552-1559)",
+                "tpage": "(prim->u1 & 0x1FFFFF) | (0x20<<16) — the pack's "
+                         "own bits 0..4 (its 4bpp page X) with bit 5 set "
+                         "(bodyprog_80056D8C.c:1546, var_a2=0x20 for "
+                         "arg0==2)",
+                "mode": "4-bit CLUT (tpage bits 7-8 = 0), page Y = 0",
+                "abr": "B+F ADDITIVE saturating (tpage bits 5-6 = 1; "
+                       "swanstation BackgroundPlusForeground "
+                       "gpu_sw_backend.cpp:171-178); the pack's own stp "
+                       "bit is NOT consulted — 0x2E semi is unconditional "
+                       "(:1469-1471); the per-texel blend gate is the CLUT "
+                       "entry's STP bit 15 (gpu_sw_backend.cpp:139-156), "
+                       "which the _STP texture alpha marks exactly",
+                "flatColor": [128, 128, 128],
+                "otBucket": "z-sorted: tag[MAX vertex SZ >> (otShift+2)] "
+                            "(bodyprog_80056D8C.c:1552-1559)",
+                "fogVeil": "none — the func_80059E34 packet replaces "
+                           "Gfx_MeshDraw's STP-branch veil draw",
+                "farCull": "same as the water family: "
+                           "isFogEnabled ? MIN(Q8(7.61) << (otShift+2), "
+                           "fog.farDistance) : Q8(7.61) << (otShift+2) "
+                           "(bodyprog_80056D8C.c:1475-1476)",
+                "uvUnits": "engine prims: page-texel coords on the pack's "
+                           "own 4bpp page (in-sheet u,v); glTF TEXCOORD_0 = "
+                           "(u/tim_w, v/tim_h) — the STANDARD normalization "
+                           "(NOT tile-relative)",
+            },
+            "src": "func_80057090 bodyprog_80056D8C.c:136-164 (the "
+                   "field_B_4 dispatch) + func_80059E34 :1457-1566 (case "
+                   "2: :1469-1471) + swanstation gpu_sw_backend.cpp:171-178 "
+                   "(BackgroundPlusForeground)",
         }}
         return builder.add_material(key, mname, tex_idx=tex_idx,
                                     has_alpha=has_alpha, extras=extras)
@@ -6832,12 +6940,28 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
                     f"consumer's IPD_MODEL_LAYERS table — the wallpaper "
                     f"would use the default base 2 for it")
         if obj.flag_b0 or obj.flag_b4 or obj.unk_b6:
-            flag_problems.append(
-                f"object {inst.lookup_name!r}: nonstandard s_ModelHeader "
-                f"flags (B0={obj.flag_b0} B4={obj.flag_b4} unk_B6="
-                f"{obj.unk_b6}) — the engine would use an alternate "
-                f"transform/draw path (func_8005A21C / func_80059D50); "
-                f"exported via the standard path, deviation reported")
+            if obj.flag_b4 in (1, 2, 3):
+                # the WATER family — exported with the class contract since
+                # v45 (B4 1/3: waterLive subtractive live-tile floors) and
+                # v46-2 (B4 2: waterAdd additive 4bpp-CLUT glow floors —
+                # func_80059E34 case 2); the material extras carry the
+                # verbatim engine draw spec.
+                flag_problems.append(
+                    f"object {inst.lookup_name!r}: water-family "
+                    f"s_ModelHeader flags (B0={obj.flag_b0} B4="
+                    f"{obj.flag_b4}) — the engine draws it through "
+                    f"func_80059D50/func_80059E34 "
+                    f"({'waterLive (subtractive live tile)' if obj.flag_b4 != 2 else 'waterAdd (additive CLUT glow)'}); "
+                    f"exported with the class contract in the material "
+                    f"extras (NOT the standard path)")
+            else:
+                flag_problems.append(
+                    f"object {inst.lookup_name!r}: nonstandard "
+                    f"s_ModelHeader flags (B0={obj.flag_b0} B4="
+                    f"{obj.flag_b4} unk_B6={obj.unk_b6}) — the engine would "
+                    f"use an alternate transform/draw path (func_8005A21C / "
+                    f"func_80059D50); exported via the standard path, "
+                    f"deviation reported")
         plm_flags.append(entry)
     report["plm_object_flags"] = {
         "semantics": ("s_ModelHeader byte @11 bitfield (decomp "

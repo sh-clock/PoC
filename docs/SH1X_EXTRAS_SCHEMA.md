@@ -291,3 +291,73 @@ composite texel STP-set — only blue-field saturation bA+bB>31 clears bit
 15, unreachable by the shipped art). Consumers regenerate the animated
 tile from this payload alone — no hardcoded asset needed (the PoC v45
 overrides its compiled-in defaults with it; absent = the defaults).
+
+## v46-2 additions (S24/V47 — the field_B_4==2 additive-water class)
+
+The corpus sweep (every IPD embedded PLM + every archive) found the
+THIRD water-family class the v45 audit missed: objects with
+`s_ModelHeader` byte-11 `field_B_4 == 2` — the engine dispatch
+(`func_80057090`, bodyprog_80056D8C.c:136-164) sends them to
+`func_80059D50(2)` -> `func_80059E34` **case 2** (:1469-1471):
+`packedColor 0x2E808080` (semi ALWAYS ON, flat 128,128,128 = UNITY
+modulate), tpage `(prim->u1 & 0x1FFFFF) | (0x20<<16)` (the pack's own
+4bpp page X bits | bit 5: **ABR-1 ADDITIVE**, page Y = 0,
+`gpu_types.h:158-161`), z-sorted OT bucket
+`tag[MAX vertex SZ >> (otShift+2)]` (:1552-1559 — the arg0==2/3 branch,
+NOT the fixed 640). Corpus: APU0002 `DRL2_ILI`, RSU01FF `FLOOR4_I`,
+SC00FF `G_HIDE_I`/`R_HIDE_I`, SPU0401 `REF_NEAR` (5 objects, 4 rooms).
+
+### material `extras.SH1X.waterAdd` — the additive-water class
+
+```
+"materials[i]": { ..., "alphaMode": "BLEND", "extras": { "SH1X": {
+  "waterAdd": true,
+  "floor": {
+    "draw": "func_80059E34 arg0==2 ...", 
+    "tpage": "(prim->u1 & 0x1FFFFF) | (0x20<<16) — own bits 0..4 | bit5",
+    "mode": "4-bit CLUT (tpage bits 7-8 = 0), page Y = 0",
+    "abr": "B+F ADDITIVE saturating (BackgroundPlusForeground, gpu_sw_backend.cpp:171-178)",
+    "flatColor": [128, 128, 128],
+    "otBucket": "z-sorted: tag[MAX vertex SZ >> (otShift+2)]",
+    "fogVeil": "none", "farCull": "same as the water family (Q8(7.61) fog-gated MIN)",
+    "uvUnits": "page-texel in-sheet u,v; glTF TEXCOORD_0 = (u/tim_w, v/tim_h) — STANDARD normalization"
+  } } }
+```
+
+- The pack's own `stp` bit is NOT consulted on this path (0x2E
+  unconditional); the per-texel blend gate is the CLUT entry's STP bit
+  (gpu_sw_backend.cpp:139-156) — exactly what the `_STP` texture
+  variant's alpha marks. So the class export = the stp=1 decode +
+  BLEND for EVERY pack of the object, stp=0 packs included. A CLUT row
+  with no STP entries yields has_alpha=false -> OPAQUE (engine-exact:
+  no texel blends — verified: SPUM103F row 3 = 0/16 STP, so REF_NEAR
+  draws fully opaque in the engine).
+- The UV basis stays the STANDARD sheet normalization (verified:
+  the five objects' prim UVs are all in-sheet, e.g. FLOOR4_I u
+  128..255 v 0..127 on the 256-wide RSULH3 sheet).
+- The static BLEND is the established ABR-approximation convention
+  (the same `_STP` + alphaMode BLEND the stp=1 packs already get); the
+  EXTRAS carry the verbatim engine contract for the accurate consumers.
+
+### the DWAVE static-polish (glTF-native, contract-neutral)
+
+The DWAVE (waterLive) material gains `pbrMetallicRoughness.
+baseColorFactor [0.4375, 0.4375, 0.4375, 1]` — the glTF-native carrier
+of the engine's flat modulate (0x2E383838 -> 56/128) — and the
+DWAVE_TILE0 texture's sampler switches to NEAREST (9728/9728): stock
+viewers now show the dark dapple at the subtract-term brightness with
+texel-1:1 sampling instead of a smeared bright-gray plane. The PNG
+stays the documented ctr=0 composite; the extras contract is
+unchanged; the PoC ignores baseColorFactor for textured materials
+(fog_poc.c:3119 — untextured-only) so its engine-exact water path is
+untouched (A/B-verified: DR01FE renders byte-identical).
+
+### the billboard leaf punch-through (comment + rule fix)
+
+The leaf decode's punch-through rule is the FETCHED-COLOR rule
+(`texture_color.bits == 0` -> not drawn, swanstation
+gpu_sw_backend.cpp:124 — the same rule the room-texture decode
+applies), NOT the 4bpp index-0 rule the old comment asserted. Output
+identical on the shipped asset (the real window references indices
+0-8 and row-2 entry 0 is 0x0000); the rule + comment are now
+hardware-exact.

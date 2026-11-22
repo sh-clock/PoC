@@ -2595,3 +2595,135 @@ the user's directive, NOT an omission.
    disable-able, never in day modes).
 - The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE
   ALL ELSE).
+
+---
+
+## Session V47 (2026-11-23, Main_Agent_v47_BranchCleanupWaterAudit) — the branch cleanup + the ripper water-texture audit (round 2)
+
+### 1. THE BRANCH CLEANUP (the owner's new directive: "clean up unnecessary
+branches — 174 PRs are cluttering the branch list")
+- Sandbox survived partially (scripts/assets/WORKLOG intact; PoC+wallpaper
+  repos gone -> recloned with the PAT). Board notified at session start
+  (Main_Agent_v47_BranchCleanupWaterAudit).
+- Enumerated branches x PR states on BOTH repos (paginated API): PoC had
+  177 branches = main + 174 PR-associated (ALL dispositioned: 0 open — the
+  V46 gate cleared the backlog) + housework-v25 [merged into main] +
+  v40-integration [the Nov-20 V40 fleet snapshot — superseded: its ripper
+  fixes verified verbatim on current main (D-F6 @ ipd2gltf.py:826, D-F4
+  @ :7164)]. wallpaper: 26 = main + 23 PR-associated (all dispositioned) +
+  Q [merged] + housework-v6 [merged].
+- DELETED 174 (PoC) + 25 (wallpaper) branches via DELETE
+  /repos/{repo}/git/refs/heads/{name} (the /branches/{name} DELETE form
+  404s). BOTH repos now: branches = [main] ONLY, open PRs = 0.
+  Scripts: scripts/v47_branch_cleanup.py + v47_branch_delete.py (+ the
+  report at pr_triage/v47_branch_report.json).
+
+### 2. THE WATER-TEXTURE RIPPER AUDIT (the owner's directive, V46's next-
+session item 1) — TWO parallel audit agents + the coordinator's own sweep
+- W1_TIMDecode_Agent_x47 (full report in the conversation log): the ENTIRE
+  TIM decode path is BYTE-CORRECT — hand-decoded DRG02/DR_WAVE/etc vs the
+  GLB-embedded PNGs: byte-identical; the DWAVE_TILE0 ctr=0 composite
+  byte-identical to the independent re-derivation; the waterRefract payload
+  (pixels/clut/upload/liveTile) verbatim vs env_effects.c/fs_queue.c/
+  lens_flare.c; the v45 waterLive floor extras verbatim vs
+  func_80059E34. Findings: 1 MINOR (the leaf punch-through comment asserts
+  the INDEX-0 rule; the hardware rule is the FETCHED-COLOR rule —
+  swanstation gpu_sw_backend.cpp:124; output-identical on the corpus) +
+  INFO-level notes (the STP->127 = ABR-0 approx of the ABR-1 rooms blend;
+  the TimFile 4bpp-only scope gate loses nothing — 901 TIMs swept, 0
+  bpp!=0 references in 493 room IPDs).
+- W2_CamtrackWater_Agent_x47 (full report in the conversation log): the
+  v45 GLB + extras are accurate and complete END-TO-END (verified vs
+  func_80059E34, func_8008E5B4, Map_EffectTexturesLoad, the swanstation
+  blend modes); the C PoC consumes them (RP_SUB_TEX + the live tile +
+  the zone gates, fog_poc.c:1929-1978/12447-12522/14850-15071). THE
+  CAMTRACK (three.js) CONSUMES NONE OF IT: no waterLive/waterRefract/
+  DWAVE consumer anywhere in camtrack.html — the water floor renders as
+  an OPAQUE STATIC BRIGHT-GRAY PLANE (mean tile value 118 vs the engine's
+  <=10-level subtractive darkening) — THE "water textures don't look
+  correct" observation point. W2 produced the COMPLETE three.js
+  implementation spec (CustomBlending SubtractEquation + per-frame tile
+  regen from the waterRefract payload, renderOrder 10, depthWrite false,
+  the exact lens_flare.c:581-599 layer windows: poly[0] OPAQUE u 0..32
+  v (ctr>>1)&0x1F..+32 / poly[1] ABR-1 u ((ctr+1)>>2)&0x1F..+32 v 8..40).
+- THE COORDINATOR'S SWEEP (the ripper's own parser over every IPD+PLM):
+  the water family = 63 B4==1 DWAVE floors (v45-covered) + **5 B4==2
+  objects in 4 rooms the v45 audit MISSED** (APU0002 DRL2_ILI, RSU01FF
+  FLOOR4_I, SC00FF G_HIDE_I + R_HIDE_I, SPU0401 REF_NEAR) — the engine
+  dispatches field_B_4==2 to func_80059E34 CASE 2 (:1469-1471):
+  0x2E808080 semi-ALWAYS, flat UNITY, tpage own|0x20 (4bpp CLUT ABR-1
+  ADDITIVE), z-sorted bucket. The S22 note "the UNUSED arg0==2 variant"
+  was WRONG — 5 corpus objects use it. These exported via the standard
+  path (opaque/no contract) -> the class export was missing.
+
+### 3. THE RIPPER FIXES (PoC tools/ipd2gltf.py, this commit)
+1. **The field_B_4==2 class export** (the "TEXA"/waterAdd class): the
+   stp=1 _STP decode for EVERY pack (the engine's unconditional 0x2E +
+   the per-texel CLUT-STP gate — gpu_sw_backend.cpp:139-156), a NEW
+   material key ("TEXA", tex, pal, stp) + name suffix _WADD, alphaMode
+   BLEND (or OPAQUE when the CLUT row has no STP entries — engine-exact,
+   verified: SPUM103F row3 = 0/16 STP -> REF_NEAR draws fully opaque),
+   and the verbatim SH1X.waterAdd.floor extras (draw/tpage/mode/abr/
+   flatColor/otBucket/fogVeil/farCull/uvUnits with the exact decomp
+   citations). UV basis: the STANDARD sheet normalization (verified
+   in-sheet: FLOOR4_I u 128..255 v 0..127 on the 256-wide RSULH3).
+2. **The DWAVE static polish** (W2's fixable list, contract-neutral):
+   baseColorFactor [0.4375 x3, 1] on the waterLive material (the glTF
+   carrier of the 0x2E383838 flat modulate) + the DWAVE_TILE0 sampler
+   NEAREST (9728) — stock viewers show the dark dapple at the subtract-
+   term brightness, texel-1:1, instead of a smeared bright-gray plane.
+   The PNG and the extras stay verbatim; the PoC ignores baseColorFactor
+   for textured materials (fog_poc.c:3119) — no double-modulation.
+3. **The leaf punch-through fix** (W1's finding): the color-0 rule
+   (texture_color.bits == 0 -> not drawn, gpu_sw_backend.cpp:124) +
+   the corrected comment.
+4. The object-flag warning now distinguishes the water family (the class
+   contract export) from the genuine standard-path deviations.
+
+### 4. THE VERIFICATION BATTERY (all green)
+- Clean rip of the full corpus (glbs/ 4-room CI set + glbs_anim/ 25
+  rooms): 0 validation errors everywhere; the APU0002 degraded=YES flag
+  is PRE-EXISTING (10 unresolved library objects — unchanged by this
+  session's edits).
+- The animation gates on the regenerated corpus: FAN 30.50% (thr 500),
+  SEW 527 px (thr 80), TV 13.55% (thr 500) — ALL PASS, exactly the V46
+  baseline values.
+- Golden md5s IDENTICAL to V46's: FAN t=1.000 a419211e84529b7528dfe528a95004e0,
+  SEW t=3 43a1d488b1cf75457971c502dbc44aef, TV t=3 deee41888426cd3c9edede58c95031a2
+  — the ripper changes are render-neutral for the battery rooms.
+- The A/B renders (the PoC, old-batch vs new-batch GLBs): DR01FE
+  BYTE-IDENTICAL (the DWAVE polish render-neutral), SPU0401 IDENTICAL
+  (REF_NEAR OPAQUE = engine-exact: the row has 0/16 STP entries),
+  APU0002/RSU01FF/SC00FF IDENTICAL at 6 camera placements each — the
+  PoC's waterAdd consumer port (the ADDITIVE raster) is NEXT session's
+  mirroring work; the TEXA material's BLEND is visible in stock viewers.
+- IPD roundtrip (tools/tests/sh1x_roundtrip.py): FULL FILE BYTE-IDENTICAL
+  on THRF9FD + HP0003 (+ blob consumption clean on SU0203/DRU0100/SPU0401).
+- The 4 case-2 rooms' GLBs: the WADD materials verified present with the
+  full contract (SPUM103F_pal3_stp_WADD etc.), BLEND where the CLUT row
+  carries STP (SCBFBH/SCBFB2/RSULH3/APUMGR1F = 15-16/16 STP entries).
+
+### 5. THE TASK SPLIT (per the owner's directive — saved for the next session)
+NEXT SESSION QUEUE (S25/V48, in order):
+1. THE CAMTRACK WATER PORT (the user's visible bug): implement W2's
+   complete spec in tools/camtrack.html — the CustomBlending subtractive
+   water floor (renderOrder 10, depthWrite false, SubtractEquation +
+   the F5=(T5*56)>>7 fragment) + the per-frame live-tile regeneration
+   from SH1X.envEffects.waterRefract (the exact lens_flare.c:581-599
+   windows + the ctr advance on the 30Hz grid + the water-zone gates)
+   + registerModel keeping envEffects + the material-extras waterLive
+   parse. [W2's report has the full grounded implementation spec.]
+2. THE PoC + WALLPAPER waterAdd CONSUMER PORT (the B4==2 class): the
+   ADDITIVE raster (BackgroundPlusForeground saturating, flat UNITY) +
+   the z-sorted bucket + the unconditional semi — the four-program
+   mirroring of this session's ripper class. (The PoC's waterLiveUvTile
+   gate must stay keyed on `floor` presence — the waterAdd materials'
+   UVs are sheet-normalized, NOT tile-relative.)
+3. THE WALLPAPER TWIN SYNC of V46+V47 (the 61+6 V46 engine merges + this
+   session's ripper class) + the 45-asset GLB regeneration + the
+   env/EXTRAs rules (no rain indoors; day/night population; unbiased
+   EXTRAs) + related-map EXTRAs.
+4. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
+5. The flashlight (user-programmable light, full camera-like movement).
+6. APU00FF/APUFFFE animation failures + the all-animations PoC suite.
+The commandments stay embedded at the head of this file.
