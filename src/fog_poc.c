@@ -13892,9 +13892,22 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             if (a->z <= 0.05f || b->z <= 0.05f || c->z <= 0.05f) continue;
             {   /* engine far cull: max vertex SZ (Q8) > field_1C -> drop
                  * (per-quad at entry creation since v15; this per-tri guard
-                 * never fires for surviving entries — defensive only)      */
+                 * is redundant for the OPAQUE/BLEND entries — their creation
+                 * test is the SAME max-vertex conversion — and kept only as
+                 * a defensive guard for the MASK/billboard entries, whose
+                 * creation test is the CENTER depth (billboard.c:263-266).
+                 * V45 audit (E-4): the GTE SZ chain TRUNCATES (RTPS
+                 * PushSZ(z>>12), swanstation gte.cpp:659) — the +0.5 round
+                 * here diverged from the entry-creation site the moment PR
+                 * #149 (D-2/D-3) lands its truncation there: a quad whose
+                 * farthest vertex sits in the [trunc==farCullQ8, frac>=0.5]
+                 * band (~1.95 mm at the fog far plane) PASSED creation but
+                 * had its triangles dropped here — a hole the engine cannot
+                 * make (one SZ integer feeds both the cull and the bucket,
+                 * bodyprog_80056D8C.c:712-733 + :855-874). Truncate here
+                 * too, keeping the guard consistent with the family.      */
                 float zm = fmaxf(a->z, fmaxf(b->z, c->z));
-                if ((int)floorf(zm * 256.0f + 0.5f) > farCullQ8) continue;
+                if ((int)floorf(zm * 256.0f) > farCullQ8) continue;
             }
             /* STP textured prim: per-texel 0x0000 holes only (v14); fogged
              * with the SAME engine formula as opaque prims (see raster_tri)
