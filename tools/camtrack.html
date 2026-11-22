@@ -8286,6 +8286,7 @@ function sh1xDriverInit(propAnims, header, opts) {
      * engine-true for a hasTv=0 table, fog_poc.c:10077-10085). */
     tvPaint: (opts && opts.tvPaint) || null,
     tvPaintPad: 0,          /* g_tvpaint_pad — D_800DB924.pad (s16) */
+    tvPaintPadStep: 0,      /* v43 (CT-5-3): last 30Hz tick the pad advanced on */
     chunkX: (header && isFinite(+header.chunkX)) ? Math.trunc(+header.chunkX) : 0,
     chunkZ: (header && isFinite(+header.chunkZ)) ? Math.trunc(+header.chunkZ) : 0
   };
@@ -11838,12 +11839,26 @@ function sh1xTvPaintUpdate() {
   const anchor = Array.isArray(tv.anchor) && tv.anchor.length >= 3
     ? tv.anchor : [160, 0, 40];     /* func_800D7718:535 literals */
   const ax = +anchor[0], aengY = +anchor[1], az = +anchor[2];
+  /* v43 (CT-5-3): the pad's tick-grid delta (see the pad comment below);
+   * a seek-back resets both fields together via sh1xDriverReset's fresh
+   * state, so the delta never runs negative past the clamp. */
+  const padTicks = Math.max(0, (S.steps | 0) - (S.tvPaintPadStep | 0));
+  S.tvPaintPadStep = S.steps | 0;
   for (const a of S.anims) {
     if (a.driver !== 2) continue;   /* the tvNoise family only */
     if (a.gated) continue;          /* the engine skips gated anims */
-    /* D_800DB924.pad++ (the flicker counter, s16) — master != 0 only */
+    /* D_800DB924.pad++ (the flicker counter, s16) — master != 0 only.
+     * v43 (CT-5-3): the pad advances on the 30 Hz TICK grid, not per rAF —
+     * the engine's sh_tvpaint_collect (fog_poc.c:12477-12484) runs once per
+     * PRESENTED frame and the C's default presentation is the authentic
+     * 30 fps (one present per tick, fog_poc.c:16211-16214); the old per-rAF
+     * form ran at the browser display rate (60-120 Hz — 2-4x too fast, the
+     * 164/188 flicker pattern cycling early). padTicks = tick boundaries
+     * crossed since the last collect (S.steps is advanced by
+     * applySh1xPropAnims earlier in the same frame); the s16 wrap emulation
+     * stays verbatim (fog_poc.c:12480). */
     if (a.tvChannel !== 0) {
-      S.tvPaintPad = (S.tvPaintPad + 1) | 0;
+      S.tvPaintPad = (S.tvPaintPad + padTicks) | 0;
       if ((S.tvPaintPad << 16 >> 16) < 0) S.tvPaintPad &= 0xFFFF;
     }
     const varS2 = ((a.tvChannel !== 0) &&
