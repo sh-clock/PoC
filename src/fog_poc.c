@@ -8000,12 +8000,17 @@ static int fx_flare_target_rate(int light_eff_pow, int scr_z, int scr_ang_z) {
  * tiles (tpage 45, same bits) all blend B+F — v32.2 relabel of the
  * v31 'mode-1 average' comments (the audit V32-C follow-up): the
  * visuals were pixel-verified before AND after; the change is comment-
- * only for the sprites (the code already did B+F).                      */
+ * only for the sprites (the code already did B+F). EXCEPT the flare
+ * GHOST-3 sprite: its tpage is 76 (lens_flare.c:481, the ONLY non-
+ * 44/45 tpage in the flare chain) — 76>>5&3 = 10 = ABR 2 =
+ * BackgroundMinusForeground, the per-channel saturating B5-F5 clamp
+ * 0 (swanstation gpu_types.h:56-57 + gpu_sw_backend.cpp:181-190) —
+ * V44 A-1: sprAbr passes the caller's tpage ABR (2 = B-F, 1 = B+F). */
 static void fx_blit_sprite_quad(
     Frame *fb, int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3,
     const unsigned char *idx_plane, int sw, int sh,
     const unsigned short clut[16], int primR, int primG, int primB,
-    float zGate) {
+    float zGate, int sprAbr) {
     /* rasterize the (possibly rotated) sprite quad: affine UV via edge
      * walk — same approach as raster_tri but on the sprite plane, in
      * PoC pixels (engine px scale fb->w/320).
@@ -8137,10 +8142,16 @@ static void fx_blit_sprite_quad(
             if (zGate > 0.0f && fb->z && fb->z[pi] < zGate)
                 continue;              /* V42 C-2: the occluded branch */
             uint8_t *bp = fb->rgb + pi * 3;
-            /* SemiTrans: same additive rule as the verified snow path   */
-            int or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
-            int og5 = (bp[1] >> 3) + fg; if (og5 > 31) og5 = 31;
-            int ob5 = (bp[2] >> 3) + fbv; if (ob5 > 31) ob5 = 31;
+            int or5, og5, ob5;
+            if (sprAbr == 2) {  /* tpage 76 ABR 2: B5-F5 clamp 0 (B-F) */
+                or5 = (bp[0] >> 3) - fr; if (or5 < 0) or5 = 0;
+                og5 = (bp[1] >> 3) - fg; if (og5 < 0) og5 = 0;
+                ob5 = (bp[2] >> 3) - fbv; if (ob5 < 0) ob5 = 0;
+            } else {            /* tpage 44/45 ABR 1: B5+F5 clamp 31   */
+                or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
+                og5 = (bp[1] >> 3) + fg; if (og5 > 31) og5 = 31;
+                ob5 = (bp[2] >> 3) + fbv; if (ob5 > 31) ob5 = 31;
+            }
             bp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
             bp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
             bp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
@@ -11359,7 +11370,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
             FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
             (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-            prim, prim, prim, flareGate);
+            prim, prim, prim, flareGate, 1);
     }
     /* core quad 2: fixed color 0x10, half-size 11 (lens_flare.c:338-365) */
     fx_blit_sprite_quad(fb,
@@ -11368,7 +11379,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
         FX_TO_PX(scrX - 11), FX_TO_PY(scrY + 11),
         FX_TO_PX(scrX + 11), FX_TO_PY(scrY + 11),
         (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-        0x10, 0x10, 0x10, flareGate);
+        0x10, 0x10, 0x10, flareGate, 1);
     /* core quad 3 (lens_flare.c:367-396): grey min(rate*2,1)*48, offset
      * hensin*9/2? engine FP_MULTIPLY(hensin, 9, Q12_SHIFT-1) = h*9/2   */
     {
@@ -11383,7 +11394,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             FX_TO_PX(scrX + ox - half), FX_TO_PY(scrY + oy + half),
             FX_TO_PX(scrX + ox + half), FX_TO_PY(scrY + oy + half),
             (const unsigned char *)kFlareCore, 64, 64, kFlareClutCore,
-            prim, prim, prim, 0.0f);
+            prim, prim, prim, 0.0f, 1);
     }
 
     if (nowRate != 0) {
@@ -11424,7 +11435,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
             fx_blit_sprite_quad(fb, cxp[0], cyp[0], cxp[1], cyp[1],
                                 cxp[2], cyp[2], cxp[3], cyp[3],
                                 (const unsigned char *)kFlareStreak, 32, 32,
-                                kFlareClutStreak, prim, prim, prim, 0.0f);
+                                kFlareClutStreak, prim, prim, prim, 0.0f, 1);
         }
 
         /* ghost 1 (lens_flare.c:447-459): RGB Q12_MULT(now,32/48/32) —
@@ -11441,7 +11452,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(px + half), FX_TO_PY(py + half),
                 (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
                 fx_q12_mul(nowRate, 32), fx_q12_mul(nowRate, 48),
-                fx_q12_mul(nowRate, 32), 0.0f);
+                fx_q12_mul(nowRate, 32), 0.0f, 1);
         }
         /* ghost 2 (lens_flare.c:462-475): RGB ((u32)now*7)>>9,
          * ((u32)now*19)>>11, Q12_MULT(now,24) — M1: the v30 blue had the
@@ -11461,11 +11472,14 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(px - half), FX_TO_PY(py + half),
                 FX_TO_PX(px + half), FX_TO_PY(py + half),
                 (const unsigned char *)kFlareGhost, 64, 64, kFlareClutGhost,
-                r, g, b, 0.0f);
+                r, g, b, 0.0f, 1);
         }
         /* ghost 3 (lens_flare.c:477-487): RGB (u32)now>>6,
          * Q12_MULT(now,24), ((u32)now*47)>>11 — M1: the v30 green had
-         * the extra >>4; tpage 76 window 0..63 clut+6                  */
+         * the extra >>4; tpage 76 window 0..63 clut+6 — tpage 76 =
+         * 0b1001100: ABR bits 5-6 = 2 = SUBTRACTIVE B-F (the only non-
+         * 44/45 tpage in the flare chain; lens_flare.c:481 + swanstation
+         * gpu_types.h:56-57) — V44 A-1: sprAbr 2                         */
         {
             unsigned urate = (unsigned)nowRate;
             int r = (int)(urate >> 6);
@@ -11477,7 +11491,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
                 FX_TO_PX(scrX - 10), FX_TO_PY(scrY + 10),
                 FX_TO_PX(scrX + 10), FX_TO_PY(scrY + 10),
                 (const unsigned char *)kFlareGhost3, 64, 64, kFlareClutCore,
-                r, g, b, 0.0f);
+                r, g, b, 0.0f, 2);
         }
     }
     /* V42 C-2: visF now drives the occluded-branch depth gate above
