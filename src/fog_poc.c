@@ -6868,6 +6868,11 @@ static void particle_environment_set(Snow *S, int arg0, uint32_t arg1) {
  * camdat track/env weatherTarget; -1 = none) — the K_R restart must
  * re-arm the same cross-fade a fresh boot arms, else restart != fresh. */
 static int g_bootWeatherTarget = -1;
+/* V45 audit W7: the resolved boot snow seed (--snow-seed, default
+ * SNOW_SEED_DEFAULT) — the K_R restart must re-seed the SnowInit warm-up
+ * with the same seed the fresh boot's final snow_reset_seed uses, else
+ * --snow-seed N restart != fresh. */
+static unsigned g_bootSnowSeed = SNOW_SEED_DEFAULT;
 static int sh_particle_weather_target_set(Snow *S, int arg0) {
     if (!S->transitionLock) {
         /* engine line 3946: `return false` — the whole body is skipped */
@@ -15517,18 +15522,56 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
             else
                 A->snow.snowDensitySel = 0;
         }
-        snow_reset(&A->snow);            /* re-seed snow (seek semantics) */
-        /* V42 D-1: re-arm the boot/camdat weatherTarget cross-fade — the
-         * fresh boot's sharedFunc_800D0B18 (CLI --weather-target > the
-         * camdat track/env weatherTarget) was never re-applied here, so
-         * the restarted session locked at the room recipe (restart !=
+        /* V42 D-1 (V45 audit W7: MOVED ABOVE the re-seed): re-arm the
+         * boot/camdat weatherTarget cross-fade — the fresh boot's
+         * sharedFunc_800D0B18 (CLI --weather-target > the camdat
+         * track/env weatherTarget) was never re-applied here, so the
+         * restarted session locked at the room recipe (restart !=
          * fresh: THRF9FD --duration 6 745 px stable 3/3, gone when the
-         * camdat carries no weatherTarget). The boot order is recipe
-         * load THEN the event arm — mirrored here (the re-sync above,
-         * then this). transitionLock was just set to 1, so the arm is
-         * accepted exactly like the boot call. */
+         * camdat carries no weatherTarget). transitionLock was just set
+         * to 1, so the arm is accepted exactly like the boot call.
+         * W7's order fix: the boot's sequence is recipe load, THEN the
+         * event arm, THEN the WeatherParticle_SnowInit re-seed (the
+         * v41-ENGFX bug 2 boot site ends with snow_reset_seed AFTER the
+         * arm) — K_R had the re-seed FIRST, so its warm-up ran on the
+         * ROOM recipe's settings byte while a fresh boot's warm-up runs
+         * on the post-arm byte. The SnowInit wind-speed seeding
+         * (particle.c:718-727: snowType >= SnowType_LightWindy ->
+         * g_WeatherParticle_SpeedX/Z = SNOW_COUNT_LIGHT_MAX*2, else 0)
+         * and the warm-up density selector (field_2349 = the D0B18 arg0,
+         * not the header field_17) both read that byte — THRF9FD's
+         * camdat weatherTarget 4 (snow wind 3) booted the field at
+         * wind 600/600 while the restart re-seeded it at 0/0 and let
+         * the wind ramp climb from zero (604 px at --duration 3). */
         if (g_bootWeatherTarget >= 0)
             sh_particle_weather_target_set(&A->snow, g_bootWeatherTarget);
+        /* V45 audit W7: the RAIN world anchor returns to its fresh-session
+         * value. g_WeatherParticle_Vectors1 (particle.h:106-108, BSS) is
+         * the previous tick's view position — the case-1 movement delta
+         * source (particle.c:3274-3275: Vectors1.viewPosition -
+         * Vectors0.viewPosition). The engine only ever writes it at the
+         * SystemUpdate tail (particle.c:638: Vectors1 = Vectors0); the
+         * map-load arm (particle.c:396-418) resets
+         * g_WeatherParticle_PrevPosition.vx/vz (lines 406-407) but NOT
+         * Vectors1, so an ENGINE room reload carries it — while a fresh
+         * process boot has the BSS zero (the first tick's rain delta is
+         * the full view position). The PoC's R models the v38/v41-E2/E3
+         * restart == fresh-SESSION contract (see the flashlight note
+         * below), so the re-seed must also restore the fresh-session
+         * zero: DRU0100 (rain recipe 5) restart carried the pre-restart
+         * view position, so the first post-restart rain tick applied a
+         * small inter-tick camera delta where a fresh boot teleports
+         * the bank by the full view position (312 px at --duration 3;
+         * --nosnow is md5-identical). */
+        A->snow.prevViewX = 0;
+        A->snow.prevViewZ = 0;
+        /* V45 audit W7: re-seed with the BOOT seed, not the default — the
+         * fresh boot's final warm-up runs snow_reset_seed(&A.snow,
+         * snowSeed) (the v41-ENGFX bug 2 site), so --snow-seed N must
+         * drive the restart warm-up too, else the re-seeded RNG stream
+         * differs from the fresh session's (restart != fresh with any
+         * --snow-seed != 1). */
+        snow_reset_seed(&A->snow, g_bootSnowSeed);
         /* v41-ENGFX bug 3b: the fresh-session flashlight fade + the boot
          * dt=0 prime. The restart had been carrying the env's converged
          * flashlightIntensity (4096) while a fresh session ramps 0->4096
@@ -17955,6 +17998,7 @@ int main(int argc, char **argv) {
      * The full 0..8 argument range is exposed (the shipped game only ever
      * calls D0B18(6) — its snow->rain street event). */
     g_bootWeatherTarget = bootWeatherTarget;   /* V42 D-1: for the K_R re-arm */
+    g_bootSnowSeed = snowSeed;                 /* V45 audit W7: same for the seed */
     if (bootWeatherTarget >= 0) {
         if (sh_particle_weather_target_set(&A.snow, bootWeatherTarget)) {
             printf("[weather] boot sharedFunc_800D0B18(%d) — sine cross-fade "
