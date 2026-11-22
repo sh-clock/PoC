@@ -498,6 +498,20 @@ const SHCore = (function () {
   const clampi = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v));
   const clamp16 = v => (v < -0x8000 ? -0x8000 : (v > 0x7FFF ? 0x7FFF : v));
 
+  /* lrintf — the C's default-rounding lrintf (FE_TONEAREST = round-half-to-
+     EVEN), used by the engine-twin quantizers (fog_poc.c:5480-5482 view
+     matrix Q12, :6299/:6403 ground Q8, :8329-8331 the s8 normals x127).
+     Math.round is half-away-from-zero: the two diverge ONLY on exact .5
+     products (nx*127 = 2.5 -> Math.round 3, lrintf 2; -3.5 -> -3 vs -4) —
+     a 1-LSB Q12/Q8/1-of-127 step on the tie. NaN/Inf pass through like
+     Math.round. (v43 CT-2#5 + CT-1-5's same-class sites.)          */
+  function lrint(x) {
+    const f = Math.floor(x), d = x - f;
+    if (d < 0.5) return f;
+    if (d > 0.5) return f + 1;
+    return (f % 2 === 0) ? f : f + 1;   /* the exact tie -> nearest EVEN */
+  }
+
   /* ====================================================================
      EMBEDDED DATA (byte-exact from PoC v12 / the decompilation)
      ==================================================================== */
@@ -1168,9 +1182,9 @@ const SHCore = (function () {
      * reflected (x,-y,-z) into the engine view frame (dot-preserving).  */
     const rq = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
     for (let i = 0; i < 3; i++) {
-      rq[i][0] = clamp16(Math.round(viewE[i] * 4096));
-      rq[i][1] = clamp16(Math.round(viewE[i + 4] * 4096));
-      rq[i][2] = clamp16(Math.round(viewE[i + 8] * 4096));
+      rq[i][0] = clamp16(lrint(viewE[i] * 4096));      /* lrintf (CT-2#5) */
+      rq[i][1] = clamp16(lrint(viewE[i + 4] * 4096));
+      rq[i][2] = clamp16(lrint(viewE[i + 8] * 4096));
     }
     const flip = [1, -1, -1];
     const f28 = [0, 0, 0], f30 = [0, 0, 0];
@@ -2262,6 +2276,7 @@ const SHCore = (function () {
     SH_MAP_EFFECTS_INFOS, SH_MODE_NAMES, SH_PAIR_LIST, SH_PAIR_COUNT, SH_PRESET_COUNT,
     FOG_CURVE, GTE_UNR_TABLE, kSineTable, kSnowSprite, kSnowClut,
     kRainStreak, kRainSplash, kRainClut,
+    lrint,
     SH_Y_ARRAY,
     SHENV_FLAG_DARKENV, SHENV_FLAG_FLASHLIGHT, SHENV_FLAG_BRIGHTNESS,
     SHENV_FLAG_USELIGHTER, SHENV_FLAG_LENSFLARE,
@@ -2523,7 +2538,7 @@ window.SHView = (function () {
       const ev = trackSampler(Math.min(t, cycleT));
       if (!ev) continue;
       const y = snowGndAt(tris, ev[0], ev[2], -2.0, 1.5);
-      if (y !== -1e9) smp.push(Math.round(y * 256));
+      if (y !== -1e9) smp.push(SC.lrint(y * 256));   /* lrintf (CT-2#5) */
     }
     if (!smp.length) return null;
     smp.sort((a, b) => a - b);
@@ -2557,7 +2572,7 @@ window.SHView = (function () {
           const px = minx + (cx + 0.5) * CELL, pz = minz + (cz + 0.5) * CELL;
           const y = snowGndTriAt(tris, i, px, pz);
           if (y === -1e9 || y < lo || y > hi) continue;
-          const h = Math.round(y * 256);
+          const h = SC.lrint(y * 256);              /* lrintf (CT-2#5) */
           if (h < -32767 || h > 32767) continue;
           const cell = cz * gnx + cx;
           if (gh[cell] === SC.SNOW_GND_NODATA || h > gh[cell]) gh[cell] = h;
@@ -3310,9 +3325,9 @@ window.SHView = (function () {
             const nx = me[0]*nxr + me[4]*nyr + me[8]*nzr;
             const ny = me[1]*nxr + me[5]*nyr + me[9]*nzr;
             const nz = me[2]*nxr + me[6]*nyr + me[10]*nzr;
-            let nx5 = (-Math.round(nx * 127)) << 5;
-            let ny5 = (-Math.round(ny * 127)) << 5;
-            let nz5 = (-Math.round(nz * 127)) << 5;
+            let nx5 = (-SC.lrint(nx * 127)) << 5;   /* lrintf (CT-2#5) */
+            let ny5 = (-SC.lrint(ny * 127)) << 5;
+            let nz5 = (-SC.lrint(nz * 127)) << 5;
             if (nx5 > 4064) nx5 = 4064; if (nx5 < -4064) nx5 = -4064;
             if (ny5 > 4064) ny5 = 4064; if (ny5 < -4064) ny5 = -4064;
             if (nz5 > 4064) nz5 = 4064; if (nz5 < -4064) nz5 = -4064;
