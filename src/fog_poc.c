@@ -12009,7 +12009,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
          * 0 vs 275: a phantom occlusion flip). scale == 1 at 320x224:
          * bit-identical. */
         int px = g_flaresys.scrLPos[0] * scale + (int)(fb->w / 2);
-        int py = g_flaresys.scrLPos[1] * scale + (int)(fb->h / 2);
+        int py = g_flaresys.scrLPos[1] * scaleYQ + (int)(fb->h / 2);
         int visible = 0;
         if (px >= 0 && px < (int)fb->w && py >= 0 && py < (int)fb->h) {
             float lightDepth = (float)g_flaresys.scrLPos[2] / 256.0f;
