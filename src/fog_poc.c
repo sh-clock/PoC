@@ -14627,9 +14627,9 @@ static int32_t r2_ang_spd_to_target(int32_t now_spd, int32_t now_ang,
 static int r2_in_restricted_zone(const v3 *eye) {
     /* engine Q19.12 world coords, x [201.8, 230.0], z [-92, -68];
      * the PoC track eye is glTF y-up meters — the room's engine->glTF
-     * transform is identity on xz (v10ipd2gltf preserves the world axes),
-     * so the zone test applies directly on the eye xz.                  */
-    int32_t x = R2_Q12((double)eye->x), z = R2_Q12((double)eye->z);
+     * transform is identity on x but NEGATED on z (v10ipd2gltf flips z,
+     * not x), so the zone test applies on eye x and the NEGATED eye z. */
+    int32_t x = R2_Q12((double)eye->x), z = R2_Q12((double)-eye->z); /* engine z = -glTF z (ipd2gltf.py:6921-6923; cf. curPosZ :13408) */
     return x >= R2_Q12(201.8) && x <= R2_Q12(230.0) &&
            z >= R2_Q12(-92.0) && z <= R2_Q12(-68.0);
 }
