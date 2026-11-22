@@ -2145,7 +2145,7 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         a->restAngle = (float)jnum(e, "rest", jnum(e, "restAngle", 0.0));
         a->angVelMax = (float)jnum(e, "angVelMax", 0.0);
         /* v27 raw-unit swing params (engine Q12 angle ints, 4096=360deg) */
-        a->rawVyFloor  = jint(e, "vyFloorRaw", 0);
+        a->rawVyFloor  = jint(e, "vyFloorRaw", -91);
         a->rawAngAccel = jint(e, "angAccelRaw", -113);
         a->rawAngVelFloor = jint(e, "angVelFloorRaw", -56);
         a->rawKickVel  = jint(e, "kickVelRaw", -128);
@@ -10089,9 +10089,10 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
         case 5: {  /* dampedSwing — map2_s00.c:1937-1943 VERBATIM in raw
                     * Q12 units: angVel += dt*Q12(-0.0277) floored at
                     * Q12(-0.0137) (MAX); vy += dt*angVel; vy floored at
-                    * Q12_ANGLE(-0.02222f) which TRUNCATES TO 0 (the door
-                    * slams shut — the v26 deg reading was 360x slow and
-                    * rested at -0.022deg instead of 0). */
+                    * Q12(-0.02222f) = -91 raw = Q12_ANGLE(-8.0f) — the
+                    * drawbridge rests at -8 deg (map2_s00.c:1942-1946;
+                    * the v26 'truncates to 0' reading was the Q12/Q12_ANGLE
+                    * mixup, fixed with the v27.2 ripper). */
             a->rawVel += (int)(((long long)dtRaw * a->rawAngAccel) >> 12);
             if (a->rawVel < a->rawAngVelFloor) a->rawVel = a->rawAngVelFloor;
             a->rawVy += (int)(((long long)dtRaw * a->rawVel) >> 12);
