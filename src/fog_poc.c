@@ -2217,15 +2217,21 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         }
         /* v31 rngWalk params (catalog: rotBase 0x800, vzBase 19.7,
          * dirMask 0x1F, dirBias 0x20 — map6_s03.c:375-444 verbatim).
-         * v31.4: the vz base prefers the AUTHORED WorldObject_Init pose
-         * (the ripper emits the exact engine Q12 grid — DRU0100 pos[2]
-         * 19.69921875 = 80690 raw, the binary value of Q12(19.7f)) over
-         * the catalog's rounded "vzBase" double (19.7*4096 = 80691 — one
-         * Q12 unit / 0.24 mm off the engine constant). */
+         * v45 (audit D-2): the vz base is the ENGINE runtime constant
+         * Q12(19.7f) = 80691 — float32(19.7) = 19.700000762939453125,
+         * *4096 = 80691.203125 -> (s32) = 80691 (TO_FIXED truncation).
+         * map6_s03.c:334 overwrites position.vz = D_800DFEF2 + Q12(19.7f)
+         * EVERY in-chunk frame, so the authored WorldObject_Init pose
+         * (itself Q12(19.7f) = 80691, map6_s03.c:202) is never what the
+         * engine renders. The old v31.4 code preferred the AUTHORED pose
+         * and its comment claimed "DRU0100 pos[2] 19.69921875 = 80690
+         * raw, the binary value of Q12(19.7f)" — BOTH FALSE:
+         * 19.69921875*4096 = 80688 (the ripper's Q8-grid quantization
+         * floorf(19.7*4096)>>4<<4 = 80688, i.e. 3 Q12 / 0.73 mm LOW),
+         * and the binary value of Q12(19.7f) is 80691. The catalog's
+         * "vzBase" 19.7 is the decomp literal itself: *4096 = 80691.  */
         a->rwRotBase = jint(e, "rotBase", 0x800);
-        a->rwVzBaseQ12 = (int)((a->pos[2] != 0.0f ? (double)a->pos[2]
-                                                   : jnum(e, "vzBase", 19.7))
-                              * 4096.0);
+        a->rwVzBaseQ12 = (int)(jnum(e, "vzBase", 19.7) * 4096.0);
         a->rwMask = jint(e, "dirMask", 0x1F);
         a->rwBias = jint(e, "dirBias", 0x20);
         /* v31 tvNoise TIM slot list (TV1/2/3.TIM — func_800D7450 loads
