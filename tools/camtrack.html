@@ -6171,11 +6171,24 @@ function trackToJSON(tr) {
     if (tr.lookMode === 'fixed') { o.yawDeg = r4(tr.yawDeg); o.pitchDeg = r4(tr.pitchDeg); }
     if (tr.lookMode === 'lazy') o.lazyRateDegS = r4(tr.lazyRateDegS == null ? 25 : tr.lazyRateDegS);   /* v9 + v9.1 default */
   } else {
+    /* v45 audit (F-1): the fixed round-trip write-back — the same
+     * lookMode/normalDirection/lazyRateDegS trio every other type emits
+     * above. The C parses all three for EVERY type (fog_poc.c:3298-3304,
+     * before the type switch), so a hand-authored fixed track must keep
+     * them through import -> sanitizeTrack -> trackToJSON. undefined (an
+     * editor-authored fixed track — makeTrack sets no lookMode) drops out
+     * of JSON.stringify, so the editor's own exports stay byte-identical.
+     * lookAt is deliberately NOT written: the C's fixed parse never reads
+     * it (fog_poc.c:3449-3470) and evalTrack's fixed branch is yaw/pitch
+     * only — same fields the engine round-trips. */
     o.position = v3j(tr.position);
     o.yawDeg = r4(tr.yawDeg); o.pitchDeg = r4(tr.pitchDeg);
     o.yawSpeedDegS = r4(tr.yawSpeedDegS); o.pitchSpeedDegS = r4(tr.pitchSpeedDegS);
     if (tr.yawBounds && tr.yawMaxDeg > tr.yawMinDeg) { o.yawMinDeg = r4(tr.yawMinDeg); o.yawMaxDeg = r4(tr.yawMaxDeg); }
     if (tr.pitchBounds && tr.pitchMaxDeg > tr.pitchMinDeg) { o.pitchMinDeg = r4(tr.pitchMinDeg); o.pitchMaxDeg = r4(tr.pitchMaxDeg); }
+    o.lookMode = tr.lookMode;
+    if (tr.lookMode === 'normal') o.normalDirection = tr.normalDirection === 'backward' ? 'backward' : 'forward';
+    if (tr.lookMode === 'lazy') o.lazyRateDegS = r4(tr.lazyRateDegS == null ? 25 : tr.lazyRateDegS);   /* v9 + v9.1 default */
   }
   /* v12: the PER-TRACK weather — emitted only when the track carries its
    * own (null/absent = inherit the model env default) */
@@ -6469,6 +6482,20 @@ function sanitizeTrack(raw) {
      * field diff: a hand-edited fixed track without a position rendered
      * 1m apart between editor preview and engine. */
     tr.position = vec3(raw.position, [1, 1, 0]);
+    /* v45 audit (F-1): the C parses lookMode / lazyRateDegS /
+     * normalDirection for EVERY type (fog_poc.c:3298-3304 — the three
+     * jstr/jnum reads sit BEFORE the type switch); the fixed branch was
+     * the only one of the eight that dropped them. A hand-authored
+     * {"type":"fixed","lookMode":"lazy","lazyRateDegS":30} keeps
+     * LOOK_LAZY in the engine (cam_update_track fog_poc.c:4369
+     * rate-limits the orientation at <= lazyRateDegS) while the editor
+     * preview turned at the outer turn.rateDegS=160, and trackToJSON
+     * silently stripped the fields on round-trip.
+     * camdat_parse_look_typed's fixed row is def=LOOK_PATH,
+     * allowCenter=0 (fog_poc.c:3240) — the same list as line/polyline. */
+    tr.lookMode = pick(raw.lookMode, ['path', 'lazy', 'point', 'fixed', 'normal'], 'path');
+    tr.normalDirection = pick(raw.normalDirection, ['forward', 'backward'], 'forward');
+    tr.lazyRateDegS = clamp(num(raw.lazyRateDegS, 25), 1, 720);
     tr.yawDeg = num(raw.yawDeg, 0); tr.pitchDeg = num(raw.pitchDeg, 0);
     tr.yawSpeedDegS = num(raw.yawSpeedDegS, 0);
     tr.pitchSpeedDegS = num(raw.pitchSpeedDegS, 0);
