@@ -10557,7 +10557,8 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
 /*     t=0; forward jumps catch up step-by-step (equivalent — every    */
 /*     step is dt=1/30, so the state is a deterministic function of    */
 /*     the step count: scrub-safe, paused = no re-run); the step count */
-/*     is capped at 5400 (180 s);                                      */
+/*     is UNCAPPED and monotonic (v44 F-2: the C's sessionT) with a    */
+/*     per-frame fired-tick bound (SH1X_MAX_TICKS_PER_FRAME);         */
 /*   - the BIND is the engine's own sh1x_anims_bind (posed-first +    */
 /*     nearest-unposed per group, the gravityScatter bean seeding) —   */
 /*     built at load (the engine's REALTIME semantics: its single-shot  */
@@ -10579,7 +10580,15 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
 /*     window.__camtrack.sh1xDebugState() surfaces it);                */
 /*   - waterRipple/waterfall tick their state but the droplet/ripple   */
 /*     paint is an engine-only FX draw (no mesh pose — documented).    */
-const SH1X_MAX_STEPS = 5400;         /* 180 s at 30 Hz */
+const SH1X_MAX_TICKS_PER_FRAME = 3600; /* v44 (F-2): 120 s of 30 Hz catch-up fired
+                                        * per frame — steps itself is UNcapped
+                                        * (the C's sessionT, fog_poc.c:14109
+                                        * "P->sessionT += dt * P->speed" — v10:
+                                        * monotonic, never wraps;
+                                        * sh1x_anims_sync :10496-10503 has no
+                                        * step cap). The old SH1X_MAX_STEPS
+                                        * 5400 froze every driver past 180 s
+                                        * while evalTrack/camera kept moving; */
 const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
 let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
 
@@ -11724,7 +11733,11 @@ function applySh1xPropAnims(t) {
   if (!rec.sh1xSt) sh1xDriverReset(rec);
   let want = Math.floor((t + 1e-9) * 30);
   if (want < 0) want = 0;
-  if (want > SH1X_MAX_STEPS) want = SH1X_MAX_STEPS;
+  /* v44 (F-2): NO cap on `want` — the C's session clock is monotonic
+   * and uncapped (fog_poc.c:14109 + sh1x_anims_sync :10496-10503; --shot
+   * t is bounded only by the track). The per-frame WORK is bounded
+   * below instead: a scrub-to-end on a 144000 s track would otherwise
+   * fire 4.32M ticks in one frame (tab freeze). */
   if (want < rec.sh1xSt.steps) sh1xDriverReset(rec);   /* seek back: re-run from t=0 */
   const S = rec.sh1xSt;
   /* v39: the school waterfall tick — the C engine calls sh1x_waterfall_tick
@@ -11739,18 +11752,24 @@ function applySh1xPropAnims(t) {
    * 13982-13983 -> 14015-14016); the old single pose evaluated at the
    * FRAME's target time made seeks/stalls replay every catch-up tick
    * with the end-frame camera (divergent chunk-gate history + a
-   * one-draw-shifted shared RNG stream vs the engine). Catch-up stays
-   * unbounded: the 2-tick clamp is the engine's realtime V_BLANKS_MAX
-   * stall policy; the deterministic consumers (the shot fast-forward,
-   * fog_poc.c:16974-16993) re-run every tick per-tick — what a seek
-   * re-construction must reproduce (V-b experiment: per-tick sampling
-   * is bit-identical to the engine discipline). */
-  while (S.steps < want) {
+   * one-draw-shifted shared RNG stream vs the engine). Catch-up fires
+   * EVERY skipped tick, no 2-tick clamp (that is the engine's realtime
+   * V_BLANKS_MAX stall policy); the deterministic consumers (the shot
+   * fast-forward, fog_poc.c:16974-16993) re-run every tick per-tick —
+   * what a seek re-construction must reproduce (V-b experiment:
+   * per-tick sampling is bit-identical to the engine discipline).
+   * v44 (F-2): the PER-FRAME fired count is bounded
+   * (SH1X_MAX_TICKS_PER_FRAME = 3600 = 120 s of catch-up) — a far
+   * scrub lands progressively over frames (S.steps keeps advancing
+   * toward `want`, monotonic), never a multi-million-tick frame. */
+  let fired = 0;
+  while (S.steps < want && fired < SH1X_MAX_TICKS_PER_FRAME) {
     const stepT = (S.steps + 1) / 30;
     const camP = sh1xWaterCamPose(stepT);  /* v44 (C-6): the tick's camera (the player stand-in, the waterfall precedent) */
     sh1xDriverTick(S, 1 / 30, camP);       /* the 30Hz grid */
     sh1xWaterfallTick(S, camP, stepT);
     S.steps++;
+    fired++;
   }
   S.lastT = t;
   /* apply the live pose per bound NODE (all its primitive items share the
