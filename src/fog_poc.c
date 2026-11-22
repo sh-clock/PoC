@@ -8158,12 +8158,58 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
                  *   dst5 = B5 + F5, F5 = modulate(texel, vcolor) — clamp 31.
                  * (V44: this ADD branch now serves the school-water ABR-1
                  * surfaces only — the DR floor quads moved to RP_SUB_TEX,
-                 * see the subtractive branch below.) */
+                 * see the subtractive branch below.)
+                 *
+                 * The blend is additive with the BACKGROUND (the fog color
+                 * under it), so the floor adds its animated texels over the
+                 * scene instead of replacing them (the DR street reference:
+                 * near-black water that only brightens where the flashlight
+                 * vcolor lights it — level 4 gray base + green/warm streaks
+                 * near the light, never a flat lit surface). The per-texel
+                 * STP 0x0000 hole is preserved (F=0 -> B+0, a no-op). The
+                 * fog veil (orr) still applies additively BELOW the floor
+                 * texels exactly like the engine's veil-quad-then-GT4 OT
+                 * order in the STP branch. No depth write (semi-trans
+                 * prims never occlude later flakes — engine-true).
+                 *
+                 * v43 E-10-2: the add is the GPU's TWO-STEP 5-bit form —
+                 * swanstation ShadePixel quantizes the modulated foreground
+                 * to 5-bit THROUGH THE DITHER LUT FIRST
+                 * (s_dither_lut[y&3][x&3][(texture_color.r * color_r) >> 4]
+                 * = clamp5((F8 + D) >> 3), gpu_sw_backend.cpp:69-70/136-139),
+                 * THEN does blargg's per-5-bit-channel saturating add (mode 1
+                 * BackgroundPlusForeground, :170-178) = min(31, B5 + F5).
+                 * The old one-step 8-bit sum folded expand(B5) = 8*B5 +
+                 * floor(B5/4) (and the veil) into the pre->>3 domain, leaking
+                 * the background's low bits through the single truncation:
+                 * +1-channel errors on 6.7% of the (F8, B5) product space,
+                 * all +1, never -1 (the v34 comment's "B5 + F5 saturating,
+                 * engine-exact" claim was arithmetically false). Same two-
+                 * step form as the engine's own sprite/gouraud blitters
+                 * (fx_blit_sprite_quad / fx_blit_gouraud_tri / rain paths);
+                 * expand(B5) >> 3 == B5 losslessly, so the readback is
+                 * exact. quantize8(+DITHER4)+>>3 is the SAME dither chain
+                 * the opaque path runs through fb_put.                             */
                 const uint8_t *bg = fb->rgb + pi * 3;
-                int r = (((tr >> 3) * vr) >> 4) + orr + (int)bg[0];
-                int g = (((tg >> 3) * vg) >> 4) + og + (int)bg[1];
-                int b = (((tb >> 3) * vb) >> 4) + ob + (int)bg[2];
-                fb_put(fb, x, y, r, g, b, quantize, dither);
+                if (quantize) {
+                    int f5r = quantize8((((tr >> 3) * vr) >> 4) + orr, dither, x, y) >> 3;
+                    int f5g = quantize8((((tg >> 3) * vg) >> 4) + og, dither, x, y) >> 3;
+                    int f5b = quantize8((((tb >> 3) * vb) >> 4) + ob, dither, x, y) >> 3;
+                    int or5 = (bg[0] >> 3) + f5r; if (or5 > 31) or5 = 31;
+                    int og5 = (bg[1] >> 3) + f5g; if (og5 > 31) og5 = 31;
+                    int ob5 = (bg[2] >> 3) + f5b; if (ob5 > 31) ob5 = 31;
+                    uint8_t *dp = fb->rgb + pi * 3;
+                    dp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+                    dp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+                    dp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+                } else {
+                    /* modern (non-15-bit-framebuffer) mode: unchanged 8-bit
+                     * one-step add — no GPU counterpart to be faithful to */
+                    int r = (((tr >> 3) * vr) >> 4) + orr + (int)bg[0];
+                    int g = (((tg >> 3) * vg) >> 4) + og + (int)bg[1];
+                    int b = (((tb >> 3) * vb) >> 4) + ob + (int)bg[2];
+                    fb_put(fb, x, y, r, g, b, quantize, dither);
+                }
                 continue;
             }
             if (pass == RP_SUB_TEX) {
