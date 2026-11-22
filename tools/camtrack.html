@@ -5306,6 +5306,14 @@ const state = {
   playing: false,
   playAll: false, playlist: [], plIndex: 0,
   t: 0,                 // seconds inside current cycle
+  sessionT: 0,          // v45 audit (F-5): monotonic session seconds — the
+                        // C's P->sessionT (fog_poc.c:14173): advances in
+                        // lockstep with t but NEVER wraps (loop/pingPong
+                        // wrap t only) and is never clamped (once clamps t
+                        // at T) — the SH1X prop-anim 30 Hz grid keys on it,
+                        // so the engine preview keeps ticking while the
+                        // camera holds a static/once end pose (the C never
+                        // pauses: playback_step has no setPlaying twin)
   rate: 1,
   showGrid: true, showPaths: true, showPip: true,
   lockAxis: null,          /* editor-only: 'x' | 'y' | 'z' | null — never serialized */
@@ -7063,6 +7071,10 @@ function setActiveModel(name) {
     state.selection = (keep && m && m.tracks.some(t => t.id === keep)) ? keep : null;
   }
   state.playing = false; state.playAll = false; state.t = 0;
+  state.sessionT = 0;   /* v45 audit (F-5): a model (re)load boots the
+                           session clock fresh (the C's K_R — fog_poc.c's
+                           room-reload resets the driver state with the
+                           session clock) */
   for (const v of three.loaded.values()) if (v.scene.parent === scene) scene.remove(v.scene);
   const loaded = three.loaded.get(name);
   if (loaded) scene.add(loaded.scene);
@@ -7781,6 +7793,8 @@ function startPlayAll() {
   state.plIndex = 0;
   state.selection = tracks[0].id;
   state.t = 0;
+  state.sessionT = 0;   /* v45 audit (F-5): play-all restart boots the
+                           session clock fresh (the C's K_R discipline) */
   state.playing = true;
   rebuildVisuals();
   renderTrackList();
@@ -7792,6 +7806,10 @@ function tickPlayback(dt) {
   const tr = playTarget();
   if (!tr) { stopPlayback(); return; }
   state.t += dt * state.rate;
+  state.sessionT += dt * state.rate;   /* v45 audit (F-5): the C's
+     P->sessionT (fog_poc.c:14173) — monotonic, advances in lockstep with
+     t, never wraps, never clamps: it drives the prop-anim grid while the
+     phase clock below holds/wraps */
   const T = playCycle(tr);
   if (state.t >= T) {
     if (state.playAll) {
@@ -7803,11 +7821,27 @@ function tickPlayback(dt) {
       renderTrackList();
       renderProps();
       updatePlaybarUI();
-    } else if (tr.loopMode === 'once' || cycleDuration(tr) <= 0) {
-      state.t = T;
-      setPlaying(false);
     } else {
-      state.t = state.t % T;
+      /* v45 audit (F-5): the C's playback_step NEVER pauses — its clamp/
+       * wrap block is gated on `isfinite(T) && T > 0` over the RAW
+       * camtrack_cycle_duration (fog_poc.c:14176): once clamps the phase
+       * at T (:14184 — the end POSE holds), loop/pingPong wrap (:14187),
+       * and a STATIC track (duration 0) takes NEITHER branch — P->t
+       * advances unbounded, the constant pose holds, and the env/snow
+       * 30 Hz grid keeps firing on it (snow_sync_live, fog_poc.c:14902).
+       * The old editor code clamped t at the 8 s static window / the
+       * once end AND called setPlaying(false), freezing state.t -> the
+       * whole engine preview (prop anims, snow/rain, TV noise) halted
+       * mid-air and Play restarted from t=0 (not resumable). Now: the
+       * pose holds exactly like the C while sessionT (above) keeps the
+       * drivers ticking; the ONLY pause is the user's (Space / the
+       * Pause button — setPlaying's genuine UI semantics). */
+      const Tc = cycleDuration(tr);
+      if (isFinite(Tc) && Tc > 0) {
+        if (tr.loopMode === 'once') state.t = T;   /* fog_poc.c:14184 */
+        else state.t = state.t % T;                /* fog_poc.c:14187 */
+      }
+      /* else STATIC: the C's T=0 gate — no clamp, no wrap, t unbounded */
     }
   }
 }
@@ -11514,7 +11548,14 @@ function startRenderLoop() {
     tickFly(dt);
     controls.update();
     tickPlayback(dt);
-    applySh1xPropAnims(state.t);   /* v13.2/v13.4: the full SH1X driver-set preview */
+    /* v45 audit (F-5): the SH1X prop-anim grid keys on the SESSION clock
+     * (state.sessionT — monotonic, never wraps/clamps), mirroring the C's
+     * sh1x_anims_sync(A->play.sessionT) (fog_poc.c:14909) — at a static or
+     * once end the phase clock state.t holds (the pose), and the old
+     * state.t keying froze every driver (fans/ferris/TV) with it. The
+     * engine sync below STAYS on the phase clock like the C's
+     * snow_sync_live/sh_env_sync_live(A->play.t) (fog_poc.c:14902/14910). */
+    applySh1xPropAnims(state.sessionT);   /* v13.2/v13.4: the full SH1X driver-set preview */
     updateLightGizmo();            /* v13.5 (T7): the user-light pose gizmo */
     updateLightHandles();          /* v41 (fix 4): the draggable light spheres */
     lightResolveForView();         /* v41 (fix 4): the authored light -> ShEnv.updatePose (mode 1) */
@@ -12555,7 +12596,7 @@ window.__camtrack = {
   get sh1xAnimPreview() { return state.sh1xAnimPreview !== false; },
   setSh1xAnimPreview(on) {
     state.sh1xAnimPreview = !!on;
-    applySh1xPropAnims(state.t);
+    applySh1xPropAnims(state.sessionT);   /* v45 audit (F-5): the grid's own clock — state.t here would seek-back reset it */
   },
   /* v13.4 (T2): the live SH1X driver state of the ACTIVE model (the TV
    * state machine — the paint now exists (v41) — the raw swing/ferris/
