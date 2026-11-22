@@ -1346,6 +1346,18 @@ typedef struct {
                                      * carousel horses' D_800EBAFC yaws) */
     int rot0PerInstN;
     int pendSlot[5];                /* ferris arm i pendulum slot (4 aliased) */
+    /* ---- v44 (C-6): the driveGate proximity rects (ferris/lissajous) ----
+     * map6_s04_2.c:3493-3508 gates the WHOLE ride update on
+     * !Get(452/453) (the eventGate half, modeled above) AND two
+     * PLAYER_NEAR_POS rects (game.h:67-69: |pos - Q12(base)| < Q12(tol),
+     * strict <). Engine literals: ferris (vx,8.0,20.0)/(vz,-28.0,22.0)
+     * (:3494), lissajous (vx,-16.0,20.0)/(vz,-64.0,20.0) (:3501); the
+     * ripper emits them in the ferris entries' driveGate doc string
+     * (ipd2gltf.py:1441-1443). Stored as engine Q12 raw counts (the
+     * rects' decimal bases/tols are exact 1/4096 multiples). */
+    int dgNear;                     /* 1 = both PLAYER_NEAR_POS rects parsed */
+    int dgBaseXQ12, dgTolXQ12;      /* |vx - base| < tol (raw Q12)           */
+    int dgBaseZQ12, dgTolZQ12;      /* |vz - base| < tol (raw Q12)           */
     /* ---- v32 (S18): the deferred driver families (A_SWEEP §4b) ---- */
     int slideIdx;                   /* slideDoor: g_WorldObject_Dr[i] index  */
     int slideVelRaw;                /* slideDoor live vel (raw Q12 m/s)      */
@@ -2316,6 +2328,54 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                 const char *p2 = jstr(e, "eventGate2Polarity", "set");
                 a->eventGate2Pol = !strcmp(p2, "clear") ? 1 : 0;
             }
+        }
+        /* v44 (C-6): the driveGate PLAYER_NEAR_POS rects — the ripper
+         * emits the engine literals verbatim in the driveGate doc string
+         * ("!Get(452) && PLAYER_NEAR_POS(vx,8.0,20.0) &&
+         * PLAYER_NEAR_POS(vz,-28.0,22.0) && AABB visible", ipd2gltf.py:
+         * 1441-1443 — the exact map6_s04_2.c:3493-3495 literals). The
+         * !Get(452/453) half is the eventGate (parsed above); the AABB
+         * screen test is a camera-frustum check (not ported); the RECTS
+         * gate the ride tick (sh1x_anims_tick). Bases/tols quantized to
+         * engine Q12 raw counts — the C TO_FIXED(x,12) truncation. */
+        a->dgNear = 0;
+        {
+            const char *dg = jstr(e, "driveGate", "");
+            const char *px = strstr(dg, "PLAYER_NEAR_POS(vx,");
+            const char *pz = strstr(dg, "PLAYER_NEAR_POS(vz,");
+            float bx = 0.0f, tx = 0.0f, bz = 0.0f, tz = 0.0f;
+            if (px && pz &&
+                sscanf(px, "PLAYER_NEAR_POS(vx,%f,%f", &bx, &tx) == 2 &&
+                sscanf(pz, "PLAYER_NEAR_POS(vz,%f,%f", &bz, &tz) == 2) {
+                a->dgBaseXQ12 = (int)(bx * 4096.0f);
+                a->dgTolXQ12  = (int)(tx * 4096.0f);
+                a->dgBaseZQ12 = (int)(bz * 4096.0f);
+                a->dgTolZQ12  = (int)(tz * 4096.0f);
+                a->dgNear = 1;
+            }
+        }
+        /* The ripper catalog carries the driveGate field ONLY on the five
+         * FERRIS entries (FW1/FW2/FW3WIR/FWBOX1/FWBOX2, ipd2gltf.py:1441/
+         * 1452/1464/1488/1511) — the lissajous WHEEL_BA entry (:1515-1525)
+         * was never given one, and pre-field GLBs would lack it entirely.
+         * Default BOTH ride families to their ENGINE literals (verbatim,
+         * map6_s04_2.c:3494 ferris / :3501 lissajous); an explicit
+         * driveGate field always wins (the !dgNear guard above). */
+        if (!a->dgNear && (a->driver == 14 || a->driver == 15)) {
+            if (a->driver == 14) {          /* ferris: (vx,8.0,20.0)/
+                                             * (vz,-28.0,22.0), :3494     */
+                a->dgBaseXQ12 = (int)(8.0f * 4096.0f);
+                a->dgTolXQ12  = (int)(20.0f * 4096.0f);
+                a->dgBaseZQ12 = (int)(-28.0f * 4096.0f);
+                a->dgTolZQ12  = (int)(22.0f * 4096.0f);
+            } else {                        /* lissajous: (vx,-16.0,20.0)/
+                                             * (vz,-64.0,20.0), :3501     */
+                a->dgBaseXQ12 = (int)(-16.0f * 4096.0f);
+                a->dgTolXQ12  = (int)(20.0f * 4096.0f);
+                a->dgBaseZQ12 = (int)(-64.0f * 4096.0f);
+                a->dgTolZQ12  = (int)(20.0f * 4096.0f);
+            }
+            a->dgNear = 1;
         }
         const JValue *cg = jarr(e, "chunkGate");
         a->hasChunkGate = 0;
@@ -9972,7 +10032,7 @@ static void sh1x_waterfall_tick(Sh1x *sx, const CamPose *cam,
     }
 }
 
-static void sh1x_anims_tick(Sh1x *sx, double dt) {
+static void sh1x_anims_tick(Sh1x *sx, double dt, const v3 *camGltf) {
     /* FOGPOC_ANIMDBG (S20): the per-tick driver-state proof — one line per
      * anim whenever the state MOVED (rawVy/rwVy/cur/master differ from the
      * last print). The camera-independent animation evidence. */
@@ -10008,6 +10068,39 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
             continue;        /* engine: the update loop is gated */
         }
         if (a->sharedLeader >= 0) continue;  /* follower: leader's state */
+        /* v44 (C-6): the driveGate proximity freeze. The engine runs the
+         * ferris/lissajous update ONLY inside its two PLAYER_NEAR_POS
+         * rects (map6_s04_2.c:3493-3508 — ferris |vx-8|<20 ∧ |vz+28|<22,
+         * lissajous |vx+16|<20 ∧ |vz+64|<20, STRICT < per game.h:67-69)
+         * AND its AABB screen test; the WorldObjects_Adds live INSIDE
+         * those funcs (:3817-3845) — a gated ride does not advance AT
+         * ALL (no master tick, no pendulum RNG draws). The port has no
+         * player — the CAMERA stands in (engine coords: x identity,
+         * z = -glTF z, ipd2gltf.py:6921-6923), tested in Q12 raw counts
+         * like the engine. FREEZE the tick only (the drawn state holds —
+         * on re-entry the phase differs from the engine's frozen frame
+         * only by the port's always-draw contract); the DRAW stays
+         * unconditional (the engine's gated-ADD — ride NOT drawn at all
+         * when outside — is the separate design question C-U1). The
+         * AABB-visible sub-gate is NOT ported (a camera-frustum test the
+         * port's fixed-camera framing cannot reproduce). DESIGN FLAG:
+         * cabin parity g_WorldObject7[(D_800EBB34+i)&1] (map6_s04_2.c:
+         * 3838) stays UNMODELED — the port draws BOTH cabin models at
+         * all 5 arms (the t=0 layout, permanent); modeling it would hide
+         * half the drawn cabins, a draw-side change that belongs with
+         * C-U1's always-draw contract (left to the primary agent). */
+        if (a->dgNear && camGltf) {
+            int exq = (int)(camGltf->x * 4096.0f);   /* engine Q12 vx */
+            int ezq = (int)(-camGltf->z * 4096.0f);  /* engine z=-glTF z */
+            int dx = exq - a->dgBaseXQ12;
+            int dz = ezq - a->dgBaseZQ12;
+            int nearX = (dx >= 0) ? (dx < a->dgTolXQ12)
+                                  : (-dx < a->dgTolXQ12);
+            int nearZ = (dz >= 0) ? (dz < a->dgTolZQ12)
+                                  : (-dz < a->dgTolZQ12);
+            if (!(nearX && nearZ))
+                continue;    /* outside the rect: the ride update FREEZES */
+        }
         switch (a->driver) {
         case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264:
                     * vz += Q12_MULT_PRECISE(dt, Q12_ANGLE(rngBase) -
@@ -10584,13 +10677,13 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
  * camtrack PHASE wraps at the cycle boundary and scrub/restart jump it;
  * the old function-static phase derivation held one tick per wrap) and
  * the clock is per-Scene, not function-static. */
-static void sh1x_anims_sync(Sh1x *sx, double sessionT) {
+static void sh1x_anims_sync(Sh1x *sx, double sessionT, const v3 *camGltf) {
     if (!sx || sx->nAnims <= 0) return;
     double dt = sessionT - sx->animsLastSessionT;
     if (dt < 0) dt = 0;                 /* restart: fresh state, 0 dt re-prime */
     if (dt > 0.1) dt = 0.1;             /* clamp like the env tick */
     sx->animsLastSessionT = sessionT;
-    sh1x_anims_tick(sx, dt);
+    sh1x_anims_tick(sx, dt, camGltf);   /* v44 C-6: cam pos for the driveGate */
 }
 
 /* v38: R restart — restore the engine-fresh driver state (the engine
@@ -14998,7 +15091,7 @@ static CamPose live_advance(LiveApp *A, double dt) {
          * engine's own discipline (one Map_WorldObjectsUpdate + the
          * LensFlare/water pass per game tick) is now mirrored per FIRED
          * tick, in the same order as the shot path's fast-forward. */
-        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT);
+        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT, &cp.pos);
         fx_water_scroll_sync(&A->R.sc->sh1x, &A->env, &cp); /* v34: scroll */
         sh1x_water_ripple_tick((Sh1x *)&A->R.sc->sh1x, &A->env, &cp); /* v37 */
         sh1x_waterfall_tick((Sh1x *)&A->R.sc->sh1x, &cp,
@@ -15025,7 +15118,7 @@ static CamPose live_advance(LiveApp *A, double dt) {
      * live water/RNG streams by one step vs the shot path.) */
     if (!A->animsPrimed) {
         A->animsPrimed = 1;
-        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT);
+        sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT, &cp.pos);
     }
     return cp;
 }
@@ -15040,7 +15133,7 @@ static void live_render(LiveApp *A) {
         snow_sync_live(&A->snow, A->play.t, cp.pos, cp.forward,
                        A->track, A->ovr.useFixed ? &A->ovr : NULL);
     sh_env_sync_live(&A->env, A->play.t, cp.pos, cp.q, 0);
-    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT); /* v38: session clock —
+    sh1x_anims_sync((Sh1x *)&A->R.sc->sh1x, A->play.sessionT, &cp.pos); /* v38: session clock —
      * dt=0 at the held sessionT: a no-op state hold (same discipline as the
      * live_advance boot prime) */
     /* v40 audit (C-F3): the WATER pair is NOT called here. live_render's
@@ -18220,7 +18313,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
+            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim, &cp.pos);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             sh1x_waterfall_tick((Sh1x *)&R.sc->sh1x, &cp, tSim); /* v39 */
@@ -18234,7 +18327,7 @@ int main(int argc, char **argv) {
         }
         if (Vr.active || Vr.returning) cp = r2view_pose(&Vr, &cp);
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt, &cp.pos); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
         Frame fb2; frame_alloc(&fb2, w, h);
         render_frame(&fb2, &R, &cp);
         /* THE RESTRICTION PROOF (all values from the verbatim pipeline) */
@@ -18401,7 +18494,7 @@ int main(int argc, char **argv) {
                     snow_sync_live(&Ss, P.t, cp.pos, cp.forward, track, NULL);
             }
             sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim);  /* v38: the session clock (the phase wraps) */
+            sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim, &cp.pos);  /* v38: the session clock (the phase wraps) */
             fx_water_scroll_sync(&R.sc->sh1x, &Es, &cp); /* v34: scroll per tick */
             sh1x_water_ripple_tick((Sh1x *)&R.sc->sh1x, &Es, &cp); /* v37: ripple walk per tick */
             sh1x_waterfall_tick((Sh1x *)&R.sc->sh1x, &cp, tSim); /* v39 */
@@ -18418,7 +18511,7 @@ int main(int argc, char **argv) {
          * also covers the phase wrap/edge cases where the pose should be
          * re-read from the current phase rather than the stepped one      */
         sh_env_sync_live(&Es, P.t, cp.pos, cp.q, 0);
-        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
+        sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim - tickDt, &cp.pos); /* v38: hold at the last synced tick (the in-loop call passes pre-increment tSim) */
         render_frame(&fb, &R, &cp);
         char out[1024];
         snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
