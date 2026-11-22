@@ -6494,6 +6494,8 @@ typedef struct {
     uint8_t   spawnCount;      /* g_ParticleSpawnCount (per tick)      */
     int32_t   boxX, boxZ;      /* g_Particle_Position x/z (Q12)        */
     int32_t   prevX, prevZ;    /* g_Particle_PrevPosition x/z (Q12)    */
+    int32_t   prevYawQ12;      /* g_WeatherParticle_PrevRotationY — written every tick
+                               * (particle.c:1424), BSS 0 at load        */
     int       camMoved;        /* g_ParticleCameraMoved                */
     int       ticksDone;       /* 30Hz ticks simulated so far          */
     double    lastTickT;       /* track time at the last tick          */
@@ -7441,6 +7443,7 @@ static void snow_reset_seed(Snow *S, unsigned seed) {
     S->ticksDone = 0;
     S->lastTickT = 0.0;
     S->prevX = 0; S->prevZ = 0;        /* g_Particle_PrevPosition at load   */
+    S->prevYawQ12 = 0;                 /* PrevRotationY (BSS 0 at load)     */
     S->boxX  = 0; S->boxZ = 0;
     S->camMoved = 0;
 }
@@ -7467,6 +7470,21 @@ static void snow_box_origin(Snow *S, v3 camPos, v3 camFwd) {
     S->boxX = ox; S->boxZ = oz;
 }
 
+/* v43 (E-09-1): the engine's per-tick view yaw on the Q12-angle grid —
+ * vwGetViewAngle -> vwMatrixToAngleYXZ -> ratan2(mat->m[0][2], mat->m[2][2])
+ * (vw_calc.c:260). Math_Sin(yaw) ∝ fwd.x and Math_Cos(yaw) ∝ fwd.z — the
+ * same relation snow_box_origin consumes (particle.c:859-860) — so the
+ * yaw is atan2(fwd.x, fwd.z)·4096/2π with the ±2048 seam KEPT (the
+ * consumer's ABS_DIFF has no wrap normalization). The r2_ratan2
+ * quantization is the port's established ratan2 stand-in (declared below
+ * at its definition site).                                                    */
+static int32_t r2_ratan2(int32_t y, int32_t x);
+static int32_t snow_view_yaw_q12(v3 camFwd) {
+    int32_t y = (int32_t)floorf(camFwd.x * 4096.0f + 0.5f);
+    int32_t x = (int32_t)floorf(camFwd.z * 4096.0f + 0.5f);
+    return r2_ratan2(y, x);
+}
+
 /* ---- Particle_Update (steady state, BOTH passes) — 1:1 ----------------
  * v8: the full two-bank update — pass 0 = snow [0, addedCount[0]), pass 1
  * = rain [addedCount[0], +addedCount[1]) — plus the weather transition
@@ -7480,17 +7498,31 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
     /* g_Particle_Position = viewPos + horizontal-forward * 3m             */
     snow_box_origin(S, camPos, camFwd);
 
+    /* this tick's viewRotation.vy (vwGetViewAngle at the head of
+     * SystemUpdate — particle.c:180)                                        */
+    int32_t yawQ12 = snow_view_yaw_q12(camFwd);
+
     if (S->prevX == 0 && S->prevZ == 0) {
         S->prevX = S->boxX; S->prevZ = S->boxZ;   /* first-tick adoption   */
     }
 
-    /* Particle_CameraMovedCheck: dist > 10000 Q12 (~2.44m);
-     * the rotY check is dead in the engine (g_Particle_RotationY is never
-     * written — BSS zero — so ABS_DIFF is always 0)                        */
+    /* Particle_CameraMovedCheck (particle.c:641-655): dist > 10000 Q12
+     * (~2.44m) OR rotY > Q12_ANGLE(45°) = 512 (fixed_point.h:450-451).
+     * g_WeatherParticle_PrevRotationY IS written every tick at the end of
+     * WeatherParticle_Update (particle.c:1424) — the old "dead check"
+     * comment was wrong. ABS_DIFF = ABS(a-b) with NO wrap normalization
+     * (arithmetic.h:147-148): a yaw change > 45°/tick (camera cuts, the
+     * fixed-cam override, lookAt jumps) fires, and so does any ±180°
+     * seam crossing (prev 2047, cur -2047 -> ABS_DIFF 4094 > 512) — a
+     * 2-unit turn — which full-circle lookAt tracks hit once per
+     * revolution while the translation clause stays false.              */
     {
         int32_t dx = S->prevX - S->boxX, dz = S->prevZ - S->boxZ;
         int64_t d2 = (int64_t)dx * dx + (int64_t)dz * dz;
-        S->camMoved = snow_isqrt((uint32_t)(d2 > 0xFFFFFFFFll ? 0xFFFFFFFFull : (uint64_t)d2)) > 10000;
+        int32_t dyaw = S->prevYawQ12 - yawQ12;
+        if (dyaw < 0) dyaw = -dyaw;               /* ABS_DIFF semantics    */
+        S->camMoved = (snow_isqrt((uint32_t)(d2 > 0xFFFFFFFFll ? 0xFFFFFFFFull : (uint64_t)d2)) > 10000) ||
+                      (dyaw > 512);
     }
 
     /* v12 VERBATIM (D4): the engine draws the per-tick rand BEFORE the
@@ -7638,6 +7670,8 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
 
     /* g_Particle_PrevPosition = current position                         */
     S->prevX = S->boxX; S->prevZ = S->boxZ;
+    /* g_WeatherParticle_PrevRotationY = viewRotation.vy (particle.c:1424) */
+    S->prevYawQ12 = yawQ12;
     /* v8: g_ParticleVectors1 = g_ParticleVectors0 (end of SystemUpdate)  */
     S->prevViewX = curViewX;
     S->prevViewZ = curViewZ;
