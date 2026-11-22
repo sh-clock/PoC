@@ -2709,9 +2709,13 @@ window.SHView = (function () {
          alpha-127 STP texels render OPAQUE like alpha 255. The old
          texel.a < 0.5 threshold wrongly vanished alpha-127 texels.   */
       if (uAlphaTest > 0.5 && texel.a < 0.002) discard;
-      /* the engine two-layer fog composite:
-         r = (texel * vcolor) >> 7 + fogColor*f     (raster_tri)          */
-      vec3 col = floor(texel.rgb * 255.0 * vcolf / 128.0) + ocolf;
+      /* the engine two-layer fog composite (v28.1 C-M1, fog_poc.c:7780):
+         r = ((T5 * C8) >> 4) + fogColor*f   (swanstation ShadePixel
+         modulate with the RAW 5-bit VRAM texel; the atlas stores
+         repl5(T5) so floor(T8/8) recovers T5 EXACTLY — truncation,
+         NOT round, which returns T5+1 for every T5 in [16,31])      */
+      vec3 t5 = floor(texel.rgb * 255.0 / 8.0);          /* T8>>3 == T5    */
+      vec3 col = floor(t5 * vcolf / 16.0) + ocolf;       /* (T5*C8)>>4 +veil */
       gl_FragColor = vec4(min(col, vec3(255.0)) / 255.0, 1.0);
     }`;
 
