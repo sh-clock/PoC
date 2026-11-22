@@ -1340,6 +1340,15 @@ typedef struct {
     float rot0PerInst[16][3];      /* v36: per-instance authored rot0 (the
                                      * carousel horses' D_800EBAFC yaws) */
     int rot0PerInstN;
+    float rotStepDeg;               /* V44 (C-2): the per-instance yaw step
+                                     * (deg) — the ripper's rotStepDeg: 45.0
+                                     * for the SAK_POL_ fence sectors (count
+                                     * 7), 90.0 for the MGR_DRL_/DRL2_ILI
+                                     * dolls (count 4). The ripper writes NO
+                                     * node rotation for posed emissions
+                                     * (the driver owns the full rotation),
+                                     * so this is the ONLY per-instance
+                                     * carrier for those families. */
     int pendSlot[5];                /* ferris arm i pendulum slot (4 aliased) */
     /* ---- v32 (S18): the deferred driver families (A_SWEEP §4b) ---- */
     int slideIdx;                   /* slideDoor: g_WorldObject_Dr[i] index  */
@@ -2205,6 +2214,16 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
                 }
             }
         }
+        /* V44 (C-2): rotStepDeg — the per-instance yaw step (deg): 45.0
+         * SAK_POL_ (fence sectors, count 7) / 90.0 MGR_DRL_ + DRL2_ILI
+         * (dolls, count 4); the ripper writes NO node rotation for posed
+         * emissions, so it is the ONLY per-instance carrier. The default
+         * reset sits PRE-parse (NOT beside the post-parse defaults reset
+         * at the rot0PerInstN/instBase zeroing below): that spot is the
+         * post-parse clobber PR #95 fixes — a reset there would zero
+         * this parse the same way 6a9e8c1 killed instBase/rot0PerInstN. */
+        a->rotStepDeg = 0.0f;
+        a->rotStepDeg = (float)jnum(e, "rotStepDeg", 0.0f);
         { const JValue *ppi = jarr(e, "posPerInst");
             int n = jcount(ppi);
             for (int q = 0; q < n && q < 16; q++) {
@@ -9107,8 +9126,21 @@ static void sh1x_anim_pose(const Sh1x *sx, const Sh1xPropAnim *a, int inst,
                  * spokes +90+i*45, map6_s04_2.c:3662-3693
                  * Math_SetSVectorFastSum(&rot, 0, D_800ED5B6+off, 0)) —
                  * all 8 fence spokes overlapped at ONE angle. rot0[1] is
-                 * the authored offset: ADD it. */
-        rotDeg[1] = a->rot0[1] + (float)a->mvMaster * R2D;
+                 * the authored offset: ADD it.
+                 * V44 (C-2): + rotStepDeg per engine loop index. Engine
+                 * (map6_s04_2.c:3664-3693): the fence sectors are added at
+                 * rot.vy = master + 90 + i*45, i=1..7 (rot.vy += Q12_ANGLE
+                 * (45) after each add); the dolls (:3696-3716) at master +
+                 * i*90, i=0..3. The posed nodes carry the LOCAL animInst
+                 * (0..6 fence / 0..3 dolls — the ripper's _base_i per-
+                 * object counter starts 0), so the engine index i =
+                 * animInst + instBase (instRange[0] = 1 for SAK_POL_; 0
+                 * for the dolls — the case-12 horse precedent above).
+                 * Without the instBase term every SAK_POL_ sector is one
+                 * step (45 deg) low. */
+        rotDeg[1] = a->rot0[1] +
+                    a->rotStepDeg * (float)((inst > 0 ? inst : 0) + a->instBase) +
+                    (float)a->mvMaster * R2D;
         break;
     case 14: { /* ferrisWheel — map6_s04_2.c:3814-3845 VERBATIM:
                  * arm angle a = (master >> 12) + (-739 + i*307) Q12_ANGLE

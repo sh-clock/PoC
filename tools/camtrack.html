@@ -8029,6 +8029,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       /* fanArray */
       bladeCount: 16, alternate: 0, fanAng: new Array(16).fill(0),
       fanSplit: 7, rotY180From: 7, posPerInstN: 0, posPerInst: [],
+      /* V44 (C-2): the carousel per-instance yaw step (rotStepDeg) + the
+       * engine loop-index base (instRange[0]) — fog_poc.c parse verbatim */
+      rotStepDeg: 0, instBase: 0,
       /* tvNoise (catalog constants; the engine's own literals). v36: the
        * ALL-TEN-SCREEN state (the engine s_800E06A0 x 10 — fog_poc.c
        * :1253-1267): tvSub/tvDur/tvSlot/tvU/tvV/tvPat/tvPatT/tvDone per
@@ -8231,6 +8234,21 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.rwMask = sh1xJi(e, 'dirMask', 0x1F);
     a.rwBias = sh1xJi(e, 'dirBias', 0x20);
     a.isCabin = sh1xJb(e, 'cabin', false) ? 1 : 0;
+    /* V44 (C-2): rotStepDeg — the per-instance yaw step (SAK_POL_ 45 deg
+     * x7 fence sectors / MGR_DRL_ + DRL2_ILI 90 deg x4 dolls; the ripper
+     * writes NO node rotation for posed emissions, so it is the ONLY
+     * per-instance carrier) + instRange[0] = the engine loop-index base
+     * (the posed nodes carry the LOCAL animInst 0..N-1; engine
+     * i = animInst + instBase — fog_poc.c, the case-12 precedent). */
+    a.rotStepDeg = sh1xJn(e, 'rotStepDeg', 0);
+    a.instBase = 0;
+    {
+      const ir = Array.isArray(e.instRange) ? e.instRange : null;
+      if (ir && ir.length >= 1) {
+        const n0 = +ir[0];
+        if (isFinite(n0)) a.instBase = Math.trunc(n0);
+      }
+    }
     {
       const ppi = Array.isArray(e.posPerInst) ? e.posPerInst : [];
       for (let q = 0; q < ppi.length && q < 16; q++) {
@@ -9094,8 +9112,13 @@ function sh1xDriverPose(S, i, inst) {
     out.mask = 2;
     break;
   }
-  case 13:  /* carouselSpin: rot.vy = master + the per-object rot0 offset */
-    out.rotDeg[1] = a.rot0[1] + a.mvMaster * R2D;
+  case 13:  /* carouselSpin: rot.vy = master + the per-object rot0 offset
+               + the per-instance rotStepDeg fan (V44 C-2: map6_s04_2.c
+               :3664-3693 fence master+90+i*45 i=1..7, :3696-3716 dolls
+               master+i*90 i=0..3 — engine i = animInst + instBase) */
+    out.rotDeg[1] = a.rot0[1] +
+                    a.rotStepDeg * ((inst > 0 ? inst : 0) + a.instBase) +
+                    a.mvMaster * R2D;
     break;
   case 14: { /* ferrisWheel — map6_s04_2.c:3814-3845 */
     let ii = inst > 0 ? inst : 0;
