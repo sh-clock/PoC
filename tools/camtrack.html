@@ -8501,9 +8501,14 @@ function sh1xDriverInit(propAnims, header, opts) {
       /* v31: tvNoise defaults LIVE-WHILE-CLEAR when the polarity is absent */
       if (a.driver === 2 && e.eventGatePolarity === undefined) a.eventGatePol = 1;
     }
-    /* v31 rngWalk params (vzBase prefers the authored pose) */
+    /* v31 rngWalk params — v45 (audit D-2): the vz base is the ENGINE
+       runtime constant Q12(19.7f) = 80691 (float32(19.7)*4096 =
+       80691.203125 -> trunc; map6_s03.c:334 overwrites position.vz =
+       D_800DFEF2 + Q12(19.7f) every in-chunk frame). The authored GLB
+       pos[2] 19.69921875 is the ripper's Q8 grid (= 80688, 3 Q12 low) —
+       NOT the engine constant; the old pose preference is dropped.    */
     a.rwRotBase = sh1xJi(e, 'rotBase', 0x800);
-    a.rwVzBaseQ12 = Math.trunc((a.pos[2] !== 0 ? a.pos[2] : sh1xJn(e, 'vzBase', 19.7)) * 4096);
+    a.rwVzBaseQ12 = Math.trunc(sh1xJn(e, 'vzBase', 19.7) * 4096);
     a.rwMask = sh1xJi(e, 'dirMask', 0x1F);
     a.rwBias = sh1xJi(e, 'dirBias', 0x20);
     a.isCabin = sh1xJb(e, 'cabin', false) ? 1 : 0;
