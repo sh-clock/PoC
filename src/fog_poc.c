@@ -10804,9 +10804,15 @@ static void fx_lens_exec(Frame *fb, const Renderer *R, const CamPose *cam) {
  * above the water and is incredibly broken"). Add order (the 2dEffects
  * run AFTER the mesh quads): the glint FIRST (the 641 chain tail =
  * painted LAST within 641 = ON TOP of the ring's opaque pair), then per
- * segment g4[0], g3[0] (641) and g4[1], g3[1] (639) — within a bucket
- * the higher add-seq paints FIRST = BELOW, so each bucket paints g3
- * UNDER g4 (the engine's per-segment add order, lens_flare.c:812-815).
+ * segment g4[0] BEFORE g3[0] (641) and g4[1] BEFORE g3[1] (639) — the
+ * engine's own AddPrim order (AddPrim(spD0,g4[0]) then AddPrim(spD0,
+ * g3[0]), lens_flare.c:812-815; AddPrim is a HEAD insert, so the
+ * last-added g3 sits at the chain head and draws FIRST = underneath).
+ * V44 (A-3): the emission order now MATCHES that add order (g4 first,
+ * g3 after => g3 gets the higher add-seq), and within a bucket the
+ * higher add-seq paints FIRST = BELOW — so each bucket paints g3
+ * UNDER g4 (the pre-V44 code emitted g3 first = lower seq = painted
+ * ON TOP, inverted vs the engine).
  * The depth gates keep the OT-bucket far-edge form (20.0625 m / 20.0 m —
  * V41 C-3). */
 typedef struct {
@@ -11067,8 +11073,11 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                              * LAST-added prim is at the chain head and
                              * draws FIRST = underneath; the engine adds
                              * g4 THEN g3 per bucket (812-815), so each
-                             * bucket paints g3 UNDER g4: g3[0], g4[0],
-                             * then g3[1], g4[1].                              */
+                             * bucket paints g3 UNDER g4 (paint seq g3[0]
+                             * then g4[0], g3[1] then g4[1]). V44 (A-3):
+                             * the port emits g4 BEFORE g3 (the engine's
+                             * add order) so g3 takes the higher add-seq
+                             * and paints first = below.                  */
                             const int g4o0[3] = { 20, 18, 12 };  /* P0 */
                             const int g4o1[3] = { 20, 18, 12 };  /* P1 */
                             const int g4o2[3] = { 4, 4, 4 };     /* P2 */
@@ -11081,7 +11090,6 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                             const int g4s3[3] = { 0, 0, 0 };     /* P3 */
                             const int g3s1[3] = { 4, 8, 4 };     /* P0 */
                             const int g3s2[3] = { 4, 8, 4 };     /* P1 */
-                            /* g3[0] OPAQUE (C,P0,P1) (24,22,12) — UNDER */
                             /* v37 (W1-5): both ring pairs depth-gated at
                              * their OT buckets — opaque pair 641, semi
                              * pair 639. V41 C-3: the buckets are MESH-rule
@@ -11098,14 +11106,10 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                              * 20.0625 m and 640*8/256 = 20.0 m. Covered
                              * by NEARER opaque geometry exactly like the
                              * engine's OT walk. */
-                            if (cVis)
-                                fx_emit_prim(post, nPost, seq, maxPost,
-                                             641, 0,
-                                             cScx, cScy, g3o0,
-                                             sxp[0], syp[0], g4o1,
-                                             sxp[1], syp[1], g4o1,
-                                             20.0625f);
-                            /* g4[0] OPAQUE (20,18,12)/(20,18,12)/(4,4,4)/(4,4,4) */
+                            /* g4[0] OPAQUE (20,18,12)/(20,18,12)/(4,4,4)/(4,4,4)
+                             * — emitted FIRST (V44 A-3: the engine's add
+                             * order, lens_flare.c:812) so the g3 below
+                             * takes the higher seq = painted first.     */
                             fx_emit_prim(post, nPost, seq, maxPost,
                                          641, 0,
                                          sxp[0], syp[0], g4o0,
@@ -11118,15 +11122,20 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                                          sxp[2], syp[2], g4o2,
                                          sxp[3], syp[3], g4o3,
                                          20.0625f);
-                            /* g3[1] SEMI (C,P0,P1) (8,8,4)/(4,8,4)/(4,8,4) — UNDER */
+                            /* g3[0] OPAQUE (C,P0,P1) (24,22,12) — UNDER:
+                             * emitted AFTER g4[0] (AddPrim(spD0,g4[0])
+                             * then AddPrim(spD0,g3[0]), lens_flare.c:812-
+                             * 813 — head insert => g3 draws FIRST =
+                             * beneath the wedge)                            */
                             if (cVis)
                                 fx_emit_prim(post, nPost, seq, maxPost,
-                                             639, 1,
-                                             cScx, cScy, g3s0,
-                                             sxp[0], syp[0], g3s1,
-                                             sxp[1], syp[1], g3s2,
-                                             20.0f);
-                            /* g4[1] SEMI (4,8,4)/(4,8,4)/(0,0,0)/(0,0,0) */
+                                             641, 0,
+                                             cScx, cScy, g3o0,
+                                             sxp[0], syp[0], g4o1,
+                                             sxp[1], syp[1], g4o1,
+                                             20.0625f);
+                            /* g4[1] SEMI (4,8,4)/(4,8,4)/(0,0,0)/(0,0,0)
+                             * — emitted FIRST (V44 A-3, lens_flare.c:814) */
                             fx_emit_prim(post, nPost, seq, maxPost,
                                          639, 1,
                                          sxp[0], syp[0], g4s0,
@@ -11139,6 +11148,17 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                                          sxp[2], syp[2], g4s2,
                                          sxp[3], syp[3], g4s3,
                                          20.0f);
+                            /* g3[1] SEMI (C,P0,P1) (8,8,4)/(4,8,4)/(4,8,4) — UNDER:
+                             * emitted AFTER g4[1] (AddPrim(spD4,g4[1])
+                             * then AddPrim(spD4,g3[1]), lens_flare.c:814-
+                             * 815)                                          */
+                            if (cVis)
+                                fx_emit_prim(post, nPost, seq, maxPost,
+                                             639, 1,
+                                             cScx, cScy, g3s0,
+                                             sxp[0], syp[0], g3s1,
+                                             sxp[1], syp[1], g3s2,
+                                             20.0f);
                         }
                     }
                 }
