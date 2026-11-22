@@ -15001,8 +15001,16 @@ static int tim_load(TimImage *t, const char *path) {
             size_t bit = (size_t)y * pw * 2 + (size_t)(x / (bpp == 4 ? 4 : 2)) * 2;
             uint16_t hw;
             memcpy(&hw, d + p + 12 + bit, 2);
-            int shift = (x % (bpp == 4 ? 4 : 2)) * 4;
-            t->indices[(size_t)y * t->w + x] = (hw >> shift) & 0xF;
+            /* V43 E-17-2: PS1 8bpp = 2 texels per halfword, 8 bits each
+             * (low byte = even x) — ipd2gltf.py's decoder and
+             * extract_snow_tim.py document the same packing. The old
+             * nibble form read BOTH texels as nibbles of the LOW byte:
+             * every 8bpp index truncated to 4 bits and the high byte was
+             * never sampled. 4bpp is unchanged (4 texels/halfword, 4
+             * bits each).                                                    */
+            int shift = (bpp == 4) ? (x & 3) * 4 : (x & 1) * 8;
+            t->indices[(size_t)y * t->w + x] =
+                (uint8_t)((hw >> shift) & (bpp == 4 ? 0xF : 0xFF));
         }
     }
     (void)plen; (void)px; (void)py;
