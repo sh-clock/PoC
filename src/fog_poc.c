@@ -3178,7 +3178,15 @@ static int scene_merge(Scene *dst, Scene *src) {
         (size_t)(dst->itemCount + src->itemCount) * sizeof(DrawItem));
     for (int i = 0; i < src->itemCount; i++) {
         DrawItem it = src->item[i];
-        it.matIdx += matOff;
+        /* v43 (E-03-4): the -1 "no material" sentinel must survive the
+         * merge — an unconditional += matOff turned it into matOff-1 >= 0
+         * (s->matCount = nMats ? nMats : 1 at load, so matOff >= 1), a
+         * VALID destination index, so the render-time skip (matIdx < 0 ||
+         * matIdx >= matCount) never fired and the quad drew with the
+         * destination map's last material. First-party GLBs always emit
+         * "material" on every primitive (ipd2gltf.py:4566/:5559) — this
+         * is the hand-edited/malformed-input class.                        */
+        it.matIdx = (it.matIdx >= 0) ? it.matIdx + matOff : -1;
         it.vbase += vertOff;
         it.ibase += idxOff;
         it.buffer = -1;          /* legacy always-drawn (active chunk set) */
