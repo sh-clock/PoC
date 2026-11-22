@@ -2327,9 +2327,11 @@ if (typeof module !== 'undefined' && module.exports) {
       uses WebGL additive blending on replicated-8-bit colors (the C++
       reads the quantized framebuffer and adds in 5-bit — a sub-LSB
       compositor difference only, positions/colors engine-exact).
-   5. POST PASS (exact math): screen-brightness overlay (5-bit additive,
-      WorldGfx_2dEffectsDraw order) + ordered dither + 15-bit replication
-      quantization over the 640x360 track-cam render target (the C++
+   5. POST PASS (exact math — V44 E-5 order): the C quantizes at RASTER
+      time (fb_put: ordered dither, clamp(c+d,0,255) >> 3 + repl5) and the
+      screen-brightness overlay (WorldGfx_2dEffectsDraw, frame END) adds
+      br5 in 5-bit on the already-quantized fb — dst5 = min(31,dst5+br5),
+      no re-dither; over the 640x360 track-cam render target (the C++
       default --res), blitted into the TRACK CAM rect with nearest
       filtering (the crisp PSX look).
    6. EDITOR ORBIT VIEW (approximation, documented): the orbit camera keeps
@@ -2691,21 +2693,29 @@ window.SHView = (function () {
     float repl5(float v5) { return floor(v5 * 255.0 / 31.0 + 0.5); }
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb * 255.0;
-      if (uBright > 0.5) {
-        /* WorldGfx_2dEffectsDraw brightness overlay: dst5 = min(31,dst5+br5) */
-        float br5 = floor(uBright / 8.0);
-        for (int i = 0; i < 3; i++) {
-          float d5 = floor(c[i] / 8.0);
-          c[i] = repl5(min(31.0, d5 + br5));
-        }
-      }
       if (uQuantize > 0.5) {
         vec2 fc = vUv * vec2(640.0, 360.0);       /* engine raster coords  */
         ivec2 p = ivec2(int(fc.x) & 3, int(fc.y) & 3);
         float d = DITHER4[p.x][p.y];              /* == C DITHER4[y][x]    */
+        /* V44 (E-5, CT-2#10): the C dithers + quantizes at RASTER time
+           (fb_put -> quantize8 clamps c+d to 0..255, rgb_to_15bit_expand
+           >> 3 + repl5) and the frame-end brightness overlay
+           (WorldGfx_2dEffectsDraw) adds br5 in 5-bit on the ALREADY-
+           quantized fb — dst5 = min(31, dst5+br5), repl5, NO re-dither.
+           Dither FIRST, then the 5-bit add (the old bright-then-dither
+           re-quantize diverged on 580/2048 (c,d) pairs at br5=3).       */
+        float br5 = (uBright > 0.5) ? floor(uBright / 8.0) : 0.0;
         for (int i = 0; i < 3; i++) {
-          float v = clamp(c[i] + (uDither > 0.5 ? d : 0.0), 0.0, 255.0);
-          c[i] = repl5(floor(v / 8.0));           /* 8->5 truncate + repl  */
+          float d5 = floor(clamp(c[i] + (uDither > 0.5 ? d : 0.0), 0.0, 255.0) / 8.0);
+          c[i] = repl5(min(31.0, d5 + br5));
+        }
+      } else if (uBright > 0.5) {
+        /* WorldGfx_2dEffectsDraw brightness overlay on the UNQUANTIZED fb
+           (uQuantize = 0): dst5 = min(31,dst5+br5) — the C overlay form  */
+        float br5 = floor(uBright / 8.0);
+        for (int i = 0; i < 3; i++) {
+          float d5 = floor(c[i] / 8.0);
+          c[i] = repl5(min(31.0, d5 + br5));
         }
       }
       gl_FragColor = vec4(c / 255.0, 1.0);
