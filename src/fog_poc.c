@@ -5459,12 +5459,18 @@ static int sh_mesh_light_vertex(const ShMeshLight *ml,
  * (x,-y,-z) into the engine view frame — orthogonal, dot-preserving.
  *
  * D_800AE500 = SVECTOR(Q12_ANGLE(255.65deg)...): Q12_ANGLE(deg) =
- * (s32)(deg/360*4096) -> (0,2909,2909) etc, |N| = 4115 (near-unit Q12). */
+ * (q3_12)Q12(deg/360.0f) = (s32)((deg/360.0f)*4096) — the TO_FIXED
+ * TRUNCATION, exactly like PR #83's Q12_ANGLE(70.0f) = 796 (not 797):
+ * float32(255.65) = 255.649993896484375, /360 = 0.7101388573646545
+ * (float32), *4096 = 2908.728759765625 -> (s32) = 2908 (NOT the rounded
+ * 2909 — v45 audit C1-2). All 8 ±255.65 literals -> ±2908; |N| =
+ * sqrt(2)*2908 = 4112.53 (near-unit Q12; the old comment's 4115 was the
+ * rounded-literal magnitude and still wrong — 2909 gives 4113.95).   */
 static const int16_t SH_BB_NORMALS[4][3] = {
-    { 0,  2909,  2909 },   /* D_800AE500[0]: top-tilt      */
-    { -2909, 0,  2909 },   /* D_800AE500[1]: left-tilt     */
-    { 2909, 0,  2909 },    /* D_800AE500[2]: right-tilt    */
-    { 0, -2909,  2909 },   /* D_800AE500[3]: down-tilt     */
+    { 0,  2908,  2908 },   /* D_800AE500[0]: top-tilt      */
+    { -2908, 0,  2908 },   /* D_800AE500[1]: left-tilt     */
+    { 2908, 0,  2908 },    /* D_800AE500[2]: right-tilt    */
+    { 0, -2908,  2908 },   /* D_800AE500[3]: down-tilt     */
 };
 
 /* Math_Vector3MagCalc = SquareRoot0(x^2+y^2+z^2) — the GTE integer floor
