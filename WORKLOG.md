@@ -2501,3 +2501,97 @@ Regression: the user's 3-map camdat loads + plays, the fan animates, 0 console e
   the altKey guard + the g/l/c/t/z/h ctrl-collision house-wide sweep (AUD-FX nits).
 - The V41 evidence dir (download/v41_evidence) is in the AUDIT fleet's sandbox — re-mirror if needed.
 - The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE ALL ELSE).
+
+---
+
+## Session V46 (2026-11-22) — THE 72-PR BACKLOG GATE (sole-merger review of the stranded V43 batch + V45 tail) + the task split
+
+The user directive order for this session: (1) CLEAR THE PR BACKLOG FIRST, (2) then the
+water-texture GLB audit, (3) SPLIT the remaining work across sessions (the task is too
+long for one session — three prior crashes). This session executed (1) completely and
+split the rest — see "NEXT SESSION" below.
+
+### The gate (72 open PRs: V43 #69-#134 minus the merged #95, S20 #133/#134, V45 #168-#174)
+- Crash recovery first: sandbox partial-wipe (repos gone, scripts survived) -> PoC recloned
+  at 0c13e6c (v33.43, V45 #160-167 already merged), decomp + swanstation shallow-cloned,
+  resumption posted to the agent board (new token).
+- 7 verification agents (V46-A..G) audited all 72 PRs in subsystem batches (camtrack JS,
+  snow/rain, R2/timing, raster/GTE, lens/TV/TIM, GLB scene/anim, ripper) — every claim
+  re-derived from decomp/swanstation with full-function reads and recomputed arithmetic,
+  every branch tested against CURRENT main (which had moved past the PR bases via the
+  V44/V45 merges). Compose tests on scratch clones, no merges by agents.
+- MERGED 61: #69 #70 #71 #72 #74 #75 #77 #78 #79 #80 #81 #82 #83 #84 #85 #87 #88 #89 #90
+  #92 #93 #94 #96 #97 #99 #101 #102 #103 #104 #105 #106 #107 #108 #109 #110 #111 #112
+  #113 #114 #115 #116 #117 #118 #119 #121 #123 #124 #125 #126 #127 #129 #130 #131 #132
+  #133 #168 #169 #170 #171 #172 #173 #174 (+ the #115 gate companion commit: the probe
+  pixel's Y switched to fb->h/224).
+- REIMPLEMENTED 6 (bug real, fix wrong/stale — NOT merged, fixed properly at the gate):
+  #86 (posed-group bind via the ripper's per-object _emitted_inst base window + the
+  posedBound++ fallback discipline onto post-#140 main), #98 (stall catch-up ONE dt=273
+  update with the V42 D-2 duration clamp wrapped AROUND stepT), #100 (splash corner-0
+  depth/bucket/CLUT with TRUNCATING quantization + Q8-snapped corner + per-branch cull),
+  #120 (stoneChoreo metadata 1337 — the PR's "~1336" contradicted merged #138; also the
+  second stale 1336 at the gravityScatter metadata and the C drop-path comment),
+  #128 (per-QUAD far cull folded into the #154 shQcull walk — the PR's own diff would
+  have failed the shader compile with a duplicate attribute declaration),
+  and #119 was merged WITH a gate amendment (4 KAIGAR2_H/KAIGAL2_H -> KAIGAR2_/KAIGAL2_
+  per map7_s01_2.c:2116/2121 + map7_s02_2.c:3412/3415 — the _H strings do not exist in
+  the engine).
+- CLOSED 6: #76 (duplicate of #133 — identical fix, #133 is current-main-based), #91
+  (duplicate — negative-wrap guards already on main via V42 D-5 ext + #167), #73
+  (duplicate — subsumed by merged #147/#166), #122 (stale premise — merged #155 settled
+  the opposite direction; merging would re-diverge the twins), #134 (bug real, fix NOT
+  engine-verbatim — the wrap-fold has no counterpart in the engine's plain ABS_DIFF;
+  the verbatim form landed as #96). All closed with evidence comments.
+- Conflict resolutions documented in the merge commits: #88 (nbMerged field unioned with
+  #87), #92 (onto #93's jsonIdx walk), #107 (V44 comment + PR comment unioned, code
+  byte-identical), #108/#130/#131 (composed with the just-landed cluster PRs), #116
+  (3-way onto post-#115 main), #78 (V44 C-6 3rd arg kept + POST-advance relocation),
+  #84 (V44 D-1 z-negation kept + x-min truncation).
+
+### The battery (ALL PASS on the final tree)
+- Clean build (cc -O2 -std=c99 -Wall -Wextra): ZERO warnings/errors.
+- Determinism: THR t=10.5 double render byte-identical (cmp).
+- Fan shot A/B t=1.000/1.0334: 30.50% pixels changed (threshold 500).
+- Fan BENCHMARK live A/B (the live_advance path — exercises the #98 stall + #78 POST
+  order): 39.98% changed.
+- Sewer water A/B t=3/t=6 (DRU0100, exercises #108/#172/#114 water paths): 527 px vs
+  threshold 80. TV A/B t=3/t=6 (SPU0401, exercises #109 TV-over-flakes): 13.55%.
+- IPD roundtrip: FULL FILE BYTE-IDENTICAL on all 6 corpus rooms (HP0003/DRU0100/
+  SPU0401/SU0203/SU0300/THRF9FD) — with #123/#124's bitfield re-encode changes live.
+- Ripper conversion set (CI parity): THRF9FD/HP0003/SU0203/SU0300 all rip clean
+  (0 validation errors, 3517/3517 quads reconstruct).
+- camtrack.html: JS syntax 4/4 script blocks, the 30-track ground-truth audit passes,
+  headless browser load ZERO console errors.
+- New golden baselines (post-#78 one-tick POST-order shift — expected): THR t=10.5
+  md5 c5132b820a63e11d5132358cb586c994; FAN t=1.000 a419211e84529b7528dfe528a95004e0;
+  SEW t=3 43a1d488b1cf75457971c502dbc44aef; TV t=3 deee41888426cd3c9edede58c95031a2;
+  LIVE t=3 0afd331c102823101ec20398d79e425c / t=6 8f79f480758233896d4d28477700d8b5.
+
+### Wallpaper twin / four-program mirroring — NOT done this session (split)
+The V46 engine changes (61 merges + 6 reimplementations) are on PoC main only. The
+wallpaper twin sync (the same fog_poc.c superset + camtrack twin), the glbs re-derivation
+and the wallpaper CI/versioning work remain for the next sessions — deliberate split per
+the user's directive, NOT an omission.
+
+### NEXT SESSION (the split's task list, in order)
+1. THE WATER-TEXTURE GLB AUDIT (the user's first directive): the generated GLB water
+   textures "don't look correct" — extensively audit the IPD/GLTF ripper's water-texture
+   path against silent-hill-decomp (TIM decode, TPage/CLUT selection, semi-transparency
+   classes, UV/texwin handling, the DWAVE/VIN CLUT research) with NO assumptions; any fix
+   goes in the IPD RIPPER (the single source of truth — all players consume the GLB).
+   Relevant merged context this session: #108 (wsheet quad split), #114 (engine-px
+   scaling), #117 (8bpp TIM decode), #118 (blit_tim center-crop), #171/#172 (the exact
+   SUB/ADD 5-bit chains), #1 (V40 water glint window) are already on main — audit the
+   RIPPER side now.
+2. DR01FE.glb as THE water reference map (the user: "use DR01FE.glb — it is more
+   relevant"), the lens effect ON the water (not floating above), and reference camera
+   angle matching BEFORE comparing water effects (fixed camera angles from the source).
+3. APU00FF/APUFFFE animation failures on Camtrack (all special properties in EXTRAs).
+4. The wallpaper twin sync of the V46 wave + the env/EXTRAs rules (no rain indoors;
+   day/night population; unbiased EXTRAs with Camtrack deriving) + related-map EXTRAs.
+5. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning, kill v11-v27).
+6. Flashlight (Harry's light source: full camera-like movement, angle distinction,
+   disable-able, never in day modes).
+- The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE
+  ALL ELSE).
