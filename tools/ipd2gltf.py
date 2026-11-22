@@ -490,19 +490,23 @@ _WATER_FLOOR_SRC = (
 def _room_water_floor(room, resolver, report):
     """v37: SH1X.waterFloor — the room's slot-0 CLUT row 0 (16 raw u16).
 
-    The engine's DWAVE floor redirect makes the water-floor quads read the
-    live 32x32 tile (the func_8008E5B4 write window at VRAM (832,224)) as
-    4bpp NIBBLES through the ROOM's FIRST fullPage texture-slot palette
-    (CLUT (0,0) — the slot strips at (16*i, 0), the FIRST table material's
-    TIM in slot 0). The clut15 array is that palette's row 0, VERBATIM raw
-    15-bit values. Consumers rebuild the floor view as:
-      texel(u, row) = clut15[(liveTile15[row][u>>2] >> (4*(u&3))) & 0xF]
-    (u 0..127 = the 32-halfword patch's 128 texels, rows 0..31) — the
-    page-texel UV mapping documented in SH1X_EXTRAS_V3_FX.md.
+    V44 (the VIN water-CLUT research) — THE CORRECT INTERPRETATION:
+    the MIZ water-floor models (field_B=0x10, the ONLY users of the
+    DWAVE material in the shipped DR corpus) draw through
+    func_80059E34(1): a FLAT code-0x2E POLY_FT4 whose tpage is FORCED
+    to 15-bit DIRECT color (prim->u1 | 0x140<<16,
+    bodyprog_80056D8C.c:1546), flat color (56,56,56) (0x2E383838),
+    fixed OT bucket org[640] — the live 32x32 tile at (832,224) is
+    sampled as RGB555 DIRECTLY, NO CLUT. The nibble/CLUT interpretation
+    was func_80059E34's UNUSED arg0==2 variant (var_a2=0x20). The
+    prim UVs are u 0..31 / v 224..255 in 15-bit texel units (u8
+    byte-verified in DR0100/DR01FE/DR01FF/DRFD00/DRFDFE + DRU0000/0100/
+    0200). This block is emitted RECORD-ONLY (consumer compat/audit);
+    the direct-color consumer (fog_poc.c v44) never reads it.
 
     Emitted ONLY for rooms whose material table carries "DWAVE" (the
     waterLive floor material) AND whose slot-0 TIM resolves locally; a
-    miss emits nothing (the consumer's legacy floor path — graceful no-op).
+    miss emits nothing (graceful no-op).
     """
     if room.plm is None:
         return None
@@ -543,10 +547,13 @@ def _room_water_floor(room, resolver, report):
         "clut15": [int(c) & 0xFFFF for c in row],
         "slot0": {"clutX": 0, "clutY": 0, "pixelX": 512, "pixelY": 0,
                   "src": "WorldMap_TexturesInit map.c:153-166 fullPage slot 0"},
-        "floorUv": {"pageTexel": True, "patchU": [0, 127], "patchV": [224, 255],
-                     "note": "the MIZ quads' UVs are page-13 texel coords "
-                              "(normalized by the DR_WAVE image's 256x64); "
-                              "the live patch = u 0..127, v 224..255"},
+        "floorUv": {"pageTexel15": True, "patchU": [0, 31], "patchV": [224, 255],
+                     "note": "V44: the MIZ quads' UVs are 15-bit TEXEL "
+                              "coords on the live tile (u 0..31, v 224..255; "
+                              "normalized by the DR_WAVE image's 128x64 -> "
+                              "u_norm*4, v_norm*2-7 recover the tile); "
+                              "the record-only clut15 belongs to the UNUSED "
+                              "func_80059E34 arg0==2 variant"},
         "src": _WATER_FLOOR_SRC,
     }
 
