@@ -4133,13 +4133,15 @@ def parse_collision(data):
             #   bytes 2-3: offsetY:14 | triggerFlagIdxLow:2    (u16)
             #   bytes 4-5: offsetZ (s16, no bits)
             #   bytes 6-9: splitVertexIdx0/1, surfaceIdx0/1
-            # ksy combines the trigger bits as (low << 2) | high.
+            # The engine combines the nibbles as (High << 2) | Low with High
+            # from word0/offsetX (collision.c:1066, ray.c:464) — v43 RIP2-3:
+            # the old (Low << 2) | High (the ksy form) swapped them.
             wx, wy = u16(data, o), u16(data, o + 2)
             polys.append({
                 "offsetX": wx & 0x3FFF,
                 "offsetY": wy & 0x3FFF,
                 "offsetZ": s16(data, o + 4),
-                "triggerFlagIdx": ((wy >> 14) & 3) << 2 | ((wx >> 14) & 3),
+                "triggerFlagIdx": ((wx >> 14) & 3) << 2 | ((wy >> 14) & 3),
                 "splitVertexIdx0": data[o + 6],
                 "splitVertexIdx1": data[o + 7],
                 "surfaceIdx0": data[o + 8],
