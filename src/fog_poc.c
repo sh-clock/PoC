@@ -11643,6 +11643,13 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
         return 0;
     mat4 view = mat4_view_from_quat(cam->pos, cam->q);
     const ShLight *L = &env->light;
+    /* V43 E-14-2: the G3 apex + ring-corner projections below are
+     * ENGINE px (the GTE 320x224 screen, H=224) — scale them to fb px
+     * with the SAME factors the sibling FX use (the glint blit:
+     * fb->w/320, fb->h/224; FX_TO_PX/FX_TO_PY in fx_pass). At the
+     * default 320x224 res the factors are 1 — bit-identical.       */
+    const float fxpX = (float)fb->w / 320.0f;
+    const float fxpY = (float)fb->h / 224.0f;
         float ex = (float)g_fxLightPos[0] * (1.0f / 4096.0f);  /* the LIGHT */
         float ez = -(float)g_fxLightPos[2] * (1.0f / 4096.0f); /* not camera */
         for (int z = 0; z < sx->nWaterZones; z++) {
@@ -11768,8 +11775,10 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                         float cdd = -cpz;
                         if (cdd > 0.05f) {
                             float civ = 224.0f / cdd;  /* v40: NTSC 224 */
-                            cScx = (int)(cpx * civ) + (int)(fb->w / 2);
-                            cScy = (int)(cpy * civ) + (int)(fb->h / 2);
+                            int aex = (int)(cpx * civ);  /* engine px, ctr */
+                            int aey = (int)(cpy * civ);
+                            cScx = (int)(aex * fxpX) + (int)(fb->w / 2);
+                            cScy = (int)(aey * fxpY) + (int)(fb->h / 2);
                             cVis = 1;
                         }
                     }
@@ -11816,8 +11825,10 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                             float dd = -pz;
                             if (dd <= 0.05f) { vis = 0; break; }
                             float iv = 224.0f / dd;    /* v40: NTSC 224 (RotTransPers4) */
-                            sxp[k] = (int)(px * iv) + (int)(fb->w / 2);
-                            syp[k] = (int)(py * iv) + (int)(fb->h / 2);
+                            int rex = (int)(px * iv);  /* engine px, ctr */
+                            int rey = (int)(py * iv);
+                            sxp[k] = (int)(rex * fxpX) + (int)(fb->w / 2);
+                            syp[k] = (int)(rey * fxpY) + (int)(fb->h / 2);
                         }
                         if (vis) {
                             /* the engine's per-segment polys
@@ -13263,11 +13274,21 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                       ? 0 : 8;   /* Q12(-92.0)= -376832, Q12(0.5)=2048,
                                    Q12(8.1)=33177 (truncating TO_FIXED) */
             mat4 view = mat4_view_from_quat(cam->pos, cam->q);
+            /* V43 E-14-2: the mesh/sprite projections below are ENGINE px
+             * (the GTE 320x224 screen) — scale to fb px with the SAME
+             * factors the sibling FX use (the glint blit: fb->w/320,
+             * fb->h/224). The ENGINE-PX cull bounds further down
+             * (±200/±160, pxi3/pyi3) keep the UNSCALED values — the
+             * engine tests screen-centered 320x224 px. At the default
+             * res the factors are 1 — bit-identical.                  */
+            const float fxpX = (float)fb->w / 320.0f;
+            const float fxpY = (float)fb->h / 224.0f;
             for (int mi = 0; mi < 4; mi++) {
                 for (int mj = 0; mj < 4; mj++) {
                     int sxq[4], syq[4], vis = 1;
                     float dsum = 0.0f;
                     float d0 = 0.0f;   /* v41 (A-4): corner [i][j]'s depth */
+                    int m0xe = 0, m0ye = 0;  /* E-14-2: corner-0 engine px */
                     /* grid corners (engine coords -> glTF)             */
                     float wx[4] = { -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f,
                                     -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f };
@@ -13302,8 +13323,11 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                         if (k == 0) d0 = d;   /* sp78[i][j], the cull corner */
                         dsum += d;
                         float iv = 224.0f / d;      /* v40: NTSC 224 (gte_rtpt) */
-                        sxq[k] = (int)(px * iv) + (int)(fb->w / 2);
-                        syq[k] = (int)(py * iv) + (int)(fb->h / 2);
+                        int mqx = (int)(px * iv);   /* engine px, screen-ctr */
+                        int mqy = (int)(py * iv);
+                        if (k == 0) { m0xe = mqx; m0ye = mqy; }
+                        sxq[k] = (int)(mqx * fxpX) + (int)(fb->w / 2);
+                        syq[k] = (int)(mqy * fxpY) + (int)(fb->h / 2);
                     }
                     if (!vis) continue;
                     /* v40 (audit B2) + v41 (A-4): the engine's PER-QUAD
@@ -13319,8 +13343,11 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                      * sp78[i+1][j]+sp78[i][j+1]+sp78[i+1][j+1])>>2 = the
                      * blit's dsum*0.25 depth below).                       */
                     {
-                        int m0x = sxq[0] - (int)(fb->w / 2);
-                        int m0y = syq[0] - (int)(fb->h / 2);
+                        /* E-14-2: the ±200/±160 bounds are ENGINE px —
+                         * read corner 0's UNSCALED projection (m0xe/m0ye
+                         * captured in the loop above), not the fb-px sxq  */
+                        int m0x = m0xe;
+                        int m0y = m0ye;
                         int mzQ8 = (int)(d0 * 256.0f);
                         if (mzQ8 <= 0 || (mzQ8 >> 3) >= 2048) continue;
                         if (m0x > 200 || m0x < -200 ||
@@ -13380,11 +13407,13 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                     if (d <= 0.05f) { vis = 0; break; }
                     dsum += d;
                     float iv = 224.0f / d;          /* v40: NTSC 224 (gte_rtps) */
-                    sxq[k] = (int)(px * iv) + (int)(fb->w / 2);
-                    syq[k] = (int)(py * iv) + (int)(fb->h / 2);
+                    int spx = (int)(px * iv);       /* engine px, screen-ctr */
+                    int spy = (int)(py * iv);
+                    sxq[k] = (int)(spx * fxpX) + (int)(fb->w / 2);
+                    syq[k] = (int)(spy * fxpY) + (int)(fb->h / 2);
                     if (k == 3) {
-                        pxi3 = (int)(px * iv);
-                        pyi3 = (int)(py * iv);
+                        pxi3 = spx;   /* engine px — the ±200/±160 cull */
+                        pyi3 = spy;
                     }
                 }
                 if (!vis) continue;
