@@ -11677,6 +11677,19 @@ static void fx_water_static_tile(int sel, unsigned char out[32][32][3]) {
         }
 }
 
+/* V44 (A-2): the engine water OT bucket's far edge — (((zQ8 + bias)>>3)
+ * + 1)*8 Q8 in metres. The engine OT-inserts every water prim at the
+ * BIASED bucket (zQ8+128)>>3 (map5_s00.c:167/234) / ((zQ8+0x100)>>3)
+ * (water.c:439/698) while the meshes insert at their plain (SZ>>3)
+ * bucket (bodyprog_80056D8C.c:855, otShift=1) — so a mesh hides the
+ * water iff meshBucket <= waterBucket, i.e. opaque geometry up to
+ * B+8 Q8 (0.53125 m / 1.03125 m) FARTHER than the water prim still
+ * paints over it. The C-3/#35 far-edge gate, per-prim bucket form. */
+static float sh_water_ot_gate(float depthM, int biasQ8) {
+    int zq8 = (int)(depthM * 256.0f);
+    return (float)((((zq8 + biasQ8) >> 3) + 1) * 8) / 256.0f;
+}
+
 /* the water quad rasterizer: a world-space POLY_FT4 sampling a 32x32 RGB
  * tile through an affine UV map. The prim color modulation = the snow
  * rule (F5 = t5*prim8>>7 — the verified BG_ETC particle path); the FB
@@ -12200,7 +12213,12 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
                 cr[3] = cg[3] = cb[3] = rowsB[k + 1][1];
                 fx_blit_wsheet_gt4(fb, sxq, syq, 1, 64, vNear, 95,
                                    vNear + vSpan, cr, cg, cb,
-                                   avgZ);   /* own depth (the v37 gate) */
+                                   /* V44 (A-2): the engine OT bucket is
+                                    * ((avg4zQ8 + 0x100)>>3) (water.c:698) —
+                                    * the far-edge gate, not the plain
+                                    * own depth (the v37 gate under-
+                                    * occluded: near-side only).          */
+                                   sh_water_ot_gate(avgZ, 0x100));
             }
         }
     }
@@ -12429,14 +12447,15 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
                     sh_light_query_pos(R->env, a->wfX[q], a->wfY[q],
                                        a->wfZ[q]), br,
                     a->wfX[q], a->wfY[q], a->wfZ[q]);
-        /* depthM = the prim's OWN average depth — the engine's
-         * established water-family gate (v37 W1-5: the ripple mesh/
-         * sprites pass dsum*0.25 with the (zQ8+128)>>3 OT note; the
-         * game's own +0x100 bucket bias (water.c:439) documents the
-         * OT-slot granularity, the painter gate uses the plain depth). */
+        /* V44 (A-2): the engine OT-inserts the droplet at
+         * ((zQ8 + 0x100) >> 3) (water.c:439) — the +0x100 Q8 bias is a
+         * 1.0 m = 32-bucket FAR-SHIFT (one OT slot = 8 Q8 = 3.125 cm,
+         * NOT "slot granularity"), so opaque geometry up to B+8 Q8 =
+         * 1.03125 m FARTHER than the droplet still paints over it. The
+         * old v37 gate fed the plain own depth (under-occlusion).     */
         fx_blit_wsheet_ft4(fb, sxq, syq, 0, u0, vv0, u1, vv0 + v17D,
                            br, br, br,
-                           (float)f160 / 256.0f);
+                           sh_water_ot_gate((float)f160 / 256.0f, 0x100));
     }
 }
 
@@ -12567,11 +12586,17 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                         if (m0x > 200 || m0x < -200 ||
                             m0y > 160 || m0y < -160) continue;
                     }
-                    /* v37 (W1-5): the engine OT bucket ((zQ8+128)>>3,
-                     * map5_s00.c:166) — occluded by nearer opaque geometry */
+                    /* V44 (A-2): the engine OT bucket ((zQ8+128)>>3,
+                     * map5_s00.c:234) — the +128 Q8 = 0.5 m = 16-bucket
+                     * far-shift's far edge (meshes insert at their plain
+                     * (SZ>>3) bucket, bodyprog_80056D8C.c:855, so opaque
+                     * geometry up to 0.53125 m FARTHER still covers the
+                     * mesh quad — the v37 "nearer only" gate under-
+                     * occluded).                                              */
                     fx_blit_water_quad(fb, sxq, syq, tile,
                                        8 * mj, 8 * mi, 8 * mj + 7, 8 * mi + 7,
-                                       brt, 0, 0, 1, dsum * 0.25f);
+                                       brt, 0, 0, 1,
+                                       sh_water_ot_gate(dsum * 0.25f, 128));
                                        /* mesh: tpage 43 = ADD; prim color
                                        (field_160, 0, 0) r-only — map5_s00.c:
                                        223-224 (v32.3 audit fix: g was brt) */
@@ -12638,8 +12663,12 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                 if (b < 0) b = 0;
                 if (b > 16) b = 16;
                 fx_blit_water_quad(fb, sxq, syq, rtile, 0, 0, 31, 31,
-                                   b, b, b, 2, dsum * 0.25f);  /* sprite:
-                                   tpage 75 = SUB, OT bucket (z+128)>>3 */
+                                   b, b, b, 2,
+                                   /* sprite: tpage 75 = SUB; V44 (A-2): the
+                                    * engine OT bucket (zQ8+128)>>3 (map5_s00.
+                                    * c:167) — the 0.5 m far-shift's far
+                                    * edge, not the plain own depth.       */
+                                   sh_water_ot_gate(dsum * 0.25f, 128));
             }
             if (getenv("FOGPOC_WATERDBG")) {
                 fprintf(stderr, "WATERDBG sel=%d t[]=", sel);
