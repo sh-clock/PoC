@@ -4945,9 +4945,19 @@ static int load_average_col(int c0, int c1, int aFrom, int aTo) {
     return (int)(mac2 & 0xFF);
 }
 
-/* Math_WeightedAverageGet(a, b, w) — world_effects.c 0x8003F7E4 */
+/* Math_WeightedAverageGet(a, b, w) — world_effects.c 0x8003F7E4:
+ * Math_MulFixed(a, Q12(1.0f) - w, 12) + Math_MulFixed(b, w, 12) —
+ * EACH product is shifted to Q12 on its own (the full-precision 64-bit
+ * mult/mfhi/mflo reassembly of player_control.c:9378 = (a*b)>>12), then
+ * the two s32 results are added. v45 audit C1-4: the old single-shift
+ * form ((a*(4096-w) + b*w)>>12) shifted the SUM — off by 1 whenever the
+ * two discarded fractional parts sum >= 1 (a=1,b=1,w=2048: engine 0+0=0,
+ * old form 1). Consumers: fogDistance, worldLightIntensity, worldTintQ12,
+ * spotLightIntensity, lightLevelMax, flashlightLensFlareIntensity,
+ * brightnessIntensity — every blend tick of every mixed pair.        */
 static int sh_weighted_avg(int a, int b, int w) {
-    return (int)(((int64_t)a * (4096 - w) + (int64_t)b * w) >> 12);
+    return (int)(((int64_t)a * (4096 - w)) >> 12)
+         + (int)(((int64_t)b * w) >> 12);
 }
 
 /* func_8003FEC0 — Y_ARRAY interpolation when fog is disabled        */

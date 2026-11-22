@@ -755,9 +755,13 @@ const SHCore = (function () {
     return mac2 & 0xFF;
   }
 
-  /* Math_WeightedAverageGet(a, b, w) — world_effects.c 0x8003F7E4 */
+  /* Math_WeightedAverageGet(a, b, w) — world_effects.c 0x8003F7E4:
+     Math_MulFixed(a, 4096-w, 12) + Math_MulFixed(b, w, 12) — EACH product
+     is shifted on its own ((a*b)>>12, player_control.c:9378), then the two
+     s32 results are added (v45 audit C1-4; Math.floor = the int64 >>12
+     floor for every sign — the live callers are all non-negative).     */
   function shWeightedAvg(a, b, w) {
-    return Math.trunc((a * (4096 - w) + b * w) / 4096);
+    return Math.floor((a * (4096 - w)) / 4096) + Math.floor((b * w) / 4096);
   }
 
   /* func_8003FEC0 Y_ARRAY (fog-off fallback distances) */
