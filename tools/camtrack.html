@@ -5106,20 +5106,49 @@ window.SHUI = (function () {
         'phase','dayenv','nightenv'].includes(k)))
       U.urlOverride = true;
     const num = (k, d) => q.has(k) ? +q.get(k) : d;
-    /* envpair / preset / worldstage — the C++ boot priority order */
+    /* envpair / preset / worldstage / night / day — the C++ boot priority
+     * (fog_poc.c:17705-17757): --envpair/--preset are the SAME envPair0
+     * variable and WIN (:17757 `if (envPair0 >= 0)`), --worldstage is the
+     * next tier (:17753-17755), --night/--day only pick the boot pair
+     * BELOW those (:17707-17718, nightForced -> the night/day pair).
+     * Last assignment wins -> assign in REVERSE priority order.
+     * v45 audit (F-6): the old order (envpair, preset, worldstage, night,
+     * day) was exactly inverted at the top — ?envpair=2,2&night booted
+     * {6,3} where the C boots {2,2}, and ?worldstage=2&envpair=7,4 booted
+     * {6,3} where the C boots {7,4} (the Help text promises "URL
+     * parameters mirror the C++ flags 1:1"). */
     let a = null, b = null;
+    if (q.has('night')) { a = 6; b = 3; }   /* nightForced=1 -> the night pair */
+    if (q.has('day')) { a = 1; b = 1; }     /* nightForced=0 -> the day pair (the old
+                                               day-vs-envpair guard is now structural:
+                                               envpair/preset below overrule day) */
+    if (q.has('worldstage')) {
+      /* the C validates at PARSE and refuses to boot (fog_poc.c:16713-16728:
+       * cli_int's strtol accepts only a strict integer — cli_long_end's
+       * `*end != '\0'` rejects "1.5"/"2 " — else "bad --worldstage (not a
+       * number)"; `worldStage < 1 || worldStage > 3` -> "bad --worldstage
+       * (1 day, 2 night, 3 {9,9})" + return 1). The old ternary silently
+       * mapped EVERY other value to {9,9} (?worldstage=4 -> {9,9}). A page
+       * cannot refuse to boot like the process does, so the param is a
+       * LOUD no-op: the C's exact message as an error toast and NOTHING
+       * applied for it. */
+      const raw = q.get('worldstage');
+      const mi = /^\s*[+-]?\d+$/.exec(raw);      /* strtol: leading ws, int, no tail */
+      if (!mi)
+        toast2('bad worldstage (not a number: \'' + raw + '\') — ignored', 'err');
+      else {
+        const st = parseInt(raw, 10);
+        if (st === 1) { a = 1; b = 1; }          /* D_800A9F80 */
+        else if (st === 2) { a = 6; b = 3; }     /* D_800A9F88 */
+        else if (st === 3) { a = 9; b = 9; }     /* D_800A9F98 */
+        else toast2('bad worldstage=' + st + ' (1 day, 2 night, 3 {9,9}) — ignored', 'err');
+      }
+    }
     if (q.has('envpair')) {
       const m = q.get('envpair').split(',').map(Number);
       if (m.length === 2 && m.every(isFinite)) { a = m[0]; b = m[1]; }
     }
     if (q.has('preset')) { a = b = num('preset', 1); }
-    if (q.has('worldstage')) {
-      const st = num('worldstage', 1);
-      const pair = st === 1 ? [1, 1] : st === 2 ? [6, 3] : [9, 9];
-      a = pair[0]; b = pair[1];
-    }
-    if (q.has('night')) { a = 6; b = 3; }
-    if (q.has('day') && !q.has('envpair')) { a = 1; b = 1; }
     if (a !== null) {
       a = Math.max(0, Math.min(20, a | 0));
       b = Math.max(0, Math.min(20, b | 0));
