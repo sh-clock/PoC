@@ -14950,6 +14950,22 @@ static CamPose live_advance(LiveApp *A, double dt) {
 
 static void live_render(LiveApp *A) {
     CamPose cp = live_current_pose(A);
+    /* V45 audit (E-3): hold the R2 (self) view pose, mirroring live_advance's
+     * between-tick discipline (`if (!fired && (A->r2.active || A->r2.returning))
+     * cp = r2view_pose(...)`): the session's last presented frame was the
+     * SELF-VIEW camera (the engine renders from the ACTIVE camera every tick
+     * — vcSetDataToVwSystem sets the view matrix from the self-view camera
+     * while VC_MV_SELF_VIEW, 0x80085884), so the final PNG must be that pose
+     * too — with the env light + snow anchored to it (Gfx_EffectsUpdate uses
+     * the same tick's camera), not re-anchored to the track pose. Without
+     * this, `--r2ctrl reverse --save-final` wrote the TRACK pose with a
+     * track-anchored light: neither the last presented frame nor the last
+     * benchmark frame — breaking the documented "bit-identical to the
+     * live/benchmark frames" contract for the R2 feature. r2view_pose is a
+     * pure function of the held R2 state + the held tick body pose, so this
+     * reproduces exactly the last tick's rendered pose (no tick advanced).  */
+    if (A->r2.active || A->r2.returning)
+        cp = r2view_pose(&A->r2, &cp);
     /* advance the 30Hz snow simulation to the current track time (the
      * engine ticks Particle_Update alongside the game camera); the env
      * (Gfx_EffectsUpdate) uses the same 30Hz tick discipline           */
