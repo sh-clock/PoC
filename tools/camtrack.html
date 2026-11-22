@@ -1299,10 +1299,12 @@ const SHCore = (function () {
     return colors;
   }
 
-  /* func_80057A3C's gte_ll — the MVMVA FC-translation hardware bug
-     (fog_poc.c:3388): the l0*vx term is DROPPED; lm=1 clamp [0,0x7FFF] */
+  /* func_80057A3C's gte_ll = 0x4A4A6412 = MVMVA{LLM(1),V0,tx=NONE(3),sf=1,
+     lm=1} (fog_poc.c sh_gte_ll_buggy): cv=3 → plain MulMatVec with ZERO
+     translation — the FULL 3-term dot l0*vx + l1*vy + l2*vz; lm=1 clamp
+     [0,0x7FFF] */
   function shGteLlBuggy(l0, l1, l2, vx, vy, vz) {
-    const v = l1 * vy + l2 * vz;
+    const v = l0 * vx + l1 * vy + l2 * vz;
     let mac = Math.trunc(v / 4096);
     if (mac < 0) mac = 0;
     if (mac > 0x7FFF) mac = 0x7FFF;
