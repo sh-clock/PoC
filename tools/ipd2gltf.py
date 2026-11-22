@@ -140,7 +140,10 @@ serialized s_IpdHeader, the PLM IS the serialized s_LmHeader):
       verified on all 2010 records; WorldMap_Draw adds chunkBoundX/Z directly
       to t[0]/t[2], confirming Q8)
   PLM_FILE_HEADER (20 bytes) = s_LmHeader:
-      u16 id @0 = 0x0630, u8 flag @2 [version = LM_VERSION 6], u8 tex_num @3
+      u16 id @0 = 0x0630 (byte @0 = magic '0' = LM_HEADER_MAGIC, byte @1
+      = version 6 = LM_VERSION — lm.h:36-38; byte @2 is the runtime
+      isLoaded bool, NOT a version, and never read by the parse below),
+      u8 tex_num @3
       [materialCount], u32 tex_name_offset @4 [materials — 24 bytes each =
       s_Material], u32 obj_num @8 [modelCount; bytes 0x9..0xB are padding,
       verified zero across every provided archive], u32 obj_start_offset @12
@@ -480,8 +483,10 @@ _WATER_FLOOR_SRC = (
     "func_8008E4EC lens_flare.c:497-502 (img0 {tPage{0,13}} all-zero -> "
     "Material_FsImageApply materials.c:130-160: field_E=45 = 4bpp page-13 "
     "x832 ABR-1 ADDITIVE, field_10=0 -> CLUT (0,0)) + WorldMap_"
-    "TexturesInit map.c:137-190 (fullPage slot i: CLUT strip (16*i, 0), "
-    "pixels (512+64*i, 0)) + Texture_Get materials.c:178-222 (slots in PLM "
+    "TexturesInit map.c:137-190 (fullPage slot i: CLUT strip (16*i, 0); "
+    "pixels (512+64*i, 0) holds for slots 0-2 ONLY — slots 3-7 are "
+    "tpages 21-25 = VRAM x 320..576, y-base 256, map.c:150-167) + "
+    "Texture_Get materials.c:178-222 (slots in PLM "
     "material-table order) + LmFilter_IsHalfPage map.c:1226-1241 (name "
     "ends 'H' = half page)"
 )
@@ -643,8 +648,12 @@ def _dr_wave_payload(resolver, room_name, report):
                      "((224,1)), window u 64..127 v 0..31, OT bucket 641",
             "causticRing": "func_8008EA68 lens_flare.c:683+ — the G4/G3 "
                            "ring + glint at OT buckets 641/639",
-            "ripple": "map5_s00 mesh/sprite quads (tpage 45, the sheet's "
-                      "right half)",
+            "ripple": "map5_s00 quads — NOT this sheet: mesh tpage 43 "
+                      "(0x2B, ABR-1 additive) / sprite tpage 75 (0x4B, "
+                      "ABR-2 subtractive), both page 11 x 704 = the "
+                      "boot-loaded BLD.TIM strip (env_effects.c:126 + "
+                      "data.c:117 D_800A9084), u 224..255, v 160+(sel<<5) "
+                      "(map5_s00.c:160-161/227-228)",
         },
         "src": "DR_WAVE.TIM (verbatim bytes above) + lens_flare.c",
     }
@@ -816,8 +825,12 @@ def _tv_paint_extras(room, resolver=None, report=None):
             _cl, prows, iw, ih = parts
             # v40 audit (D-F6): the strip column = VRAM x - 448 (the
             # paint CLUT base, fs_queue.c:643-682 clutX=448 D_800DB91C).
-            # fullPage slot i uploads at VRAM x 512 + 64*i (map.c:153-166
-            # tPage[1] = 8+i -> fs_queue.c:657 x = u + ((tPage[1]&0xF)<<6))
+            # fullPage slot i (i <= 2 ONLY — this strip reads si in
+            # {0,1,2}) uploads at VRAM x 512 + 64*i: map.c:150-167 runs
+            # tPage[1] = 8,9,10 for slots 0-2, then the y==11 -> 21 jump
+            # makes slots 3-7 tpages 21-25 = x (tp&0xF)<<6 = 320..576,
+            # y-base 256 (fs_queue.c:657 x = u + ((tPage[1]&0xF)<<6);
+            # :660 y = v + ((tPage[1]<<4)&0x100))
             # => strip column 64 + 64*si, which is what the comment always
             # claimed ("strip x 512 + si*64"). The old `48 + si*64` put
             # slot 0 at VRAM 496 (16 into the stale region before the
@@ -5885,7 +5898,10 @@ def _material_for(builder, gk, report):
             "floor": {
                 "draw": "func_80059E34 arg0==1 (the field_B_4==1 models; "
                         "bodyprog_80056D8C.c:1435-1560 via "
-                        "func_80059D50)",
+                        "func_80059D50); the FIXED otBucket 640 below is "
+                        "the arg0==1 branch ONLY — arg0==3 z-buckets at "
+                        "tag[maxSZ>>(otShift+2)] with the same 0x140 "
+                        "tpage/color (:1552-1559)",
                 "tpage": "(prim->u1 & 0x1FFFFF) | (0x140<<16) — 0x14D for "
                          "the MIZ prims (their own bits 0..4 = 13)",
                 "mode": "15-bit DIRECT color (tpage bits 7-8 = 2)",
@@ -5895,10 +5911,16 @@ def _material_for(builder, gk, report):
                 "otBucket": 640,
                 "fogVeil": "none — the func_80059E34 packet replaces "
                            "Gfx_MeshDraw's STP-branch veil draw",
-                "farCull": "MIN(Q8(7.61) << (otShift+2), "
-                           "g_WorldEnvRenderWork.fog.farDistance)",
+                "farCull": "g_WorldEnvRenderWork.isFogEnabled ? MIN(Q8"
+                           "(7.61) << (otShift+2), fog.farDistance) : "
+                           "Q8(7.61) << (otShift+2) "
+                           "(bodyprog_80056D8C.c:1475-1476 — the MIN is "
+                           "fog-gated, not unconditional)",
                 "uvUnits": "engine prims: page-texel u 0..31 / v 224..255 "
-                           "(the 32x32 live tile at tpage base (832,0)); "
+                           "(the 32x32 live tile at VRAM (832,224) = "
+                           "D_800AFDA4, lens_flare.c:536 — page-texel "
+                           "v 224..255 on the 0x14D tpage whose base is "
+                           "(832,0), the DR_WAVE sheet); "
                            "glTF TEXCOORD_0 = (u/32, (v-224)/32) — "
                            "tile-relative, IN range",
             },
@@ -6258,7 +6280,14 @@ def build_sh1x(room, resolver, report, known_rooms=None):
         "intensityDefault": 1.0,                # g_SysWork.lightIntensity
         "ramp": {"ratePerSec": 4.0, "range": [0, 4096],
                  "units": "Q12; WorldEnv_Update effects.c:417-426"},
-        "dayModes": "never Spot (preset table; isFlashlightUnavailable)",
+        "dayModes": "never Spot EXCEPT field_16==3 overlays: ER03FD/"
+                    "SU00FF carry preset pair {9,9} (D_800A9F98, "
+                    "effects.c:28/257-259) and preset 9 IS Spot "
+                    "(map_info.c table idx 9, spotLightIntensity "
+                    "Q12(1.8)) — isFlashlightUnavailable is set for "
+                    "{9,9} (effects.c:342-349) but the day/flashlight-off "
+                    "state stays Spot (WorldEnv_Update blends current "
+                    "from transition[0], effects.c:454)",
         "src": "Game_FlashlightAttribsSet effects.c:210-218; "
                "WorldEnv_Update effects.c:417-426",
     }
@@ -6314,8 +6343,12 @@ def build_sh1x(room, resolver, report, known_rooms=None):
                      "order; packs in pack order (WorldMap_Draw, "
                      "world_map.c:1349-1447)"),
         "quadBucket": ("ot_base + (MAX vertex SZ Q8 >> 3)  [otShift 1: "
-                       "((maxZ >> 1) >> 2)]; <=32 -> 32; > farCull -> skip"),
-        "farCullQ8": 0x79C << 3,   # engine Gfx_MeshDraw: MIN(0x79C<<(otShift+2), fog.far)
+                       "((maxZ >> 1) >> 2)]; <=32 -> 32; > farCull -> "
+                       "skip (farCull = the isFogEnabled-gated MIN below)"),
+        "farCullQ8": 0x79C << 3,
+        # engine Gfx_MeshDraw (bodyprog_80056D8C.c:61-70):
+        # isFogEnabled ? MIN(0x79C<<(otShift+2), fog.far)
+        #              : 0x79C<<(otShift+2) — the MIN is fog-gated
         "semiTransBit": "pack byte @7 bit 7 (engine prim->bits1.flags & (1<<15))",
     }
     return sh1x

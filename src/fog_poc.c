@@ -1302,16 +1302,23 @@ typedef struct {
     int mvVel;                      /* gravityScatter fall velocity          */
     int mvState;                    /* stoneChoreo state / cutscene sub-state */
     float mvTimer;                  /* the discrete-step accumulator (v43:
-                                     * was INT — the per-tick += (float)
-                                     * (dt*30.0) with dt=1/30 adds 0.9999
-                                     * -> TRUNCATES TO +0 EVERY TICK, so the
-                                     * while (mvTimer >= 1.0f) step loops of
-                                     * doorRattle/kickSwing/gravityScatter/
-                                     * fallOnce NEVER RAN (the rattle never
-                                     * kicked, the kick never stepped; only
-                                     * the 0.1-clamped seek ticks ever
-                                     * fired). FLOAT restores the engine's
-                                     * one-step-per-30Hz-frame discipline)   */
+                                     * was INT. The v43 commit's numeric
+                                     * story was FALSE (V45 A-F3): with
+                                     * dt=1/30 the addend (float)(dt*30.0)
+                                     * is EXACTLY 1.0f, so the INT already
+                                     * stepped +1 per tick — the while
+                                     * (mvTimer >= 1.0f) loops of doorRattle/
+                                     * kickSwing/gravityScatter DID run.
+                                     * The genuinely dead accumulator was
+                                     * case 18 fallOnce's seconds-domain
+                                     * += (float)dt (addend 0.0333 -> INT
+                                     * stuck at 0, freezing the engine's
+                                     * varA0 = MAX(0, Q12(1)-timer*2) ramp
+                                     * at 4096, map4_s03.c:1693-1731). FLOAT
+                                     * steps identically at integral rates,
+                                     * strictly more correct at fractional
+                                     * ones (e.g. the wallpaper twin's
+                                     * per-display-frame ticks).          */
     int posPerInstN;                /* fanArray posed positions (glTF m)     */
     float posPerInst[16][3];
     int rotY180From;                /* fanArray: i>=this gets +180 deg y     */
@@ -3433,6 +3440,12 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
     if (t->lazyRateDegS < 1.0f) t->lazyRateDegS = 1.0f;
     if (t->lazyRateDegS > 720.0f) t->lazyRateDegS = 720.0f;
     t->normalDirection = !strcmp(jstr(raw, "normalDirection", "forward"), "backward") ? 1 : 0;
+    /* name cap divergence (V45 B-4/F-9): name[64] keeps up to 63 chars;
+     * the camtrack editor twin clips at 60 (sanitizeTrack
+     * raw.name.slice(0, 60), camtrack.html:6128; input maxLength 60) —
+     * a hand-edited 61-63-char name survives this parse but truncates
+     * on any editor import/re-export. Display-only: --track N selection
+     * is index-based (the --track parse below), never by name. */
     snprintf(t->name, sizeof(t->name), "%s", jstr(raw, "name", ""));
     /* v31 (audit D-2): the per-track weatherTarget (the camtrack editor's
      * trackToJSON writes it; sanitizeTrack clamps 0..8 like the model-level
@@ -4359,6 +4372,13 @@ static double camtrack_cycle_duration(const CamTrack *tr) {
     }
     if (tr->type == TRK_CIRCLE) {
         double w = fabs(tr->speedDegS);
+        /* dead guard, twin divergence (V45 B-5): the editor twin uses
+         * `Math.abs(tr.speedDegS) || 1e-6` (camtrack.html:5898); BOTH
+         * fallbacks are unreachable — the parse clamps circle speedDegS
+         * >= 0.001 (the v41 B-1 clamp in camdat_load_track) and
+         * sanitizeTrack floors it at 0.001 (camtrack.html:6172). 1e-9
+         * vs 1e-6 only changes the absurd zero-speed cycleDuration
+         * display value. */
         if (w < 1e-9) w = 1e-9;
         int bounded = tr->arcBounds && tr->arcMaxDeg > tr->arcMinDeg;
         if (bounded) {
@@ -13140,7 +13160,14 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
             fprintf(stderr, "TVPDBG anim '%s' gated=%d ch=%d slot0=%d\n",
                     a->object, a->gated, a->tvChannel, a->tvSlot[0]);
         if (a->gated) continue;
-        /* D_800DB924.pad++ (the flicker) — master != 0 only */
+        /* D_800DB924.pad++ (the flicker) — master != 0 only. ENGINE
+         * CADENCE (V45 D-4): the engine advances the pad once per 30 Hz
+         * GAME frame with nonzero dt (map4_s03.c:539-548: if (field_0
+         * != 0) { if (g_DeltaTime != Q12(0)) pad++; ... }); this collect
+         * runs per RENDERED frame — exact only under the default 30 fps
+         * presentation lock (maxFps=30, one present per tick — the
+         * v22 CLI default); --fps 60 doubles the 164/188 flicker cadence
+         * (the camtrack twin got the tick-grid fix in PR #132). */
         if (a->tvChannel != 0) {
             g_tvpaint_pad++;
             if ((int16_t)g_tvpaint_pad < 0) g_tvpaint_pad &= 0xFFFF;
@@ -14160,9 +14187,11 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                              * (bodyprog_80056D8C.c:1455) — NOT the depth
                              * bucket: the quads ride one fixed far overlay
                              * slot (occluded by nearer geometry, added over
-                             * everything beyond it; the caustic ring's 641
-                             * and the glint's 639 bracket it exactly like
-                             * the engine). */
+                             * everything beyond it; the ring's OPAQUE pair
+                             * + the glint at 641 (lens_flare.c:678; spD0
+                             * = &ot[641], :718) and the ring's SEMI pair
+                             * at 639 (spD4, :719, AddPrim'd :812-815)
+                             * bracket it exactly like the engine). */
                             bucket = 640;
                         } else {
                             /* v16: the per-model OT section base — the engine's
@@ -14385,7 +14414,9 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
     /* ---- v26 SH1X v3: LENS FLARE + WATER SHIMMER pass --------------------
      * Engine order: shLensFlareExec runs INSIDE WorldGfx_2dEffectsDraw
      * (before the GPU walk) computing the target rate + the occlusion
-     * seed; shLensFlareDraw runs AFTER DrawSync (game_main.c:223) adding
+     * seed; shLensFlareDraw runs BEFORE DrawSync (game_main.c:222-223 —
+     * `shLensFlareDraw(); DrawSync(SyncMode_Wait);` — the GsDrawOt GPU
+     * walk is later still, game_main.c:300), adding
      * the sprites at the FRONT OT slots (org[1], depth_ot+7). In the PoC
      * the whole flare paint happens here — after the mesh OT walk, before
      * the brightness overlay — which preserves the engine's LAYERING
@@ -14661,9 +14692,13 @@ static CamPose playback_step(Playback *P, const CamTrack *tr, double dt,
 /*  - vcSetFlagsByCamMvType: SELF_VIEW sets VC_WARP_CAM_F|CAM_TGT_F      */
 /*      EVERY tick -> the camera is HARD-GLUED to the ideal position     */
 /*      (the vcRenewalCamData velocity model never runs in self view);   */
-/*      WARP_WATCH_F on the entry edge only. On release the engine       */
-/*      glides back to the auto camera with cam_mv_prm_user              */
-/*      {accel 10/3, max 6/2} + vwRenewalXZVelocityToTargetPos.          */
+/*      WARP_WATCH_F on the entry edge only. On release the engine sets  */
+/*      NO warp flag (vcSetFlagsByCamMvType, vc_main.c:759-788) — the    */
+/*      camera carries through the road-camera velocity model. The PoC   */
+/*      implements the SNAP (the vcReturnPreAutoCamWork(true) WARP form, */
+/*      see the RELEASE comment in r2view_tick); the glide-back          */
+/*      machinery below (R2_TGT_R/R2_CAM_* + R2View.returning) is DEAD,  */
+/*      never wired (V45 E-7).                                           */
 /*  - vcMakeFarWatchTgtPos 0x800832B4: target 10m (VC_AREA_WIDE town)    */
 /*      ahead of the body at eyeYaw, y = root + 0.8m (root = top-1.7m).  */
 /*  - vcRetSelfViewEffectRate 0x800818D4: Q8(16)=4096 full; falloff      */
@@ -14740,6 +14775,10 @@ static CamPose playback_step(Playback *P, const CamTrack *tr, double dt,
 #define R2_VANG_CLAMP     797     /* Q12_ANGLE(70.0f): vertical clamp          */
 #define R2_PITCH_CLAMP    910     /* Q12_ANGLE(80.0f): final pitch clamp       */
 #define R2_PAN_RATE       22      /* g_VBlanks(2) * V_BLANKS_MULT(11)/tick     */
+/* DEAD (V45 E-7): the release glide-back machinery (cam_mv_prm_user
+ * {accel 10/3, max 6/2} + R2_TGT_R arrival radius) — zero uses; the
+ * release implements the snap (see r2view_tick's RELEASE comment).
+ * Engine constants kept for documentation only.                        */
 #define R2_TGT_R          410     /* Q12(0.1f): chase arrival radius           */
 #define R2_CAM_ACCEL_XZ   40960   /* Q12(10.0f) cam_mv_prm_user.accel_xz       */
 #define R2_CAM_ACCEL_Y    12288   /* Q12(3.0f)  .accel_y                      */
@@ -14810,7 +14849,9 @@ typedef struct {
     int prevHeld;       /* held LAST tick (VC_OLD_PRS_F_VIEW_F)            */
     int inL, inR, inU, inD;   /* pan-key states (the "D-pad")             */
     int active;         /* currently in SELF_VIEW                          */
-    int returning;      /* released: engine glide back to the track cam    */
+    int returning;      /* DEAD (V45 E-7): never set to 1 — no glide-back
+                         * is implemented; the release is the snap
+                         * (r2view_tick's RELEASE comment).             */
     /* head-look input (the "head bone" offsets driven by the pan keys)   */
     int32_t headYaw;    /* q3_12, + = right of body forward, clamped +/-932 */
     int32_t headPitch;  /* q3_12, + = up, clamped +/-88                     */
@@ -17446,7 +17487,11 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "--tim-file") && i + 1 < argc) timFile = argv[++i];
         else if (!strcmp(a, "--tim") && i + 1 < argc) {
             /* --tim N or --tim N,PAL — V41 (E-8): strict; N and PAL must
-             * be clean integers with nothing else following              */
+             * be clean integers with nothing else following.
+             * DEAD FLAG (V45 E-5): N (timView) is parsed + validated but
+             * NEVER APPLIED — the standalone viewer below blits only the
+             * PAL palette (timPalette, default 0), so `--tim 3` renders
+             * palette 0 while the help text says "view page N".         */
             const char *v = argv[++i];
             long n;
             char *end = cli_long_end(v, &n);
@@ -17873,7 +17918,7 @@ int main(int argc, char **argv) {
         snprintf(out, sizeof(out), "%s/tim_p%02d_%dx%d.png", outdir, timPalette, tim.w, tim.h);
         if (!write_png_rgb(out, fb.rgb, fb.w, fb.h)) return 1;
         printf("wrote %s\n", out);
-        if (timView >= 0) { /* --tim N used as palette selector here */ }
+        if (timView >= 0) { /* V45 E-5: DEAD — N parsed but never applied; NOT a palette selector (blit_tim used only timPalette) */ }
         tim_free(&tim);
         free(fb.rgb); free(fb.z);
         return 0;
