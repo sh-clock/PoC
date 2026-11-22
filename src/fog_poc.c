@@ -9021,6 +9021,7 @@ static void sh1x_anims_bind(Scene *sc) {
          * proven by the audit on ER02FC). */
         {
             int want = (a->count > 1) ? a->count : 1;
+            int posedBound = 0;       /* C-1: posed groups pass 1 binds  */
             int posedAvail = 0;
             for (int q = 0; q < ngrp; q++)
                 if (grps[q].n && grps[q].posed >= 0 &&
@@ -9037,15 +9038,20 @@ static void sh1x_anims_bind(Scene *sc) {
                     }
                     grps[q].n = 0;                 /* mark used */
                     posedAvail--;
+                    posedBound++;
                 }
             }
-            /* pass 2: unposed groups fill the remaining slots by distance */
-            int took = 0;
-            for (int q = 0; q < ngrp && posedAvail > 0; q++) {
-                if (grps[q].n && grps[q].posed >= 0 &&
-                    grps[q].posed < a->count) took++;
-            }
-            int fill = want - took;
+            /* pass 2: unposed groups fill the remaining slots by distance.
+             * C-1: the old took loop was provably dead — pass 1 decrements
+             * posedAvail (initialized to the bindable-posed count) to 0
+             * ALWAYS, and bound groups have n == 0 — so took stayed 0,
+             * fill was always `want`, and pass 2 bound up to `want` MORE
+             * unposed groups on top of the posed ones: phantom animated
+             * baked copies + double-driven instance indices. The engine
+             * draws exactly `count` WorldObjects_Add copies (world/draw.c
+             * 556-579, one draw per object entry). */
+            int fill = want - posedBound;
+            if (fill < 0) fill = 0;
             int nth = 0;
             for (int taken = 0; taken < fill; ) {
                 int bg = -1; float bd = 1e30f;
