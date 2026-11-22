@@ -15537,8 +15537,12 @@ static int32_t r2_ratan2(int32_t y, int32_t x) {
 }
 
 /* vcCamMatNoise 0x80085A7C: (cos(spd1*t) + cos(spd2*t))/2 * weight.
- * FP_RADIAN(rad) = rad * 20480 / (2*PI) (fixed_point.h:487 — the
- * [0,20480] radian circle); t = vcSelfViewTimer in Q12 SECONDS.        */
+ * v43 (E18-3): FP_RADIAN semantics corrected — fixed_point.h:510-512 is
+ *   (s32)((wrap(rad) * (FP_PI/PI)) * ((rad<0 || rad>=PI) ? 1.0f : 2.0f))
+ * with FP_PI = 0x5000/2 = 10240: angles in [0,pi) are DOUBLED and
+ * negatives wrap to 2*PI-|rad| (x1) — NOT the linear rad*20480/(2*PI) the
+ * old comment claimed (self-demonstrating: FP_RADIAN(PI/2)==FP_RADIAN(PI)
+ * == 10240). t = vcSelfViewTimer in Q12 SECONDS.                        */
 static int32_t r2_cam_mat_noise(int32_t noise_w, int32_t ang_spd1,
                                 int32_t ang_spd2, int32_t tQ12) {
     /* v43 (E18-2): the engine is Math_Cos + Math_Cos (vc_main.c:2938) —
@@ -15549,18 +15553,20 @@ static int32_t r2_cam_mat_noise(int32_t noise_w, int32_t ang_spd1,
     n >>= 1;
     return R2_MUL(noise_w, n);
 }
-/* the engine's exact noise speeds (vcSetDataToVwSystem, FP_RADIAN args) */
-#define R2_NS1_VX  2844   /* FP_RADIAN(PI/18*5)  = 50deg/s  */
-#define R2_NS2_VX  4551   /* FP_RADIAN(PI/9*4)   = 80deg/s  */
-#define R2_NS1_VY  2276   /* FP_RADIAN(PI/9*2)   = 40deg/s  */
-#define R2_NS2_VY  -9102  /* FP_RADIAN(PI/9*-8)  = -160deg/s */
-#define R2_NS_M00  3982   /* FP_RADIAN(PI/18*7)  = 70deg/s  */
-#define R2_NS_M01  10240  /* FP_RADIAN(PI)       = 180deg/s */
-#define R2_NS_M02  -9102  /* FP_RADIAN(PI/9*-8)  = -160deg/s */
-#define R2_NS_M10  2844   /* FP_RADIAN(PI/18*5)  = 50deg/s  */
-#define R2_NS_M11  2276   /* FP_RADIAN(PI/9*2)   = 40deg/s  */
-#define R2_NS_M12  7387   /* FP_RADIAN(PI/36*13) = 130deg/s */
-#define R2_NS_M1X  -9639  /* FP_RADIAN(PI/18*-17)= -170deg/s */
+/* the engine's exact noise speeds (vcSetDataToVwSystem vc_main.c:2910-2920,
+ * FP_RADIAN args — every value re-derived in float32 through the real
+ * fixed_point.h:510 macro: [0,PI) doubled, negatives wrapped, (s32) trunc) */
+#define R2_NS1_VX  5688   /* FP_RADIAN((PI/18)*5)   50deg, doubled  */
+#define R2_NS2_VX  9102   /* FP_RADIAN((PI/9)*4)    80deg, doubled  */
+#define R2_NS1_VY  4551   /* FP_RADIAN((PI/9)*2)    40deg, doubled  */
+#define R2_NS2_VY  11377  /* FP_RADIAN((PI/9)*-8) -160deg, wrapped  */
+#define R2_NS_M00  7964   /* FP_RADIAN((PI/18)*7)   70deg, doubled  */
+#define R2_NS_M01  10240  /* FP_RADIAN(PI)          180deg          */
+#define R2_NS_M02  6826   /* FP_RADIAN(PI/3)         60deg, doubled */
+#define R2_NS_M10  5688   /* FP_RADIAN((PI/18)*5)   50deg, doubled  */
+#define R2_NS_M11  4551   /* FP_RADIAN((PI/9)*2)    40deg, doubled  */
+#define R2_NS_M12  7395   /* FP_RADIAN((PI/36)*13)  65deg, doubled  */
+#define R2_NS_M1X  10808  /* FP_RADIAN((PI/18)*-17)-170deg, wrapped */
 
 /* the R2 (self) view state — engine VC_WORK subset + input model */
 typedef struct {
@@ -15890,11 +15896,15 @@ static CamPose r2view_pose(const R2View *V, const CamPose *body) {
      * the rotational content is preserved, the pure-shear part is
      * sub-GTE-pixel at 320x224 (documented approximation)              */
     if (V->active) {
+        /* v43 (E18-3): the m-row argument PAIRS corrected to the engine's
+         * vcSetDataToVwSystem call sites (vc_main.c:2915-2920):
+         * m00=(70deg,180deg) m01=(60deg,-160deg) m02=(60deg,80deg)
+         * m10=(50deg,50deg)  m11=(180deg,40deg)  m12=(65deg,-170deg)  */
         int32_t m00 = r2_cam_mat_noise(12, R2_NS_M00, R2_NS_M01, t);
-        int32_t m01 = r2_cam_mat_noise(12, R2_NS_M02, R2_NS_M10, t);
+        int32_t m01 = r2_cam_mat_noise(12, R2_NS_M02, R2_NS2_VY, t);
         int32_t m02 = r2_cam_mat_noise(12, R2_NS_M02, R2_NS2_VX, t);
-        int32_t m10 = r2_cam_mat_noise(12, R2_NS_M10, R2_NS_M11, t);
-        int32_t m11 = r2_cam_mat_noise(12, R2_NS_M11, R2_NS2_VY, t);
+        int32_t m10 = r2_cam_mat_noise(12, R2_NS_M10, R2_NS_M10, t);
+        int32_t m11 = r2_cam_mat_noise(12, R2_NS_M01, R2_NS1_VY, t);
         int32_t m12 = r2_cam_mat_noise(12, R2_NS_M12, R2_NS_M1X, t);
         right[0] += (double)m00 / 4096.0;
         right[1] += (double)m01 / 4096.0;
