@@ -6861,6 +6861,11 @@ static void snow_position_randomize_r(Snow *S, SnowPart *p, uint16_t *randv, int
     int x = t - r;
     p->pos[0] = x;
     int rr = r - (x < 0 ? -x : x);
+    if (rr <= 0) { p->pos[2] = 0; return; }  /* rr==0 (both mods 0): MIPS DIV
+                                              * by zero is UNPREDICTABLE (no
+                                              * hardware exception) — the x86
+                                              * build must not SIGFPE; guard
+                                              * only, p(r) ~ 3.7e-9 per call  */
     p->pos[2] = (int)(*randv % (uint32_t)rr) + (int)((uint32_t)snow_rand16(S) % (uint32_t)rr) - rr;
 }
 static void snow_position_randomize(Snow *S, SnowPart *p, uint16_t *randv) {
