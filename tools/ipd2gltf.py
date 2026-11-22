@@ -4151,11 +4151,15 @@ def parse_collision(data):
         cyls = []
         for i in range(c.n_cylinder):
             o = cy_off + 10 * i
+            # decomp s_IpdCylinder layout (formats/ipd.h:71-77): word0 =
+            # floorType:5 | disableHeight:3 | triggerFlagIdx:4  -> bits 8-11
+            # (v43 RIP2-2: was >>12, the 4 pad bits — the engine reads
+            # cylinder->triggerFlagIdx directly, collision.c:1762).
             u16v = u16(data, o)
             cyls.append({
                 "floorType": u16v & 0x1F,
                 "disableHeight": (u16v >> 5) & 7,
-                "triggerFlagIdx": (u16v >> 12) & 0xF,
+                "triggerFlagIdx": (u16v >> 8) & 0xF,
                 "offset": list(struct.unpack_from("<3h", data, o + 2)),
                 "radius": s16(data, o + 8),
                 "raw": bytes(data[o:o + 10]),
