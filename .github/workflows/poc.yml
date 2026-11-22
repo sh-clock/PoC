@@ -195,13 +195,22 @@ jobs:
           # v40: the SEWER water-animation regression (the DR_WAVE scroll +
           # glints MOVE: fixed camera, t=3 vs t=6 must differ — the water
           # tile advances + the glint pattern shimmers)
+          # V44/V45 recalibration: the threshold was cut for the pre-V44
+          # ADDITIVE water (which changed far more pixels per scroll step);
+          # the engine-exact SUBTRACTIVE water (func_80059E34(1): ABR-2,
+          # flat (56,56,56), bucket 640 — VLM-verified against the S20
+          # reference images) moves ~122 DIFFERING PIXELS (~306 channel
+          # diffs, mean per-pixel channel shift 8.4) over this 3s window
+          # at this camera (the dapple scroll + the glint shimmer). The
+          # check counts DIFFERING PIXELS against the threshold: 80 keeps
+          # the frozen-water detector (0 px) with ~35% headroom.
           ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json \
               --input input --cam 56 1.8 -20 66 -1 -22 \
               --shot t=3.0,file=SEW_A.png
           ./fog_poc --glb input/DRU0100.glb --camdat input/sewer_camdat.json \
               --input input --cam 56 1.8 -20 66 -1 -22 \
               --shot t=6.0,file=SEW_B.png
-          python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/SEW_A.png shots/SEW_B.png 500
+          python3 "$GITHUB_WORKSPACE/tools/tests/fan_anim_check.py" shots/SEW_A.png shots/SEW_B.png 80
           # v40: the TV-animation regression (tvNoise paint: t=3 vs t=6)
           ./fog_poc --glb input/SPU0401.glb --camdat input/tv_camdat.json \
               --input input --cam 160 1.4 -56 164 0.6 -52 \
