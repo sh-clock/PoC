@@ -15607,7 +15607,12 @@ static int32_t r2_idle_yaw_correct(int32_t delta) {
     return corrected;
 }
 
-/* vwRetNewVelocityToTargetVal 0x8004914C (verbatim fixed point) */
+/* vwRetNewVelocityToTargetVal 0x8004914C (verbatim fixed point).
+ * v43 (E18-1): the deceleration cap is MIN(spd_lim, new_spd) on the
+ * positive branch / MAX(-spd_lim, new_spd) on the negative — the engine
+ * keeps new_spd only when spd_lim >= new_spd (vw_calc.c:151-168); the
+ * old inverted comparison made it a floor (MAX) and could exceed
+ * max_spd since spd_lim = dec*|diff| is unbounded.                       */
 static int32_t r2_vel_to_target(int32_t now_spd, int32_t pos, int32_t tgt,
                                 int32_t accel, int32_t max_spd,
                                 int32_t dec_lim_spd) {
@@ -15622,10 +15627,10 @@ static int32_t r2_vel_to_target(int32_t now_spd, int32_t pos, int32_t tgt,
     int32_t abs_diff = pos_diff < 0 ? -pos_diff : pos_diff;
     int32_t spd_lim = R2_MUL(dec_lim_spd, abs_diff);
     if (pos_diff >= 0) {
-        int32_t r = spd_lim; if (r < new_spd) r = new_spd; /* min(spd_lim,new) */
+        int32_t r = spd_lim; if (r >= new_spd) r = new_spd; /* min(spd_lim,new) */
         new_spd = r;
     } else {
-        int32_t r = -spd_lim; if (r > new_spd) r = new_spd;
+        int32_t r = -spd_lim; if (r < new_spd) r = new_spd; /* max(-spd_lim,new) */
         new_spd = r;
     }
     return new_spd;
