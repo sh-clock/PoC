@@ -10607,8 +10607,17 @@ function applyLightHandleDrag(which, p, vertical) {
   /* v43: the Y-rail roles — VERTICAL-only writes (the cyan markers above
    * the gold spheres; /(Y)$/.test(role) already forced the vertical drag
    * plane in startDrag, so p carries the ray's intersection with the
-   * camera-facing vertical plane). */
+   * camera-facing vertical plane).
+   * v45 audit (F-4): the camera handles' axis-lock guard (applyHandleDrag
+   * :7537-7538 "rail inert when X/Z locked") — the light twin lacked it,
+   * so applyLockedMove(cur, p, true) under lockAxis 'x'/'z' took the
+   * `lock === 'x' -> n[0] = p.x` arm and wrote the ray's HORIZONTAL
+   * plane-intersection coordinate into models[].light.pos/start/end
+   * (r4-rounded, exported to camdat.json) — the "writes ONLY the y term"
+   * comment was false in that state. Same guard: the Y rail is inert
+   * unless the lock is 'y' (or off). */
   if (which === 'posY' || which === 'startY' || which === 'endY') {
+    if (state.lockAxis && state.lockAxis !== 'y') return;   /* rail inert when X/Z locked */
     const base = which.slice(0, -1);          /* pos / start / end        */
     const cur = which === 'pos' ? vec3(l.pos, [0, 1, 0])
       : which === 'posY' ? vec3(l.pos, [0, 1, 0])
