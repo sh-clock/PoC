@@ -1672,15 +1672,22 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
     sx->chunkX = jint(hdr, "chunkX", 0);         /* s8 (converter v14.1+) */
     sx->chunkZ = jint(hdr, "chunkZ", 0);
     const JValue *tbl = jarr(hdr, "subcellTable");
-    for (int z = 0; z < 5; z++) {
-        const JValue *row = jat(tbl, z);
-        for (int x = 0; x < 5; x++) {
-            const JValue *ent = jat(row, x);
-            sx->subcell[z][x][0] = ent ? jint(ent, 0, -1) : -1;   /* arrays of [start,count] */
-            sx->subcell[z][x][1] = ent ? jcount(ent) > 1 ? (int)jat(ent, 1)->num : 0 : 0;
-        }
-    }
-    /* subcellTable entries are [start, count] pairs of NUMBERS, not objects */
+    /* subcellTable entries are [start, count] pairs of NUMBERS, not objects.
+     * V45 audit (B-1 + B-6): this loop REPLACED an older first pass that
+     * stored `ent ? jint(ent, 0, -1) : -1` — jint's 2nd parameter is a KEY
+     * string (const char*), so the literal 0 passed a NULL key and jget()
+     * reached `strcmp(obj->items[i]->key, NULL)` on the first child of any
+     * OBJECT-form entry (the natural hand-edited {"start":s,"count":c}
+     * spelling of the pair) — a segfault, ASan-proven, reachable through
+     * scene_load_glb_q on ANY GLB including the silent mapLink neighbor
+     * probe (sh1x_load_neighbors loads every <room>.glb next to the active
+     * room). The old loop was also vestigial: the converter emits every
+     * entry as a 2-element array (ipd2gltf.py `subcellTable` emitter), and
+     * THIS loop fully overwrites both fields for exactly those entries;
+     * for anything else it stored a broken pair ([0]=-1 sentinel + [1]=
+     * element 1) that no shipped file exercises. Deleted — non-array /
+     * absent entries now keep the memset-0 {start=0, count=0} defaults
+     * (the consumer's "draw nothing" empty cell) instead.                  */
     for (int z = 0; z < 5; z++) {
         const JValue *row = jat(tbl, z);
         for (int x = 0; x < 5; x++) {
