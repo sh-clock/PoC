@@ -15490,7 +15490,10 @@ static CamPose playback_step(Playback *P, const CamTrack *tr, double dt,
 #define R2_NEAR_ZERO       8192   /* Q12(2.0m): zero-rate enemy dist           */
 #define R2_YAW_DEAD        45     /* Q12_ANGLE(4.0f): idle dead zone           */
 #define R2_PITCH_IDLE     91      /* Q12_ANGLE(8.0f): idle pitch offset        */
-#define R2_VANG_CLAMP     797     /* Q12_ANGLE(70.0f): vertical clamp          */
+#define R2_VANG_CLAMP     796     /* Q12_ANGLE(70.0f): vertical clamp —
+                                     * (s32)(70/360*4096) = (s32)796.44 = 796
+                                     * (v43 E18-6: was 797, llround — the
+                                     * engine truncates; 1 q3_12 = 0.088deg) */
 #define R2_PITCH_CLAMP    910     /* Q12_ANGLE(80.0f): final pitch clamp       */
 #define R2_PAN_RATE       22      /* g_VBlanks(2) * V_BLANKS_MULT(11)/tick     */
 /* DEAD (V45 E-7): the release glide-back machinery (cam_mv_prm_user
