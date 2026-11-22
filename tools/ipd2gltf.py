@@ -1755,7 +1755,7 @@ _PROP_ANIMS = {
         {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 0, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136): case 2 moves the outer 4 "
                 "doors, cases 3/4 all 6; vz += dt*(i&1 ? +D_800E16A8[k] : "
@@ -1767,61 +1767,61 @@ _PROP_ANIMS = {
                 "(-20.9,0,-20.9), :2229-2234)",
          "slideSign": "-vz (i=0, even)",
          "src": "map7_s01_2.c:2074-2105, 2081-2136, 2218-2235, "
-                "2495-2501 (add chunks (-1,-1)/(-3,-2))"},
+                "2445-2451 (add chunks (-1,-1)/(-3,-2))"},
         {"object": "DR1R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 1, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"], "dir": -1,
+         "chunkCells": [[-3, -2], [-1, -1]], "dir": -1,
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136) — outer set i<4, slideSign +vz "
                 "(i odd, :2086/:2104)",
          "slideSign": "+vz (i=1, odd)",
-         "src": "map7_s01_2.c:2074-2105, 2081-2136, 2218-2235, 2495-2501"},
+         "src": "map7_s01_2.c:2074-2105, 2081-2136, 2218-2235, 2445-2451"},
         {"object": "DR3L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 2, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136) — outer set i<4, slideSign -vz "
                 "(i even, :2086/:2104); PLUS the shared elevator ride "
                 "states 14-16 (sharedFunc_800D15F0_3_s01.h:331-365 via "
                 "map7_s01_2.c:2052)",
          "slideSign": "-vz (i=2, even)",
-         "src": "map7_s01_2.c:2222 (init), 2081-2136, 2495-2501, "
+         "src": "map7_s01_2.c:2222 (init), 2081-2136, 2445-2451, "
                 "sharedFunc_800D15F0_3_s01.h:331-365"},
         {"object": "DR3R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 3, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136) — outer set i<4, slideSign +vz "
                 "(i odd, :2086/:2104); PLUS the shared elevator ride "
                 "states 14-16 (sharedFunc_800D15F0_3_s01.h:331-365)",
          "slideSign": "+vz (i=3, odd)",
-         "src": "map7_s01_2.c:2223 (init), 2081-2136, 2495-2501, "
+         "src": "map7_s01_2.c:2223 (init), 2081-2136, 2445-2451, "
                 "sharedFunc_800D15F0_3_s01.h:331-365"},
         {"object": "DR2L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 4, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136) — inner set i>=4 moves only from "
                 "case 3 on (D_800E16A8[1], :2100-2105); PLUS the shared "
                 "elevator ride states 15-16 (inner set, "
                 "sharedFunc_800D15F0_3_s01.h:342-355)",
          "slideSign": "-vz (i=4, even)",
-         "src": "map7_s01_2.c:2224 (init), 2081-2136, 2495-2501, "
+         "src": "map7_s01_2.c:2224 (init), 2081-2136, 2445-2451, "
                 "sharedFunc_800D15F0_3_s01.h:331-365"},
         {"object": "DR2R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 5, "axis": "z",
          "speed": 0.1, "accel": 0.25, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "levitating-door cutscene (local, "
                 "map7_s01_2.c:2081-2136) — inner set i>=4 from case 3 on "
                 "(:2100-2105); PLUS the shared elevator ride states 15-16 "
                 "(inner set, sharedFunc_800D15F0_3_s01.h:342-355)",
          "slideSign": "+vz (i=5, odd)",
-         "src": "map7_s01_2.c:2225 (init), 2081-2136, 2495-2501, "
+         "src": "map7_s01_2.c:2225 (init), 2081-2136, 2445-2451, "
                 "sharedFunc_800D15F0_3_s01.h:331-365"},
     ],
     "MAP7_S02": [
@@ -1889,11 +1889,11 @@ _PROP_ANIMS = {
         # appear to be working", map7_s02_2.c:226) is the BROKEN-elevator
         # message at mapPoint 14. Engine-fresh (no event run) the doors
         # sit closed at the authored pose, added in chunks
-        # (-1,-1)/(-3,-2) (map7_s02_2.c:3727-3733).
+        # (-1,-1)/(-3,-2) (map7_s02_2.c:3681-3687).
         {"object": "DR1L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 0, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 14-16 (shared code, "
                 "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
                 "invoked by map event [153] — TouchObbFacing+Button at "
@@ -1902,13 +1902,13 @@ _PROP_ANIMS = {
                 "header.c:71); vz resets to -60.9 on exit "
                 "(shared default :385-391))",
          "slideSign": "-vz (i=0, even)",
-         "src": "map7_s02_2.c:3507, 3728-3733 (add chunks (-1,-1)/"
+         "src": "map7_s02_2.c:3507, 3681-3687 (add chunks (-1,-1)/"
                 "(-3,-2)), sharedFunc_800D15F0_3_s01.h:331-365, "
                 "map7_s02.h:109"},
         {"object": "DR1R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 1, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 14-16 (shared code, "
                 "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
                 "invoked by map event [153] — TouchObbFacing+Button at "
@@ -1917,12 +1917,12 @@ _PROP_ANIMS = {
                 "header.c:71); vz resets to -60.9 on exit "
                 "(shared default :385-391))",
          "slideSign": "+vz (i=1, odd)",
-         "src": "map7_s02_2.c:3508, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+         "src": "map7_s02_2.c:3508, 3681-3687, sharedFunc_800D15F0_3_s01.h:"
                 "331-365, map7_s02.h:109"},
         {"object": "DR3L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 2, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 14-16 (shared code, "
                 "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
                 "invoked by map event [153] — TouchObbFacing+Button at "
@@ -1931,12 +1931,12 @@ _PROP_ANIMS = {
                 "header.c:71); vz resets to -60.9 on exit "
                 "(shared default :385-391))",
          "slideSign": "-vz (i=2, even)",
-         "src": "map7_s02_2.c:3509, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+         "src": "map7_s02_2.c:3509, 3681-3687, sharedFunc_800D15F0_3_s01.h:"
                 "331-365, map7_s02.h:109"},
         {"object": "DR3R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 3, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 14-16 (shared code, "
                 "sharedFunc_800D15F0_3_s01.h:331-365 via map7_s02_2.c:3153; "
                 "invoked by map event [153] — TouchObbFacing+Button at "
@@ -1945,12 +1945,12 @@ _PROP_ANIMS = {
                 "header.c:71); vz resets to -60.9 on exit "
                 "(shared default :385-391))",
          "slideSign": "+vz (i=3, odd)",
-         "src": "map7_s02_2.c:3510, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+         "src": "map7_s02_2.c:3510, 3681-3687, sharedFunc_800D15F0_3_s01.h:"
                 "331-365, map7_s02.h:109"},
         {"object": "DR2L_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 4, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 15-16 (shared code, inner set "
                 "i>=4, sharedFunc_800D15F0_3_s01.h:342-355 via "
                 "map7_s02_2.c:3153; invoked by map event [153] — "
@@ -1959,12 +1959,12 @@ _PROP_ANIMS = {
                 "(map_events.c:1444-1451, header.c:71); vz resets to "
                 "-60.9 on exit (shared default :385-391))",
          "slideSign": "-vz (i=4, even)",
-         "src": "map7_s02_2.c:3511, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+         "src": "map7_s02_2.c:3511, 3681-3687, sharedFunc_800D15F0_3_s01.h:"
                 "331-365, map7_s02.h:109"},
         {"object": "DR2R_HID", "pos": [-100.9, 0.0, -60.9],
          "rot0": [0, 0, 0], "driver": "slideDoor", "slideIdx": 5, "axis": "z",
          "speed": 0.35, "accel": 0.8, "resetZ": -60.9,
-         "chunkGate": ["-1|-3", "-1|-2"],
+         "chunkCells": [[-3, -2], [-1, -1]],
          "cutscene": "elevator ride states 15-16 (shared code, inner set "
                 "i>=4, sharedFunc_800D15F0_3_s01.h:342-355 via "
                 "map7_s02_2.c:3153; invoked by map event [153] — "
@@ -1973,7 +1973,7 @@ _PROP_ANIMS = {
                 "(map_events.c:1444-1451, header.c:71); vz resets to "
                 "-60.9 on exit (shared default :385-391))",
          "slideSign": "+vz (i=5, odd)",
-         "src": "map7_s02_2.c:3512, 3728-3733, sharedFunc_800D15F0_3_s01.h:"
+         "src": "map7_s02_2.c:3512, 3681-3687, sharedFunc_800D15F0_3_s01.h:"
                 "331-365, map7_s02.h:109"},
         # ---- dagger-room doors (EventFlag_557) ----
         {"object": "DOR1_HID", "pos": [21.15, -0.8, -60.0],
@@ -2043,6 +2043,41 @@ _PROP_ANIMS = {
          "src": "map7_s03_3.c:8191, 8296-8342"},
     ],
 }
+
+# v43 (RIP2-4): the MAP7 slideDoor "chunkCells" expansion. The engine adds
+# the six levitating doors on the EXACT diagonal pair of add-chunks —
+#     case MAP_CHUNK_CELL(-1, -1):
+#     case MAP_CHUNK_CELL(-3, -2):
+#         for (i = 0; i < 6; i++) WorldObjects_Add(&g_WorldObject_Dr[i]...)
+# (map7_s01_2.c:2445-2451, map7_s02_2.c:3681-3687) — and the emitted
+# chunkGate's per-axis-OR encoding ("x-alts", "z-alts") CANNOT express a
+# diagonal pair: the old ["-1|-3", "-1|-2"] cross-products to the 4 cells
+# (-1,-1)/(-1,-2)/(-3,-1)/(-3,-2), of which (-1,-2) (Stone1/Ana + SavePad,
+# map7_s01_2.c:2465-2493) and (-3,-1) (no case) are spurious — the engine
+# never draws the doors there. Entries carrying "chunkCells" are expanded
+# here into ONE propAnims entry PER engine add-chunk, each with an
+# EXACT-CELL chunkGate [x, z] (every consumer — fog_poc.c, camtrack.html,
+# the Wallpaper twin — decodes a 2-int gate as the single exact cell).
+# The doors' pos cell (-3,-2) comes FIRST: _room_prop_anims attaches by
+# pos-cell, and the consumers bind an object's items to the FIRST matching
+# entry — the binding entry must be the one whose gate passes in the room
+# where the object lives (render stays bit-identical; the second entry
+# carries the other engine add-chunk for any gate-applying consumer, e.g.
+# a neighbor merge: the union of the two entries' cells IS the engine's
+# exact pair).
+for _ovl in list(_PROP_ANIMS):
+    _expanded = []
+    for _e in _PROP_ANIMS[_ovl]:
+        _cells = _e.get("chunkCells")
+        if not _cells:
+            _expanded.append(_e)
+            continue
+        for _cell in _cells:
+            _e2 = dict(_e)
+            del _e2["chunkCells"]
+            _e2["chunkGate"] = list(_cell)
+            _expanded.append(_e2)
+    _PROP_ANIMS[_ovl] = _expanded
 
 
 def _room_env_fx(room_name, resolver=None, report=None):
