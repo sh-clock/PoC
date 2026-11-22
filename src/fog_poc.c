@@ -9288,10 +9288,16 @@ static void rain_blit_streak(Frame *fb, const RainFlakeDraw *rd) {
     int adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
     int len = adx > ady ? adx : ady;
     if (len <= 0) len = 1;
-    for (int s = 0; s <= len; s++) {
+    for (int s = 0; s < len; s++) {
         int px = rd->x0 + (dx * s) / len;
         int py = rd->y0 + (dy * s) / len;
-        int v = (s * 16) / (len + 1);
+        /* v43 E-11-5: the quad's texel rows run v=112 (tail edge) .. v=128
+         * (head edge) — the len covered pixels sample at their CENTERS:
+         * v = 112 + 16*(s+0.5)/len -> sprite row (16*s+8)/len, i.e.
+         * (s*32+16)/(2*len). The s=len HEAD pixel (center on the v=128
+         * edge) lies outside the quad and is never drawn (top-left fill
+         * rule; engine particle.c:2846 streak / :3088 drip setUV4).      */
+        int v = (s * 32 + 16) / (2 * len);
         if (v < 0) v = 0;
         if (v > 15) v = 15;
         if (py < 0 || py >= fb->h) continue;
