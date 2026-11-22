@@ -5743,7 +5743,7 @@ static void sh_billboard_colors(const ShEnv *env, const int anchorQ8[3],
         if (var_a1 > 64) var_a1 = 64;             /* dead engine clamp */
         for (int c = 0; c < 3; c++) {
             int sum = env->field_24[c] + ((env->worldTintColor[c] * var_a1) >> 7);
-            bk[c] = (int)(((int64_t)sum * fogAlpha) >> 12);
+            bk[c] = ((int)(((int64_t)sum * fogAlpha) >> 12)) << 4;  /* SetBackColor: BK = arg<<4 */
         }
     } else {
         /* func_8005A838 (enum-2 directional): light source = field_28
@@ -5753,7 +5753,7 @@ static void sh_billboard_colors(const ShEnv *env, const int anchorQ8[3],
             llmRow0[c] = v >> 1;
         }
         for (int c = 0; c < 3; c++)
-            bk[c] = (int)(((int64_t)env->field_24[c] * fogAlpha) >> 12);
+            bk[c] = ((int)(((int64_t)env->field_24[c] * fogAlpha) >> 12)) << 4;
     }
 
     /* ---- Gfx_BillboardDraw:191-239 — fog scale, magnitude rescale,
