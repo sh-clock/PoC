@@ -487,6 +487,169 @@ _WATER_FLOOR_SRC = (
 )
 
 
+# ---------------------------------------------------------------------------
+# v45 (S22 water-texture audit): the DR_WAVE live-tile machinery, emitted as
+# GLB data so consumers reproduce the engine water WITHOUT any hardcoded
+# asset.  All engine facts below are byte/code-verified:
+#   - Map_EffectTexturesLoad env_effects.c:164-168/201-202 loads
+#     DR_WAVE.TIM via Fs_QueueStartReadTim(&D_800A908C); Fs_QueuePostLoadTim
+#     (fs_queue.c:643-678) relocates pixels to page 13 x=832 y=0 and the
+#     CLUT strip (rows 0..1) to (224,0) — the TIM's own (0,0) header rects
+#     are overridden by the descriptor (data.c:118
+#     {tPage{0,13}, u=0, v=0, clutX=224, clutY=0}).
+#   - func_8008E5B4 (lens_flare.c:525-608) re-draws the 32x32 live tile at
+#     VRAM (832,224) every frame the light stands inside a water zone: two
+#     32x32 POLY_FT4s (tpage 45 = 4bpp, TX 13 (x 832), ABR-1 ADDITIVE, clut
+#     WATER_CLUT (224,0) row 0, prim color (128,128,128) = identity
+#     modulation) into the draw-area rect D_800AFDA4 {832,224,32,32}:
+#       poly[0] OPAQUE:  window u 0..32,  v (ctr>>1)&0x1F .. +32
+#       poly[1] SEMI:    window u ((ctr+1)>>2)&0x1F .. +32, v 8..40
+#     ctr = D_800AFDAC, ++ when g_DeltaTime != 0 (lens_flare.c:554-557).
+#   - The 15-bit halfwords the two quads write keep the texel STP bit
+#     (swanstation gpu_sw_backend.cpp:131 carries (texture_color.bits &
+#     0x8000) through the modulation); every DR_WAVE CLUT entry >= 0x8000,
+#     so every tile texel ends STP-set (only a blue-field saturation
+#     bA+bB>31 clears bit 15 — blargg carry — never reached by the shipped
+#     art, max 14+14=28).
+#   - The MIZ water-floor models (field_B_4 = 1) draw through
+#     func_80059E34(1) (bodyprog_80056D8C.c:1435-1560): tpage forced to
+#     (prim->u1 & 0x1FFFFF)|(0x140<<16) = 0x14D — bits 7-8 = 2 (15-bit
+#     DIRECT color), bits 5-6 = 2 (ABR-2 B-F SUBTRACTIVE) — flat color
+#     (56,56,56) (packedColor 0x2E383838), FIXED OT bucket org[640], NO fog
+#     veil; the prims sample the live tile as RGB555 with page-texel UVs
+#     u 0..31 / v 224..255 (byte-verified across the DR corpus).
+#   - The v33..v44 GLBs normalized those UVs against the DR_WAVE sheet
+#     (128x64) -> v 3.5..3.98 OUT of glTF range and embedded the raw sheet
+#     as the material texture: every non-waterLive consumer rendered
+#     garbage.  v45: the material texture is the LIVE TILE (the ctr=0
+#     composite) and the UVs are tile-relative (u/32, (v-224)/32).
+# ---------------------------------------------------------------------------
+def _dr_wave_parts(tim):
+    """(idx array, clut rows) from a DR_WAVE TimFile — the raw 4bpp sheet."""
+    w, h = tim.width, tim.height          # 128 x 64 texels
+    img = np.frombuffer(tim.img_data, dtype=np.uint8)
+    if img.size < w // 2 * h:
+        img = np.pad(img, (0, w // 2 * h - img.size))
+    img = img[: w // 2 * h].reshape(h, w // 2)
+    idx = np.empty((h, w), dtype=np.uint8)
+    idx[:, 0::2] = img & 0x0F            # low nibble = even u (decode() parity)
+    idx[:, 1::2] = img >> 4
+    rows = []
+    for r in range(tim.clut_h):
+        rows.append([int(c) for c in struct.unpack_from(
+            f"<{tim.clut_w}H", tim.clut_data, r * tim.clut_w * 2)])
+    return idx, rows
+
+
+def _dr_wave_live_tile(tim):
+    """The 32x32 live tile at ctr=0, EXACT per func_8008E5B4 (lens_flare.c:
+    525-608): poly[0] OPAQUE window (u 0..32, v 0..32) then poly[1] SEMI
+    ABR-1 ADDITIVE window (u 0..32, v 8..40) over it, per-5-bit-channel
+    saturating add, STP carried (bit 15).  Returns the RGBA uint8 tile
+    (32x32x4) — the engine writes 15-bit halfwords; the 8-bit view is the
+    PS1 DAC bit replication (v<<3 | v>>2) exactly like TimFile.decode."""
+    idx, rows = _dr_wave_parts(tim)
+    if len(rows) < 2 or idx.shape != (64, 128):
+        return None, rows
+    pal0 = np.array(rows[0], dtype=np.uint16)
+    vA, uB, vB = 0, 0, 8                  # ctr=0: (0>>1)&0x1F = 0, ((0+1)>>2)&0x1F = 0
+    A = pal0[idx[vA:vA + 32, 0:32]]        # layer A: rows 0..31, cols 0..31
+    B = pal0[idx[vB:vB + 32, uB:uB + 32]]  # layer B: rows 8..39,  cols 0..31
+    ch = lambda c, s: ((c >> s) & 0x1F).astype(np.int16)
+    r5 = np.clip(ch(A, 0) + ch(B, 0), 0, 31)
+    g5 = np.clip(ch(A, 5) + ch(B, 5), 0, 31)
+    b5 = np.clip(ch(A, 10) + ch(B, 10), 0, 31)
+    # bit 15 of the additive result: fg STP carried; a blue-field saturation
+    # (bA+bB>31) would clear it (never reached by the shipped art).  Layer A
+    # alone also leaves bit 15 set (every CLUT entry >= 0x8000) — the tile
+    # is STP-set everywhere either way.
+    rep = lambda v: ((v << 3) | (v >> 2)).astype(np.uint8)
+    tile = np.stack([rep(r5), rep(g5), rep(b5),
+                     np.full(r5.shape, 255, dtype=np.uint8)], axis=-1)
+    return tile, rows
+
+
+def _dr_wave_payload(resolver, room_name, report):
+    """The SH1X.envEffects.waterRefract block — the full DR_WAVE payload
+    (upload rects, CLUT rows, raw nibbles, live-tile layer formulas) so
+    compatible players regenerate the animated tile from the GLB alone.
+    Graceful no-op (None) when DR_WAVE.TIM does not resolve."""
+    entry = None
+    try:
+        entry, _rec = resolver.resolve("DR_WAVE", room_name)
+    except Exception:
+        entry = None
+    if entry is None:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterRefract: DR_WAVE.TIM not resolved — "
+                f"the live-tile payload omitted (the room's static floor "
+                f"texture stays the ctr=0 composite already embedded)")
+        return None
+    try:
+        tim = TimFile("DR_WAVE", entry.read_bytes())
+        tile, rows = _dr_wave_live_tile(tim)
+    except Exception as e:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterRefract: DR_WAVE.TIM: {e}")
+        return None
+    if tile is None:
+        if report is not None:
+            report.setdefault("problems", []).append(
+                f"{room_name}: waterRefract: DR_WAVE.TIM is "
+                f"{tim.width}x{tim.height} {tim.clut_w}x{tim.clut_h} CLUT "
+                f"— not the 128x64/2-row sheet; payload omitted")
+        return None
+    nibbles = tim.img_data
+    return {
+        "upload": {
+            "pixels": [832, 0], "clut": [224, 0], "clutRows": len(rows),
+            "src": "Fs_QueuePostLoadTim fs_queue.c:643-678 + D_800A908C "
+                   "data.c:118 {tPage{0,13}, u=0, v=0, clutX=224, "
+                   "clutY=0}; Map_EffectTexturesLoad env_effects.c:201-202",
+        },
+        "srcSize": [tim.width, tim.height],
+        "srcBpp": 4,
+        "pixels": _b64(nibbles),
+        "pixelsNote": "the 4096 TIM img_data bytes verbatim (4bpp: 2 "
+                      "texels/byte, LOW nibble = even u — the TimFile "
+                      "layout; b64). Same encoding as SH1X.waterTex.",
+        "clut": rows,
+        "liveTile": {
+            "vramRect": [832, 224, 32, 32],
+            "layers": [
+                {"quad": 0, "blend": "opaque", "tpage": 45, "clutRow": 0,
+                 "primColor": [128, 128, 128],
+                 "u": [0, 32], "v0": "(ctr>>1)&0x1F", "vSpan": 32},
+                {"quad": 1, "blend": "semi ABR-1 ADDITIVE (tpage 45 "
+                                     "bits 5-6 = 01)", "clutRow": 0,
+                 "primColor": [128, 128, 128],
+                 "u0": "((ctr+1)>>2)&0x1F", "uSpan": 32, "v": [8, 40]},
+            ],
+            "ctr": "D_800AFDAC: ++ while g_DeltaTime != 0 inside "
+                   "func_8008E5B4 (lens_flare.c:554-557), which runs every "
+                   "frame the light stands inside a water zone "
+                   "(shLensFlareExec lens_flare.c:79-93)",
+            "stp": "every DR_WAVE CLUT entry >= 0x8000 -> every composite "
+                   "texel STP-set (bit 15; the modulation carries it, "
+                   "swanstation gpu_sw_backend.cpp:131); only blue-field "
+                   "saturation (bA+bB>31) clears bit 15 — unreachable by "
+                   "the shipped art (max 14+14)",
+            "src": "func_8008E5B4 lens_flare.c:525-608",
+        },
+        "consumers": {
+            "glint": "func_8008E794 lens_flare.c:610-681 — clut row+1 "
+                     "((224,1)), window u 64..127 v 0..31, OT bucket 641",
+            "causticRing": "func_8008EA68 lens_flare.c:683+ — the G4/G3 "
+                           "ring + glint at OT buckets 641/639",
+            "ripple": "map5_s00 mesh/sprite quads (tpage 45, the sheet's "
+                      "right half)",
+        },
+        "src": "DR_WAVE.TIM (verbatim bytes above) + lens_flare.c",
+    }
+
+
 def _room_water_floor(room, resolver, report):
     """v37: SH1X.waterFloor — the room's slot-0 CLUT row 0 (16 raw u16).
 
@@ -1869,7 +2032,7 @@ _PROP_ANIMS = {
 }
 
 
-def _room_env_fx(room_name):
+def _room_env_fx(room_name, resolver=None, report=None):
     """v3 envEffects + waterZones for one room GLB (AREA-level data).
 
     Tag from the room filename prefix (THR/HP/DR/...). The effect-texture
@@ -1881,7 +2044,10 @@ def _room_env_fx(room_name):
     map_points coverage) resolves MAP1_S02/MAP1_S03 rooms; the flag is
     area-constant for every room those overlays load: Water = WATER.TIM,
     env_effects.c:137-139) — the school rooms get the SAME self-contained
-    treatment as the sewers. Returns ({}, []) for areas with no FX
+    treatment as the sewers. v45: the DR/DRU envEffects block carries the
+    full waterRefract payload (the DR_WAVE bytes + live-tile formulas —
+    _dr_wave_payload) so the animated water tile regenerates from the GLB
+    alone. Returns ({}, []) for areas with no FX
     (the graceful no-op contract — old behavior preserved)."""
     tag = _room_tag(room_name)
     known = {t[0] for t in _MAP_INFOS}
@@ -1910,6 +2076,13 @@ def _room_env_fx(room_name):
                "mapIdx": 29 if tag == "DR" else 36,
                "eventFlag": None,
                "src": "env_effects.c:131-136 (MapIdx_MAP5_S00/MAP6_S03)"}
+        # v45 (S22 water-texture audit): the full DR_WAVE payload — the
+        # live tile, its scroll formulas and the raw sheet nibbles — so
+        # consumers reproduce the animated water WITHOUT hardcoded assets.
+        if resolver is not None:
+            payload = _dr_wave_payload(resolver, room_name, report)
+            if payload is not None:
+                env["waterRefract"] = payload
     elif tag == "SU":
         # v39: the nightmare school — the overlay binding comes from the
         # SH1X.env table (derive_room_env). MAP1_S02 = mapIdx 5, MAP1_S03 = 6
@@ -5390,6 +5563,10 @@ def build_instance_meshes(room, inst, lib, resolver, builder, report,
                 tex_name = lib.tex_names[pack.tex_num]
                 mat_key = ("TEX", tex_name, pack.cba, pack.stp)
                 tex_w = tex_h = None
+                # v45: the waterLive packs' UVs are live-tile page-texel
+                # coords (the note at the tex_w assignment below); flips
+                # True only for the field_B_4 in {1,3} objects' DWAVE packs.
+                water_tile_uv = False
                 tim = report["tim_cache"].get(tex_name, False)
                 if tim is False:
                     # directory-tree discovery + evidence-ranked resolution:
@@ -5411,6 +5588,21 @@ def build_instance_meshes(room, inst, lib, resolver, builder, report,
                     else:
                         tex_w, tex_h = tim.width, tim.height
                         report["tex_ok"].add(tex_name)
+                        # v45 (S22 water-texture audit): the DWAVE packs of
+                        # water-floor models (the object's field_B_4 in
+                        # {1,3} -> the func_80059E34 draw path with its
+                        # forced 15-bit tpage) sample the 32x32 LIVE TILE at
+                        # the tpage base (832,0): the prim UVs are page-texel
+                        # coords (u 0..31 = the tile's halfword columns, v
+                        # 224..255 = the tile's rows).  Normalizing them
+                        # against the DR_WAVE sheet (128x64) produced
+                        # v 3.5..3.98 — OUT of glTF range, the broken water
+                        # textures of every shipped GLB since v33.  The UVs
+                        # are now TILE-relative: (u/32, (v-224)/32).
+                        if tex_name == "DWAVE" and obj.flag_b4 in (1, 3):
+                            water_tile_uv = True
+                            report["water_uv_tile_normalized"] = \
+                                report.get("water_uv_tile_normalized", 0) + 1
                 else:
                     report["tex_missing"].add(tex_name)
                     mat_key = ("MISSING", tex_name)
@@ -5518,7 +5710,14 @@ def build_instance_meshes(room, inst, lib, resolver, builder, report,
                     gn = gn / nl
                     if tex_w:
                         uu, vv = pack.uv[ui]
-                        guv = (uu / tex_w, vv / tex_h)
+                        if water_tile_uv:
+                            # v45: the MIZ water-floor prims' UVs are the
+                            # 15-bit page-texel coords on the 32x32 live
+                            # tile (u 0..31, v 224..255) — normalized
+                            # tile-relative (see the pack-loop note)
+                            guv = (uu / 32.0, (vv - 224.0) / 32.0)
+                        else:
+                            guv = (uu / tex_w, vv / tex_h)
                     else:
                         guv = (0.0, 0.0)
                     corner_data.append((tuple(gp), tuple(gn), guv))
@@ -5622,6 +5821,83 @@ def _material_for(builder, gk, report):
     has_alpha = bool((variant[..., 3] < 255).any())
     if not HAS_PIL:
         raise RuntimeError("Pillow required for texture embedding")
+    # v45 (S22 water-texture audit): the DWAVE material's texture is the
+    # 32x32 LIVE TILE (the ctr=0 composite of func_8008E5B4's two quads),
+    # NOT the 128x64 DR_WAVE sheet — the engine redirects every DWAVE
+    # material to the live tile (func_8008E4EC) and the MIZ floor prims
+    # sample the tile directly as 15-bit RGB555 (func_80059E34(1)).  The
+    # sheet itself rides the SH1X.envEffects.waterRefract payload
+    # (srcNibbles + clut rows) so consumers regenerate the ANIMATED tile
+    # from the GLB alone.  The static PNG view = the first-frame tile: a
+    # naive viewer shows approximately the right water; the waterLive
+    # extras below carries the exact engine contract.
+    if tex_name == "DWAVE":
+        tile_png = report.get("water_tile_png")
+        if tile_png is None:
+            tim = report.get("tim_cache", {}).get("DWAVE")
+            if tim is None or tim is False:
+                report.setdefault("problems", []).append(
+                    "DWAVE material: DR_WAVE.TIM not in the tim cache — "
+                    "the live-tile texture CANNOT be built")
+                tile = variant[:32, :32] if variant.shape[0] >= 32 and \
+                    variant.shape[1] >= 32 else variant
+            else:
+                tile, _rows = _dr_wave_live_tile(tim)
+                if tile is None:
+                    report.setdefault("problems", []).append(
+                        "DWAVE material: DR_WAVE.TIM is not the 128x64 "
+                        "2-row sheet — the live tile fell back to the "
+                        "sheet decode")
+                    tile = variant
+            img = Image.fromarray(tile)
+            import io as _io
+            buf = _io.BytesIO()
+            img.save(buf, format="PNG", optimize=False)
+            tile_png = buf.getvalue()
+            report["water_tile_png"] = tile_png
+        png = tile_png
+        iname = "DWAVE_TILE0"
+        img_idx = builder.add_image(png, iname)
+        tex_idx = builder.add_texture(img_idx)
+        mname = f"{tex_name}_pal{pal_y}" + ("_STP" if stp else "")
+        extras = {"SH1X": {
+            "waterLive": True,
+            "tileImage": "DWAVE_TILE0",
+            "tile": {
+                "content": "the ctr=0 composite of func_8008E5B4's two "
+                           "32x32 quads (the live tile's first frame); the "
+                           "engine rewrites the tile every frame the light "
+                           "stands inside a water zone",
+                "regen": "SH1X.envEffects.waterRefract (srcNibbles + clut "
+                         "+ liveTile layers) regenerates the animated tile",
+            },
+            "floor": {
+                "draw": "func_80059E34 arg0==1 (the field_B_4==1 models; "
+                        "bodyprog_80056D8C.c:1435-1560 via "
+                        "func_80059D50)",
+                "tpage": "(prim->u1 & 0x1FFFFF) | (0x140<<16) — 0x14D for "
+                         "the MIZ prims (their own bits 0..4 = 13)",
+                "mode": "15-bit DIRECT color (tpage bits 7-8 = 2)",
+                "abr": "B-F SUBTRACTIVE (tpage bits 5-6 = 2; "
+                       "bg - flat-modulated tile texel, clamped 0)",
+                "flatColor": [56, 56, 56],
+                "otBucket": 640,
+                "fogVeil": "none — the func_80059E34 packet replaces "
+                           "Gfx_MeshDraw's STP-branch veil draw",
+                "farCull": "MIN(Q8(7.61) << (otShift+2), "
+                           "g_WorldEnvRenderWork.fog.farDistance)",
+                "uvUnits": "engine prims: page-texel u 0..31 / v 224..255 "
+                           "(the 32x32 live tile at tpage base (832,0)); "
+                           "glTF TEXCOORD_0 = (u/32, (v-224)/32) — "
+                           "tile-relative, IN range",
+            },
+            "src": "func_8008E4EC lens_flare.c:497-502 + "
+                   "WorldMap_ChunkPropertiesSet map.c:1181 (the DWAVE "
+                   "material redirect to tpage 13) + func_80059E34 "
+                   "bodyprog_80056D8C.c:1435-1560 (the floor draw)",
+        }}
+        return builder.add_material(key, mname, tex_idx=tex_idx,
+                                    has_alpha=has_alpha, extras=extras)
     img = Image.fromarray(variant)
     import io as _io
     buf = _io.BytesIO()
@@ -5631,19 +5907,8 @@ def _material_for(builder, gk, report):
     img_idx = builder.add_image(png, iname)
     tex_idx = builder.add_texture(img_idx)
     mname = f"{tex_name}_pal{pal_y}" + ("_STP" if stp else "")
-    # v33 (S20): the DWAVE material — the engine redirects it to the LIVE
-    # animated tile at every chunk load (WorldMap_ChunkPropertiesSet ->
-    # func_8008E4EC matches materials by the name string, lens_flare.c:
-    # 497-502 + map.c:1167-1186; the material table in the sewer IPDs
-    # carries the name "DWAVE"). Consumers with a live-tile port render
-    # the animated water floor; others keep the static art (no-op).
-    extras = ({"SH1X": {"waterLive": True,
-                        "src": "func_8008E4EC lens_flare.c:497-502 "
-                               "+ WorldMap_ChunkPropertiesSet map.c:1181 "
-                               "(the DWAVE material redirect to tpage 13)"}}
-               if tex_name == "DWAVE" else None)
     return builder.add_material(key, mname, tex_idx=tex_idx,
-                                has_alpha=has_alpha, extras=extras)
+                                has_alpha=has_alpha, extras=None)
 
 
 def _instance_marker_matrix(room, inst):
@@ -5939,7 +6204,7 @@ def build_sh1x(room, resolver, report, known_rooms=None):
         "plm": _sh1x_plm(room.plm),
     }
     # ---- v3 engine FX blocks (docs/SH1X_EXTRAS_V3_FX.md) ----------------
-    env_fx, water_zones = _room_env_fx(room.name)
+    env_fx, water_zones = _room_env_fx(room.name, resolver, report)
     if env_fx:
         sh1x["envEffects"] = env_fx
     if water_zones:
@@ -7219,9 +7484,22 @@ def validate_glb(path, tex_aliases=None):
                                   offset=views[accs[uv_acc]["bufferView"]]["byteOffset"] +
                                   accs[uv_acc].get("byteOffset", 0)).reshape(-1, 2)
                 if u.size and (u.min() < -1e-6 or u.max() > 1 + 1e-6):
-                    checks["warnings"].append(
-                        f"mesh {mi} prim {pi}: UV out of [0,1] "
-                        f"[{u.min():.3f},{u.max():.3f}]")
+                    # v45 (S22): out-of-range UVs are the shipped-water bug
+                    # class (the v33..v44 DWAVE floors rode v 3.5..3.98) —
+                    # flagged as a WARNING for the general corpus but an
+                    # ERROR when the primitive's material is waterLive: the
+                    # water floor MUST carry tile-relative in-range UVs.
+                    wlive = False
+                    if p.get("material") is not None:
+                        mex = doc.get("materials", [])[p["material"]].get(
+                            "extras") or {}
+                        wlive = bool(mex.get("SH1X", {}).get("waterLive"))
+                    msg = (f"mesh {mi} prim {pi}: UV out of [0,1] "
+                           f"[{u.min():.3f},{u.max():.3f}]"
+                           + (" (waterLive material — the live-tile "
+                              "normalization is BROKEN)" if wlive else ""))
+                    (checks["errors"] if wlive else
+                     checks["warnings"]).append(msg)
             iacc = p["indices"]
             idx = np.frombuffer(bin_data, dtype="<u2", count=accs[iacc]["count"],
                                 offset=views[accs[iacc]["bufferView"]]["byteOffset"] +
@@ -7469,20 +7747,41 @@ def validate_glb(path, tex_aliases=None):
                 # TIM-derived material): alpha presence still applies below
                 pass
             else:
-                tex_img = iname.split("_pal")[0].lower()
-                tex_mat = mname.split("_pal")[0].lower()
-                alias_ok = (tex_aliases is not None and
-                            tex_img.upper() in tex_aliases.get(
-                                tex_mat.upper(), ()))
-                if tex_img != tex_mat and not alias_ok:
-                    checks["errors"].append(
-                        f"material {mi} ({mname!r}) bound to image {im_i} "
-                        f"({iname!r}) of a DIFFERENT texture")
-                elif tex_img != tex_mat:
-                    checks.setdefault("tex_alias_bindings", []).append(
-                        f"material {mi} ({mname!r}) -> image {im_i} "
-                        f"({iname!r}): content-identical TIM alias "
-                        f"(byte-equal source files, verified)")
+                # v45: the waterLive material's texture is the LIVE TILE
+                # ("DWAVE_TILE0", the ctr=0 composite of func_8008E5B4's
+                # two quads) — bound to the DWAVE material by contract; the
+                # live-tile image must be 32x32 (the engine tile rect).
+                wlive_ex = (m.get("extras") or {}).get("SH1X", {})
+                if wlive_ex.get("waterLive"):
+                    if not iname.lower().startswith("dwave"):
+                        checks["errors"].append(
+                            f"material {mi} ({mname!r}) waterLive but bound "
+                            f"to image {im_i} ({iname!r}) — expected the "
+                            f"DWAVE live-tile image")
+                    if im_i < len(emb):
+                        rec = emb[im_i]
+                        if rec.get("width") != 32 or rec.get("height") != 32:
+                            checks["errors"].append(
+                                f"material {mi} ({mname!r}) waterLive tile "
+                                f"image {iname!r} is {rec.get('width')}x"
+                                f"{rec.get('height')} — the live tile is "
+                                f"32x32 (D_800AFDA4)")
+                    ok("waterLive live-tile binding")
+                else:
+                    tex_img = iname.split("_pal")[0].lower()
+                    tex_mat = mname.split("_pal")[0].lower()
+                    alias_ok = (tex_aliases is not None and
+                                tex_img.upper() in tex_aliases.get(
+                                    tex_mat.upper(), ()))
+                    if tex_img != tex_mat and not alias_ok:
+                        checks["errors"].append(
+                            f"material {mi} ({mname!r}) bound to image {im_i} "
+                            f"({iname!r}) of a DIFFERENT texture")
+                    elif tex_img != tex_mat:
+                        checks.setdefault("tex_alias_bindings", []).append(
+                            f"material {mi} ({mname!r}) -> image {im_i} "
+                            f"({iname!r}): content-identical TIM alias "
+                            f"(byte-equal source files, verified)")
             if m.get("alphaMode") == "BLEND":
                 if im_i >= len(emb) or not emb[im_i].get("has_partial_alpha"):
                     checks["errors"].append(
@@ -7879,10 +8178,18 @@ def main(argv=None):
         # embedded-texture cross-check: every decoded texture variant must
         # appear as an embedded image with the TIM's pixel dimensions (an
         # image named after a byte-identical TIM alias counts - the content
-        # is the same)
+        # is the same).  v45 exception: the DWAVE material's embedded image
+        # is the 32x32 LIVE TILE (the engine redirect — func_8008E4EC —
+        # makes the floor sample the animated tile, not the sheet); the
+        # 128x64 sheet rides the SH1X.envEffects.waterRefract payload's
+        # srcNibbles, and the variant stays the sheet decode for the report.
         img_dims = {e["name"]: (e["width"], e["height"])
                     for e in rep["validation"].get("embedded_images", [])}
         for v in rep.get("tex_variants_struct", []):
+            if v["tex"] == "DWAVE" and any(
+                    n.lower().startswith("dwave") and d == (32, 32)
+                    for n, d in img_dims.items()):
+                continue
             if not any((n.split("_pal")[0] == v["tex"] or
                         n.split("_pal")[0].upper() in tex_aliases.get(
                             v["tex"].upper(), ()))

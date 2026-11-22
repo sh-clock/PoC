@@ -242,3 +242,52 @@ two-quad composite at (832,224)). The ripper flags such materials:
 ```
 The PoC v33+ samples the ANIMATED tile for these materials (u/v wrap
 mod 32); other consumers keep the static art (no-op contract).
+
+## v45 additions (S22 — the water-texture audit)
+
+The v33..v44 water encoding was BROKEN for every non-PoC consumer: the
+MIZ floor prims' engine UVs are 15-bit page-texel coords (u 0..31,
+v 224..255 — the 32x32 live tile at tpage base (832,0)), but the ripper
+normalized them against the DR_WAVE sheet (128x64) — `v` landed at
+3.5..3.98, OUT of glTF range, and the material texture was the raw
+sheet decode. v45:
+
+### the DWAVE material texture = the LIVE TILE (32x32)
+
+`DWAVE_TILE0` — the ctr=0 composite of `func_8008E5B4`'s two quads
+(exactly the first-frame tile the engine builds; byte-verified against
+the PoC's engine-exact composite). The floor prims' `TEXCOORD_0` are
+now TILE-relative: `(u/32, (v-224)/32)` — in [0,1] like every other
+material. The old GLBs' UVs are distinguished by the extras: the v45
+material carries the `"floor"` spec (below) — its absence marks the
+legacy sheet-normalized form.
+
+```
+"materials[i]": { ..., "extras": { "SH1X": {
+  "waterLive": true,
+  "tileImage": "DWAVE_TILE0",
+  "tile":   { "content": "...", "regen": "..." },
+  "floor": {
+    "draw": "func_80059E34 arg0==1 ...", "tpage": "(prim->u1&0x1FFFFF)|(0x140<<16)",
+    "mode": "15-bit DIRECT color", "abr": "B-F SUBTRACTIVE",
+    "flatColor": [56,56,56], "otBucket": 640, "fogVeil": "none",
+    "farCull": "MIN(Q8(7.61) << (otShift+2), fog.farDistance)",
+    "uvUnits": "engine prims: page-texel u 0..31 / v 224..255; glTF TEXCOORD_0 = (u/32, (v-224)/32)"
+  } } }
+```
+
+### `envEffects.waterRefract` — the full DR_WAVE payload
+
+Every DR/DRU room's `envEffects` block now carries the verbatim
+DR_WAVE.TIM: `"pixels"` (b64 of the 4096 4bpp img_data bytes — the same
+encoding as `SH1X.waterTex`), `"clut"` (the 2 rows, 16 u16 each), the
+VRAM upload rects (`Fs_QueuePostLoadTim` + the `D_800A908C` descriptor),
+and the `liveTile` spec: `vramRect [832,224,32,32]`, the two layer
+windows (poly[0] opaque `u 0..32, v (ctr>>1)&0x1F..+32`; poly[1] ABR-1
+additive `u ((ctr+1)>>2)&0x1F..+32, v 8..40`), the ctr advance rule
+(`D_800AFDAC` ++ per frame with dt != 0 while the light stands inside a
+water zone) and the STP note (every CLUT entry >= 0x8000 -> every
+composite texel STP-set — only blue-field saturation bA+bB>31 clears bit
+15, unreachable by the shipped art). Consumers regenerate the animated
+tile from this payload alone — no hardcoded asset needed (the PoC v45
+overrides its compiled-in defaults with it; absent = the defaults).
