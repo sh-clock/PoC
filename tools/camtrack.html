@@ -9703,14 +9703,25 @@ function sh1xTvPaintFromExtras(tvp) {
     strip: []
   };
   const scr = tvp.screens;
+  /* v44 (F-3): the C's element coercion — fog_poc.c:1905-1913
+   * `(int)jat(ca, i)->num` over the CALLOC'd JValue (jnew, fog_poc.c
+   * :358-362): only JV_NUM (strtod, :519) and JV_BOOL-true (:496) ever
+   * set `num`, so a STRING (JV_STR) or false/null element reads the
+   * calloc zero — `(int)`-truncated here via `| 0`. The old `x | 0`
+   * coerced a numeric string ("5") to 5 through ToNumber instead of 0.
+   * The same rule the file's own vec3 el (:6117) and sh1xJib (:7984)
+   * already implement (booleans coincide: true|0 === 1). Latent in the
+   * shipped corpus (the ripper emits JSON numbers — ipd2gltf.py's
+   * tvPaint literals) — only a hand-edited/hashed GLB triggers it. */
+  const tvEl = (x) => (typeof x === 'number' ? x : x === true ? 1 : 0) | 0;
   for (let k = 0; k < scr.length && k < TV_SCREENS; k++) {
     const s = scr[k];
     if (!s) continue;
     out.big[k] = sh1xJib(s, 'big', 0);   /* the ripper emits numbers 0/1 */
     if (Array.isArray(s.cA) && s.cA.length >= 3)
-      out.cA[k] = [s.cA[0] | 0, s.cA[1] | 0, s.cA[2] | 0];
+      out.cA[k] = [tvEl(s.cA[0]), tvEl(s.cA[1]), tvEl(s.cA[2])];
     if (Array.isArray(s.cB) && s.cB.length >= 3)
-      out.cB[k] = [s.cB[0] | 0, s.cB[1] | 0, s.cB[2] | 0];
+      out.cB[k] = [tvEl(s.cB[0]), tvEl(s.cB[1]), tvEl(s.cB[2])];
   }
   const sty = Array.isArray(tvp.styles) ? tvp.styles : [];
   for (let k = 0; k < sty.length && k < TV_STYLES; k++) {
@@ -9730,8 +9741,12 @@ function sh1xTvPaintFromExtras(tvp) {
   for (let r = 0; r < ps.length && r < 12; r++) {
     const row = Array.isArray(ps[r]) ? ps[r] : [];
     const rr = new Uint16Array(256);
+    /* v44 (F-3): the C :1950 `(unsigned short)(int)v->num` — the same
+     * calloc-zero element rule as cA/cB above, then the u16 wrap
+     * ((int)-1 -> 65535). The old `(row[c] & 0xFFFF) | 0` coerced a
+     * numeric string ("5") to 5 instead of the C's 0. */
     for (let c = 0; c < row.length && c < 256; c++)
-      rr[c] = (row[c] & 0xFFFF) | 0;
+      rr[c] = ((typeof row[c] === 'number' ? row[c] : row[c] === true ? 1 : 0) & 0xFFFF) >>> 0;
     out.strip.push(rr);
   }
   while (out.strip.length < 12) out.strip.push(new Uint16Array(256));
