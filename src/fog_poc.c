@@ -7297,12 +7297,17 @@ static void snow_reset_seed(Snow *S, unsigned seed) {
                         if (p->pos[1] == 0) p->state++; /* land -> rest */
                     } else {
                         rain_spawn_movement_apply(S, p, dt);
-                        /* engine: clamp Y at 0 and rest (SpawnMovementApply
-                         * case 1 has NO state++ — the warm-up rain rests in
-                         * state 1 only if clamped... the engine's shared tail
-                         * clamps vy but the state advance for the warm-up is
-                         * absent; particles stay Active until the steady
-                         * update lands them. Verbatim: no state++ here. */
+                        /* S20 audit F1: the engine's Active case in
+                         * WeatherParticle_SnowInit is SHARED by both banks
+                         * (particle.c:771-781): SpawnMovementApply runs,
+                         * then `if (part->position0.vy == 0)
+                         * part->stateStep++;` — the check lives in the
+                         * CALLER's loop, not inside SpawnMovementApply's
+                         * case 1, so it advances warm-up rain to rest
+                         * exactly like warm-up snow. The old comment
+                         * misread the decomp as banking the advance
+                         * inside the case-1 function body. */
+                        if (p->pos[1] == 0) p->state++; /* land -> rest */
                     }
                     break;
                 default:
