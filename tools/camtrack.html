@@ -2768,11 +2768,24 @@ window.SHView = (function () {
     attribute vec3 iPos; attribute float iScale; attribute float iClut;
     attribute vec3 iCol;
     varying vec2 vUvS; varying vec3 vColS;
+    uniform float uPsx;
+    uniform vec2 uPixScale;
     void main() {
       vColS = iCol;
       vUvS = vec2(uv.x, (iClut + uv.y) / 8.0);
       vec3 p = iPos + position * iScale;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      /* V44 (E-3): the C snaps ALL 4 splash ground corners
+         (gte_snap_screen under opts.ps1, fog_poc.c:13244-13245) —
+         the FLAKE_VERT snap branch verbatim.                        */
+      if (uPsx > 0.5 && clip.w > 0.0) {
+        vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
+                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
+        screen = floor(screen / uPixScale) * uPixScale;
+        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
+                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+      }
+      gl_Position = clip;
     }`;
   const SPLASH_FRAG = `
     uniform sampler2D map;
@@ -2892,7 +2905,11 @@ window.SHView = (function () {
       geo.setAttribute('iCol', new three.InstancedBufferAttribute(new Float32Array(N * 3), 3));
       const mat = new three.ShaderMaterial({
         vertexShader: SPLASH_VERT, fragmentShader: SPLASH_FRAG,
-        uniforms: { map: { value: buildSplashAtlas(three) } },
+        uniforms: {
+          map: { value: buildSplashAtlas(three) },
+          uPsx: { value: 1 },
+          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) }    /* v40: NTSC 224 */
+        },
         transparent: true, depthWrite: false,
         blending: three.AdditiveBlending
       });
@@ -3482,6 +3499,7 @@ window.SHView = (function () {
     }
     V.flakes.material.uniforms.uHalfFovTan.value = Math.tan(cam.fov * Math.PI / 360);
     V.flakes.material.uniforms.uPsx.value = V.psxWobble ? 1 : 0;
+    V.splashes.material.uniforms.uPsx.value = V.psxWobble ? 1 : 0;   /* V44 E-3: the snap gate */
 
     const cr = V.enabled ? env.fog.fogColor[0] : 16;
     const cg = V.enabled ? env.fog.fogColor[1] : 16;
