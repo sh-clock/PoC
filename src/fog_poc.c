@@ -10755,7 +10755,7 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
                 break;
             }
             case 2: {
-                a->stoneVel += 1336 >> 1;             /* D_800E168E += g>>1 */
+                a->stoneVel += 1337 >> 1;             /* D_800E168E += g_GravitySpeed>>1 (1337>>1=668; the old "1336>>1" comment text was the same 668) */
                 int vyQ = (int)(a->cur[1] * 4096.0f);
                 if (vyQ < -4300) {   /* vy < Q12(-1.05): the stone RISES */
                     vyQ += (int)(((int64_t)dtRaw * a->stoneVel) >> 12);

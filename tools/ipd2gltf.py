@@ -1746,9 +1746,9 @@ _PROP_ANIMS = {
          "rot0": [0, 90.0, 0], "driver": "stoneChoreo",
          "states": [
              {"slide": "vz = (step*409)/8192 - 575897 (case 1)"},
-             {"drop": "vel += g>>1 (5209/tick); vy clamps at -4300"},
+             {"drop": "vel += g_GravitySpeed>>1 (Q12_MULT(vCount,10419)>>1 = 668/tick); vy clamps at -4300"},
              {"wobble": "rotZ -= 284/s; vy = cos(rotZ)*614 - 4914; vz = sin(rotZ)*(-614) - 575488; 0.5s"},
-             {"tumble": "vel += 10419; rotZ -= 1365/s; vy += vel*dt; vz += 1228/s; until vy >= 0"},
+             {"tumble": "vel += g_GravitySpeed (Q12_MULT(vCount,10419)>>12 = 1337 raw/tick — the consumer's constant, fog_poc.c stoneChoreo case 4 'a->stoneVel += 1337'; H_BLANKS_GRAVITY_SCALE 10419 itself is only the per-H-blank scale, game_main.c:135/294); rotZ -= 1365/s; vy += vel*dt; vz += 1228/s; until vy >= 0"},
              {"rest": "pos (-139.5,-0.05,-140.0) rotZ -1024"}],
          "sound": "Sfx_Unk1647/1648/1649",
          "src": "map7_s01_2.c:1545-1596, 2188-2195"},
@@ -1834,7 +1834,7 @@ _PROP_ANIMS = {
          "count": 16, "scatterAmp": 2.2, "gravityRaw": 10419,
          "gravityUnits": "H_BLANKS_GRAVITY_SCALE Q12(9.8*0.25956907477)="
                 "10419 raw per H-BLANK; the per-tick velocity increment is "
-                "g_GravitySpeed = Q12_MULT(vCount,10419) = 1336 raw at the "
+                "g_GravitySpeed = Q12_MULT(vCount,10419) = 1337 raw at the "
                 "30Hz tick (vCount 526) — game_main.c:132-137,295",
          "vyClampRaw": 20480, "floorY": 0.0,
          "scatterInit": "amp[i] = FP_FROM(sin(Rng(0,511)|0x200)*Q12(2.2), 12); angle[i] = Rng(0,4095)",
