@@ -1150,6 +1150,11 @@ typedef struct {
     int alphaMode;            /* 0 = OPAQUE, 1 = MASK (billboard), 2 = BLEND (STP) */
     int waterLive;            /* v33: SH1X.waterLive — the DWAVE material the
                                * engine redirects to the animated tile   */
+    int waterLiveUvTile;       /* v45: 1 = the GLB's TEXCOORD_0 is TILE-relative
+                               * (u/32, (v-224)/32 — the floor.uvUnits extras
+                               * present); 0 = the v33..v44 legacy form
+                               * (sheet-normalized u/128, v/64 — the render
+                               * path still un-mangles those) */
 } MaterialInfo;
 
 typedef struct {
@@ -1513,6 +1518,7 @@ typedef struct {
     /* v3 FX (all optional — zeroed = feature off, v2 behavior) */
     int hasEnvEffects;             /* 1 = effectTexFlag present            */
     int envFlagIsWaterRefract;      /* DR/DRU shimmer flag                  */
+    int hasDrWave;                 /* v45: the waterRefract payload loaded */
     Sh1xWaterZone waterZones[4];    /* s_WaterZone, max 4 (decomp has <=2)  */
     int nWaterZones;
     Sh1xMapLink mapLink;
@@ -1865,6 +1871,56 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
             fprintf(stderr, "sh1x: waterTex: decoded %d bytes (expect "
                             "8192) — using the compiled-in default sheet\n",
                     nb);
+        }
+    }
+    /* v45: SH1X.envEffects.waterRefract — the DR_WAVE payload (the sewer
+     * water). The ripper emits the verbatim TIM: "pixels" = the 4096
+     * img_data bytes (4bpp, LOW nibble = even u), "clut" = the 2 rows
+     * (16 u16 each). It OVERRIDES the compiled-in defaults
+     * (dr_wave_data.h — the same bytes for the authentic TIM), the SAME
+     * contract as waterTex/water_tim_data.h. Absent (older GLBs /
+     * non-water rooms) = the compiled-in defaults stand. The liveTile
+     * block (vramRect, the two layer windows, the ctr rule) is the
+     * engine's func_8008E5B4 spec — already implemented verbatim in
+     * fx_water_tile_update; the block is record/audit material for this
+     * consumer (the formulas below cite it). */
+    if (ee && ee->type == JV_OBJ && sx->envFlagIsWaterRefract) {
+        const JValue *wr = jget(ee, "waterRefract");
+        if (wr && wr->type == JV_OBJ) {
+            const char *b64 = jstr(wr, "pixels", "");
+            unsigned char sheet[4096];
+            int nb = sh_b64_decode(b64, sheet, sizeof(sheet));
+            const JValue *cl = jarr(wr, "clut");
+            int clRows = jcount(cl);
+            if (nb == 4096 && clRows >= 2) {
+                /* 4bpp: 2 texels/byte, low nibble = even u (the same
+                 * TimFile layout the waterTex path decodes) */
+                for (int v = 0; v < 64; v++) {
+                    const unsigned char *row = sheet + (size_t)v * 64;
+                    for (int ub = 0; ub < 64; ub++) {
+                        g_drWaveIdx[v][ub * 2]     = row[ub] & 0xF;
+                        g_drWaveIdx[v][ub * 2 + 1] = row[ub] >> 4;
+                    }
+                }
+                for (int r = 0; r < 2; r++) {
+                    const JValue *cr = jat(cl, r);
+                    for (int k = 0; k < 16 && cr; k++) {
+                        const JValue *cv = jat(cr, k);
+                        if (cv)
+                            g_drWaveClut[r][k] =
+                                (unsigned short)((int)cv->num & 0xFFFF);
+                    }
+                }
+                sx->hasDrWave = 1;
+                g_waterTileEverUpdated = 0;  /* re-seed the live tile from
+                                                the new sheet (see
+                                                fx_water_live_rgba) */
+            } else if (nb >= 0) {
+                fprintf(stderr, "sh1x: waterRefract: decoded %d bytes "
+                                "(expect 4096) — the compiled-in DR_WAVE "
+                                "default stands\n",
+                        nb);
+            }
         }
     }
     const JValue *ml = jget(sh, "mapLink");
@@ -2793,11 +2849,16 @@ static int scene_load_glb_q(Scene *s, const char *path, int quiet) {
          * (WorldMap_ChunkPropertiesSet -> func_8008E4EC matches the
          * material by NAME — "DWAVE" in the sewer IPDs — and rewrites
          * its tpage to 13 x=832, lens_flare.c:497-502 + map.c:1167-1186);
-         * func_8008E5B4 then rewrites the 32x32 window per frame. */
+         * func_8008E5B4 then rewrites the 32x32 window per frame.
+         * v45: the extras' "floor" spec (uvUnits) marks the TILE-relative
+         * UV form — the v45 ripper normalizes the MIZ floor prims' UVs on
+         * the 32x32 live tile (the v33..v44 GLBs carried the mangled
+         * sheet-normalized v 3.5..3.98). */
         {
             const JValue *ex = jget(m, "extras");
             const JValue *sx = jget(ex, "SH1X");
             s->mat[i].waterLive = jintb(sx, "waterLive", 0);
+            s->mat[i].waterLiveUvTile = jget(sx, "floor") != NULL;
         }
     }
 
@@ -13847,11 +13908,15 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                  * alternate path replaces that draw entirely); the depth
                  * fade is the far cull alone (var_t9 =
                  * MIN(Q8(7.61)<<3, fog.far) — the same farCullQ8 above).
-                 * The UV remap onto the 32x32 direct tile: u' = u*4,
-                 * v' = v*2-7. All live-tile texels are STP-set (every
-                 * DR_WAVE CLUT entry >= 0x8000) -> every texel blends
-                 * (SUBTRACTS — ABR-2, see the RP_SUB_TEX raster branch);
-                 * the 0x0000-hole rule never fires on the direct view. */
+                 * V45 UV forms: the v45 GLBs carry TILE-relative TEXCOORD_0
+                 * (u/32, (v-224)/32 — the extras' floor.uvUnits) used
+                 * AS-IS; the v33..v44 GLBs carry the sheet-normalized form
+                 * (u/128, v/64) whose un-mangle (u*4, v*2-7) recovers the
+                 * tile coords 0..0.9688. All live-tile texels are STP-set
+                 * (every DR_WAVE CLUT entry >= 0x8000) -> every texel
+                 * blends (SUBTRACTS — ABR-2, see the RP_SUB_TEX raster
+                 * branch); the 0x0000-hole rule never fires on the direct
+                 * view. */
                 if (getenv("FOGPOC_WFLDBG")) {
                     static int cnt = 0;
                     fprintf(stderr, "WFLDBG[%d] item=%d name=%s buf=%d vcol=(%d,%d,%d) z=%.2f\n",
@@ -13860,9 +13925,12 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                     cnt++;
                 }
                 RVert ra = *a, rb = *b, rc = *c;
-                ra.u = a->u * 4.0f;  ra.v = a->v * 2.0f - 7.0f;
-                rb.u = b->u * 4.0f;  rb.v = b->v * 2.0f - 7.0f;
-                rc.u = c->u * 4.0f;  rc.v = c->v * 2.0f - 7.0f;
+                if (!m->waterLiveUvTile) {
+                    /* the legacy (v33..v44) sheet-normalized form */
+                    ra.u = a->u * 4.0f;  ra.v = a->v * 2.0f - 7.0f;
+                    rb.u = b->u * 4.0f;  rb.v = b->v * 2.0f - 7.0f;
+                    rc.u = c->u * 4.0f;  rc.v = c->v * 2.0f - 7.0f;
+                }
                 ra.vcol[0] = ra.vcol[1] = ra.vcol[2] = 56;
                 rb.vcol[0] = rb.vcol[1] = rb.vcol[2] = 56;
                 rc.vcol[0] = rc.vcol[1] = rc.vcol[2] = 56;
