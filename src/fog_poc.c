@@ -12763,7 +12763,9 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
              * state; unseeded = no driver-21 entry was loaded. */
             if (!a->seeded) continue;
             /* the 5x5 mesh (func_800CB25C:166-231): grid x -93.5 +
-             * col*0.75, z 9.6 - row*0.75, y 0.5 (engine); 4x4 quads,
+             * col*0.75 (exact: engine Q12_TO_Q8(col*3072 - Q12(93.5))
+             * = (col*3072 - 382976)>>4, all multiples of 1/256), z the
+             * v45 (D-1) engine lattice below, y 0.5 (engine); 4x4 quads,
              * per-quad UV (u 224+8j .. 231+8j, v 160+sel*32+8i .. +7);
              * v37 (W1-7): brightness = !(func_80055D78(Q12(-92.0),
              * Q12(0.5), Q12(8.1)) < 129) * 8 — the VERBATIM light probe
@@ -12804,8 +12806,26 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                     /* grid corners (engine coords -> glTF)             */
                     float wx[4] = { -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f,
                                     -93.5f + mj * 0.75f, -93.5f + (mj + 1) * 0.75f };
-                    float wzE[4] = { 9.6f - mi * 0.75f, 9.6f - mi * 0.75f,
-                                     9.6f - (mi + 1) * 0.75f, 9.6f - (mi + 1) * 0.75f };
+                    /* v45 (audit D-1): the engine z base — map5_s00.c:179
+                     *   z_Q8 = Q12_TO_Q8(Q8(153.6f) - row*(Q12(1.5f)>>1))
+                     *       = (39321 - row*3072) >> 4
+                     * (Q8(153.6f) = (s32)(float32(153.6)*256) =
+                     * (s32)39321.6015625 = 39321 — a raw value the engine
+                     * then subtracts the Q12 row term from and re-shifts
+                     * >>4; rows 0..4 -> 2457,2265,2073,1881,1689 Q8 =
+                     * 9.59765625, 8.84765625, 8.09765625, 7.34765625,
+                     * 6.59765625 m — the DOUBLE-TRUNCATED lattice, not the
+                     * decimal 9.6 - row*0.75 (each row was +2.34 mm).
+                     * Cross-check: the center corner Q8(6.6f) = 1689 = the
+                     * row-4 value — the same lattice.                      */
+                    int zq8r0 = (39321 - mi * 3072) >> 4;
+                    int zq8r1 = (39321 - (mi + 1) * 3072) >> 4;
+                    float wzE[4] = {
+                        (float)zq8r0 * (1.0f / 256.0f),
+                        (float)zq8r0 * (1.0f / 256.0f),
+                        (float)zq8r1 * (1.0f / 256.0f),
+                        (float)zq8r1 * (1.0f / 256.0f)
+                    };
                     for (int k = 0; k < 4; k++) {
                         /* engine (x, y-down 0.5, z) -> glTF (x, -y, -z) */
                         float gx = wx[k], gy = -0.5f, gz = -wzE[k];
