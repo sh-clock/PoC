@@ -1124,10 +1124,20 @@ const SHCore = (function () {
     const L = env.light;
     const colors = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
-    /* fogAlpha = 4096 - Q8_TO_Q12(min(func_80055A50(Q12 view depth), 1)) */
+    /* fogAlpha = 4096 - Q8_TO_Q12(min(func_80055A50(Q12 view depth), 1))
+       V44 (D-3): the GTE-SZ float->Q8 sites TRUNCATE (no +0.5) — the
+       engine's SZ is floor((T<<12+Sum R*V)>>12) off the s16-quantized
+       view matrix (swanstation gte.cpp:649-659) and every downstream
+       step is an arithmetic shift (stszotz sra 2, the fog ramp index,
+       the OT buckets). Sites mirrored here: t2q8 (this), the veil zq8,
+       the per-vertex zq8, the TV bucket/subBucket, the snow/rain otz
+       (D-2). The RECONSTRUCTION sites (anchorQ8 below, cam Q12, rotQ12)
+       keep round-to-nearest. Residual: the float view matrix carries
+       ~±0.6 Q8 counts of noise at 20 m vs the engine's quantized matrix
+       (see fog_poc.c sh_billboard_colors for the family head note). */
     let fogAlpha = 4096;
     if (fogOn) {
-      const t2q8 = Math.floor(anchorDepth * 256 + 0.5) | 0;
+      const t2q8 = Math.floor(anchorDepth * 256) | 0;   /* V44 D-3: truncate */
       let ramp = env.fog.fogVertex(t2q8);
       if (ramp > 4096) ramp = 4096;
       fogAlpha = 4096 - (ramp << 4);
@@ -3163,7 +3173,7 @@ window.SHView = (function () {
             const qz = me[2]*bx + me[6]*by + me[10]*bz + me[14];
             const qd = -(viewE[2]*qx + viewE[6]*qy + viewE[10]*qz
                          + viewE[14]);
-            const zq8 = Math.floor(qd * 256 + 0.5) | 0;
+            const zq8 = Math.floor(qd * 256) | 0;   /* V44 D-3: SZ truncates */
             const ramp = fog.fogVertex(zq8);
             let fq12 = ramp * 16 + fogIntensity;
             if (fq12 > 4096) fq12 = 4096;
@@ -3196,7 +3206,7 @@ window.SHView = (function () {
         if (fogEnabled) {
           let ramp = 0, fq12 = 0, Tq12 = 4096;
           if (fogOn) {
-            const zq8 = Math.floor(depth * 256 + 0.5) | 0;
+            const zq8 = Math.floor(depth * 256) | 0; /* V44 D-3: SZ truncates */
             ramp = fog.fogVertex(zq8);
             fq12 = ramp * 16 + fogIntensity;
             if (fq12 > 4096) fq12 = 4096;
@@ -3286,7 +3296,12 @@ window.SHView = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* particle collection — the render_frame collect port                   */
+  /* particle collection — the render_frame collect port */
+  /* V44 (D-2 companion): the engine feeds the GTE the particles on the
+   * Q8 lattice — particlePosQ8 = Q12_TO_Q8(pos) = pos>>4 (particle.c:
+   * 2562-2571/2773-2782/2907-2921; fixed_point.h:399-400) — never the
+   * raw Q12. fog_poc.c sh_particle_pos_q8_snap twin. */
+  const q8Snap = (q12) => Math.floor(q12 / 16) * 16;
   function collectParticles(env, snow, viewE) {
     const flakes = [], streaks = [], splashes = [];
     if (!snow || !snow.enabled || !V.particlesOn)
@@ -3298,13 +3313,14 @@ window.SHView = (function () {
       const p = snow.p[i];
       if (p.hide) continue;
       if (p.state === 0) continue;
-      const wx = (snow.boxX + p.pos[0]) / 4096;
-      const wy = datumM - p.pos[1] / 4096;
-      const wz = (snow.boxZ + p.pos[2]) / 4096;
+      /* V44 (D-2 companion): Q8 lattice snap first (q8Snap above) */
+      const wx = q8Snap(snow.boxX + p.pos[0]) / 4096;
+      const wy = datumM - q8Snap(p.pos[1]) / 4096;
+      const wz = q8Snap(snow.boxZ + p.pos[2]) / 4096;
       const vz = viewE[2]*wx + viewE[6]*wy + viewE[10]*wz + viewE[14];
       const depth = -vz;
       if (depth <= 0.05) continue;
-      const otz = Math.floor(depth * 64 + 0.5) | 0;
+      const otz = Math.floor(depth * 64) | 0;   /* V44 D-2: the chain truncates */
       const snowBase = env.snowBase()[0];
       let prim = ((snowBase - (fog.fog80055A50(otz) >> 2)) & 0xFF) >>> 0;
       const zHalf = otz >> 1;
@@ -3328,16 +3344,17 @@ window.SHView = (function () {
          i < snow.addedCount + snow.addedCount1 && i < SC.SNOW_COUNT_MAX; i++) {
       const p = snow.p[i];
       if (p.state === 0) continue;
-      const hx = (snow.boxX + p.pos[0]) / 4096;
-      const hy = datumM - p.pos[1] / 4096;
-      const hz = (snow.boxZ + p.pos[2]) / 4096;
-      const tx = (snow.boxX + p.pos1[0]) / 4096;
-      const ty = datumM - p.pos1[1] / 4096;
-      const tz = (snow.boxZ + p.pos1[2]) / 4096;
+      /* V44 (D-2 companion): Q8 lattice snap first (q8Snap above) */
+      const hx = q8Snap(snow.boxX + p.pos[0]) / 4096;
+      const hy = datumM - q8Snap(p.pos[1]) / 4096;
+      const hz = q8Snap(snow.boxZ + p.pos[2]) / 4096;
+      const tx = q8Snap(snow.boxX + p.pos1[0]) / 4096;
+      const ty = datumM - q8Snap(p.pos1[1]) / 4096;
+      const tz = q8Snap(snow.boxZ + p.pos1[2]) / 4096;
       const tDepth = -(viewE[2]*tx + viewE[6]*ty + viewE[10]*tz + viewE[14]);
       const hDepth = -(viewE[2]*hx + viewE[6]*hy + viewE[10]*hz + viewE[14]);
       if (tDepth <= 0.05 || hDepth <= 0.05) continue;
-      const otz = Math.floor(tDepth * 64 + 0.5) | 0;
+      const otz = Math.floor(tDepth * 64) | 0; /* V44 D-2: the chain truncates */
       const zHalf = otz >> 1;
       if (!(zHalf > 32 && zHalf < 2047)) continue;
       const clutRow = (zHalf > 63 && zHalf < 256) ? 104 + (zHalf >> 5) : 104;
@@ -11474,7 +11491,7 @@ function sh1xTvPaintUpdate() {
       /* the OT bucket bound: 0 < (maxZ*256)>>3 < 2047 — the whole quad
        * (both the small POLY_FT4 and each big sub-quad uses its own max) */
       const zm = Math.max(depth[0], depth[1], depth[2], depth[3]);
-      const bucket = Math.floor(zm * 256 + 0.5) >> 3;
+      const bucket = Math.floor(zm * 256) >> 3;   /* V44 D-3: corner SZ truncates */
       if (!(bucket > 0 && bucket < 2047)) continue;
       if (tv.big[si]) {
         /* the 3x3 subdivided near screen (sp10 -> sp30 midpoints,
@@ -11508,7 +11525,7 @@ function sh1xTvPaintUpdate() {
             if (tvQuads >= TV_MAX_QUADS) continue;
             const q = [gi(jj, kk), gi(jj, kk + 1), gi(jj + 1, kk), gi(jj + 1, kk + 1)];
             const subZm = Math.max(md[q[0]], md[q[1]], md[q[2]], md[q[3]]);
-            const subBucket = Math.floor(subZm * 256 + 0.5) >> 3;
+            const subBucket = Math.floor(subZm * 256) >> 3;  /* V44 D-3 */
             if (!(subBucket > 0 && subBucket < 2047)) continue;
             tvEmitQuad(tvQuads,
               [mx[q[0]], mx[q[1]], mx[q[2]], mx[q[3]]],
