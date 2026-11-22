@@ -1177,13 +1177,18 @@ typedef struct {
                                  animInst (rip emission order)             */
     int cutsceneOnly;          /* v27.2: node extras cutsceneOnly — hidden at
                                  engine-fresh (map7_s02 beans)             */
-    int nbMerged;              /* v43 (E-03-1): item merged from a mapLink
-                                 neighbor GLB — its billboard anchors must
-                                 NOT inherit the MAIN room's buffer verdict
-                                 (engine: a neighbor chunk's billboards ride
-                                 the NEIGHBOR's own chunk windows, map.c:
-                                 1387-1446; the merged items ride the legacy
-                                 always-drawn path per the merge contract)  */
+    int nbMerged;              /* v43 (E-03-1 + E-03-2): item merged from a
+                                 mapLink neighbor GLB — (a) its billboard
+                                 anchors must NOT inherit the MAIN room's
+                                 buffer verdict (engine: a neighbor chunk's
+                                 billboards ride the NEIGHBOR's own chunk
+                                 windows, map.c:1387-1446; merged items
+                                 ride the legacy always-drawn path per the
+                                 merge contract) and (b) NON-BINDABLE: the
+                                 merge's documented contract is "neighbors
+                                 render static" — the lazy post-merge bind
+                                 must not bind them to the MAIN room's
+                                 drivers                                 */
 } DrawItem;
 
 typedef struct {
@@ -2894,7 +2899,7 @@ static void glb_walk_node(Glb *g, const JValue *nodes, int nodeIdx, mat4 parent,
             item.animIdx = -1;   /* v26.3: bound in sh1x_anims_bind */
             item.posedInst = nodePosedInst;   /* v27.2                  */
             item.cutsceneOnly = nodeCutsceneOnly; /* v27.2               */
-            item.nbMerged = 0;   /* v43 (E-03-1): native item, not merged   */
+            item.nbMerged = 0;   /* v43 (E-03-1/E-03-2): native item      */
             item.vbase = (int)(sb->n / 8);
             item.ibase = (int)sb->in;
             for (int i = 0; i < pos.count; i++) {
@@ -3201,13 +3206,23 @@ static int scene_merge(Scene *dst, Scene *src) {
         it.addSeq = dst->itemCount + i;
         it.animIdx = -1;        /* neighbors render static (documented)    */
         it.animInst = 0;
-        it.nbMerged = 1;        /* v43 (E-03-1): merged neighbor item —
-                                  do not resolve its billboard buffer
-                                  against the MAIN room's subcell windows
-                                  (map.c:1387-1446: a neighbor chunk's
-                                  billboards follow the NEIGHBOR's own
-                                  chunk; always-drawn is the merge block's
-                                  documented contract, see 2912-2914)     */
+        it.posedInst = -1;      /* v43 (E-03-2): posedInst was NOT reset —
+                                  the lazy bind (sh1x_anims_draw_apply)
+                                  runs AFTER this merge over the FULL item
+                                  list and its name-based candidate filter
+                                  + posedInst grouping could still bind a
+                                  merged neighbor item to a MAIN driver   */
+        it.nbMerged = 1;        /* v43 (E-03-1/E-03-2): merged neighbor
+                                  item — (a) do not resolve its billboard
+                                  buffer against the MAIN room's subcell
+                                  windows (map.c:1387-1446: a neighbor
+                                  chunk's billboards follow the NEIGHBOR's
+                                  own chunk; always-drawn is the merge
+                                  block's documented contract, see
+                                  2912-2914) and (b) non-bindable — checked
+                                  at the top of the bind candidate loop
+                                  (the "neighbors render static"
+                                  contract, see 2912-2914)               */
         dst->item[dst->itemCount + i] = it;
     }
     dst->texCount += src->texCount;
@@ -9157,6 +9172,9 @@ static void sh1x_anims_bind(Scene *sc) {
         int ngrp = 0;
         for (int i = 0; i < sc->itemCount; i++) {
             DrawItem *it = &sc->item[i];
+            if (it->nbMerged) continue;   /* v43 (E-03-2): merged neighbor
+                                  items never bind — the merge's documented
+                                  "neighbors render static" contract        */
             if (it->animIdx >= 0) continue;    /* already bound */
             const size_t nl = strlen(it->name);
             if (ol > nl) continue;
