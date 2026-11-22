@@ -15588,6 +15588,9 @@ typedef struct {
     int32_t viewYaw, viewPitch;      /* current view angles (q3_12)        */
     int32_t viewSpdY, viewSpdX;      /* vwRetNewAngSpdToTargetAng speeds   */
     int32_t selfViewTimer;           /* vcSelfViewTimer, Q12 seconds       */
+    int32_t mvSpd;                   /* chara_mv_spd (Q12 m/s) — anchor    */
+    int32_t prevHead[3];             /* last tick's head pos (Q12), for    */
+    int hasPrevHead;                 /*   the per-tick displacement speed  */
     int32_t effRate;                 /* last effect rate (HUD/debug)       */
     int32_t farDist;                 /* active far-watch distance (HUD)    */
     int restricted;                  /* in the THR self-view restricted zone */
@@ -15667,6 +15670,27 @@ static int r2_in_restricted_zone(const v3 *eye) {
 /* one engine tick of the self-view system. body = the track pose this
  * tick (the "Harry" anchor: pos = head, forward = body facing).         */
 static void r2view_tick(R2View *V, const CamPose *body) {
+    /* v43 (E18-5): the anchor's chara_mv_spd (engine vcSetSubjChara passes
+     * the PLAYER's moveSpeed, vc_util.c:144-147; the PoC anchor is the
+     * track pose): the per-tick Q12 displacement magnitude * 30 (one
+     * tick = 1/30 s), tracked EVERY tick so the speed is current when
+     * the view engages.                                                */
+    {
+        int32_t hx = R2_Q12((double)body->pos.x),
+                hy = R2_Q12((double)body->pos.y),
+                hz = R2_Q12((double)body->pos.z);
+        if (V->hasPrevHead) {
+            int64_t dx = hx - V->prevHead[0];
+            int64_t dy = hy - V->prevHead[1];
+            int64_t dz = hz - V->prevHead[2];
+            int32_t dist = (int32_t)llround(sqrt((double)dx * dx +
+                                                 (double)dy * dy +
+                                                 (double)dz * dz));
+            V->mvSpd = R2_MUL(dist, R2_Q12(30.0));
+        }
+        V->prevHead[0] = hx; V->prevHead[1] = hy; V->prevHead[2] = hz;
+        V->hasPrevHead = 1;
+    }
     /* --- button edge + mode selection (vcPreSetDataInVC_WORK +
      * vcRetCurCamMvType): SELF_VIEW when (extraViewCtrl && !held) ||
      * (!extraViewCtrl && held), gated by extraViewMode + the zone       */
@@ -15840,6 +15864,22 @@ static void r2view_tick(R2View *V, const CamPose *body) {
          * the effect-rate-blended watch params)                         */
         int32_t waX = R2_WA_X_D + R2_MUL(R2_WA_X_SV - R2_WA_X_D, V->effRate);
         int32_t waY = R2_WA_Y_D + R2_MUL(R2_WA_Y_SV - R2_WA_Y_D, V->effRate);
+        /* v43 (E18-5): the engine's chara_mv_spd yaw-accel add
+         * (vcGetUseWatchAndCamMvParam, vc_main.c:2550-53), applied AFTER
+         * the blend exactly like the engine:
+         *   add = clamp(Q12_MULT_PRECISE(mv_spd, Q12_ANGLE(360)),
+         *               Q12_ANGLE(0), Q12_ANGLE(720))
+         * Q12_ANGLE(360)=4096 -> the multiply is the identity on the Q12
+         * speed; the clamp bounds it to [0, 8192]. The yaw deceleration
+         * (ang_accel_y*3.0, R2_WDEC_Y) derives from the POST-add value
+         * (vcAdjCamOfsAngByOfsAngSpd reads vcWatchMvPrmSt).               */
+        {
+            int32_t addAngAccelY = R2_MUL(V->mvSpd, fx_q12_angle(360.0f));
+            if (addAngAccelY < 0) addAngAccelY = 0;                       /* Q12_ANGLE(0)   */
+            if (addAngAccelY > fx_q12_angle(720.0f))
+                addAngAccelY = fx_q12_angle(720.0f);
+            waY += addAngAccelY;
+        }
         int32_t wsX = R2_WS_X_D + R2_MUL(R2_WS_X_SV - R2_WS_X_D, V->effRate);
         int32_t wsY = R2_WS_Y_D + R2_MUL(R2_WS_Y_SV - R2_WS_Y_D, V->effRate);
         V->viewSpdY = r2_ang_spd_to_target(V->viewSpdY, V->viewYaw, tgtYaw,
