@@ -9677,26 +9677,59 @@ function sh1xDriverBind(S, items) {
     }
     /* selection: count==1 -> the nearest group; count>1 -> fill slots.
      * POSED groups bind first with their own posedInst index; unposed
-     * groups only fill the remaining slots (clamped to want-1). */
+     * groups only fill the remaining slots (clamped to want-1).
+     * v43 (E-12-2, twin of the C fix): the ripper's B-F4 per-object
+     * numbering — same-object catalog entries number their posed nodes
+     * CONTIGUOUSLY (animInst = i + base, base accumulating each
+     * same-name entry's pose count), each entry's own instance index
+     * 0-based. Track the per-object running base over the anims array
+     * and accept posed groups in [base, base+count); animInst =
+     * posed - base (the entry's own instance index). */
     {
       const want = (a.count > 1) ? a.count : 1;
+      let base = 0;           /* E-12-2: per-object running base */
+      for (let j = 0; j < k; j++)
+        if (S.anims[j].object === a.object)
+          base += S.anims[j].count > 0 ? S.anims[j].count : 1;
       let posedBound = 0;      /* C-1: posed groups pass 1 binds   */
       let posedAvail = 0;
       for (let q = 0; q < grps.length; q++)
-        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) posedAvail++;
+        if (grps[q].n && grps[q].posed >= base &&
+            grps[q].posed < base + a.count) posedAvail++;
       /* pass 1: every valid posed group */
       if (posedAvail > 0) {
         for (let q = 0; q < grps.length && posedAvail > 0; q++) {
           if (grps[q].n === 0 || grps[q].posed < 0) continue;
-          if (grps[q].posed >= a.count) continue;
+          if (grps[q].posed < base || grps[q].posed >= base + a.count)
+            continue;
           for (let j = 0; j < grps[q].n; j++) {
             const it = items[grps[q].items[j]];
             it.animIdx = k;
-            it.animInst = grps[q].posed;
+            it.animInst = grps[q].posed - base;
           }
           grps[q].n = 0;                  /* mark used */
           posedAvail--;
           posedBound++;
+        }
+      } else if (a.count <= 1) {
+        /* E-12-2 malformed-data fallback (pre-B-F4 / hand-edited
+         * multi-entry GLBs number all same-name posed nodes from 0):
+         * for a count<=1 anim bind the NEAREST posed group with
+         * animInst 0, exactly the posed-0 case. posedBound++ keeps
+         * the C-1 fill discipline (fill = want - posedBound). */
+        let bg = -1, bd = 1e30;
+        for (let q = 0; q < grps.length; q++) {
+          if (grps[q].n === 0 || grps[q].posed < 0) continue;
+          if (grps[q].cx < bd) { bd = grps[q].cx; bg = q; }
+        }
+        if (bg >= 0) {
+          for (let j = 0; j < grps[bg].n; j++) {
+            const it = items[grps[bg].items[j]];
+            it.animIdx = k;
+            it.animInst = 0;
+          }
+          grps[bg].n = 0;                /* mark used */
+          posedBound++;   /* the fallback binds a slot */
         }
       }
       /* pass 2: unposed groups fill the remaining slots by distance
