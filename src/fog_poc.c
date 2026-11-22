@@ -11967,6 +11967,13 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
      * rate easing and shLensFlareDraw's sprites (the FRONT OT slots —
      * drawn LAST over everything). */
     const int scale = fb->w / 320 > 0 ? fb->w / 320 : 1;
+    /* V43 E-14-3: the vertical factor is fb->h/224 — the flare-sprite
+     * screen Ys are ENGINE 224-row px (shLensFlareEffect_Draw's
+     * scr_l_pos->vy ± r; the glint's scaleY), NOT 320-column px. The
+     * old FX_TO_PY scaled Y by fb->w/320: ×1.244 too tall at 640x360,
+     * ×0.933 at 640x480; exact only when fb->w/320 == fb->h/224
+     * (320x224, 640x448, 960x672...). X keeps `scale' (fb->w/320).   */
+    const float scaleYQ = (float)fb->h / 224.0f;
     /* ---- shLensFlareDraw (lens_flare.c:176-223) ---------------------- */
     if (!g_flaresys.syncDrawExecF) return;
     g_flaresys.syncDrawExecF = 0;
@@ -12060,7 +12067,7 @@ static void fx_pass(Frame *fb, const Renderer *R, const CamPose *cam) {
 
     /* sprite blits in PoC px (engine px * scale, screen-centered)      */
     #define FX_TO_PX(v) ((int)((v) * scale) + (int)(fb->w / 2))
-    #define FX_TO_PY(v) ((int)((v) * scale) + (int)(fb->h / 2))
+    #define FX_TO_PY(v) ((int)((v) * scaleYQ) + (int)(fb->h / 2))
 
     /* core quad 1 (lens_flare.c:326-336): grey ((rate+3)>>2)*40, half-
      * size ((rate+3)>>2)*30, offset hensin*5; UV 0..63 clut+6          */
