@@ -8029,6 +8029,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       /* fanArray */
       bladeCount: 16, alternate: 0, fanAng: new Array(16).fill(0),
       fanSplit: 7, rotY180From: 7, posPerInstN: 0, posPerInst: [],
+      /* v43 (rot0 fix): the carousel per-instance fields (fog_poc.c v36
+       * parse, restored pre-parse — was missing from the twin entirely) */
+      instBase: 0, rot0PerInstN: 0, rot0PerInst: [],
       /* tvNoise (catalog constants; the engine's own literals). v36: the
        * ALL-TEN-SCREEN state (the engine s_800E06A0 x 10 — fog_poc.c
        * :1253-1267): tvSub/tvDur/tvSlot/tvU/tvV/tvPat/tvPatT/tvDone per
@@ -8231,6 +8234,25 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.rwMask = sh1xJi(e, 'dirMask', 0x1F);
     a.rwBias = sh1xJi(e, 'dirBias', 0x20);
     a.isCabin = sh1xJb(e, 'cabin', false) ? 1 : 0;
+    /* v43 (rot0 fix): instRange[0] = the sineBob GLOBAL horse index base
+     * (UMA1_HID 6..9) + rot0PerInst = the D_800EBAFC yaws — the C parse
+     * (fog_poc.c), verbatim; the twin never carried them */
+    a.instBase = 0;
+    {
+      const ir = Array.isArray(e.instRange) ? e.instRange : null;
+      if (ir && ir.length >= 1) { const n0 = +ir[0]; if (isFinite(n0)) a.instBase = Math.trunc(n0); }
+    }
+    a.rot0PerInstN = 0;
+    {
+      const rpi = Array.isArray(e.rot0PerInst) ? e.rot0PerInst : [];
+      for (let q = 0; q < rpi.length && q < 16; q++) {
+        const rp = rpi[q];
+        if (Array.isArray(rp) && rp.length >= 3) {
+          a.rot0PerInst[q] = [+rp[0], +rp[1], +rp[2]];
+          a.rot0PerInstN++;
+        }
+      }
+    }
     {
       const ppi = Array.isArray(e.posPerInst) ? e.posPerInst : [];
       for (let q = 0; q < ppi.length && q < 16; q++) {
@@ -9038,6 +9060,11 @@ function sh1xDriverPose(S, i, inst) {
     posEng: [a.pos[0], a.pos[1], a.pos[2]],
     mask: 0
   };
+  /* v43 (rot0 fix): the per-instance authored rot0 (the carousel horses'
+   * D_800EBAFC yaws — fog_poc.c sh1x_anim_pose, v36 restored) */
+  if (a.rot0PerInstN > inst && inst >= 0) {
+    out.rotDeg = [a.rot0PerInst[inst][0], a.rot0PerInst[inst][1], a.rot0PerInst[inst][2]];
+  }
   if (a.sharedLeader >= 0 && a.sharedLeader < S.anims.length) {
     /* follower: the leader's live rotation vector, its own pos */
     const lp = sh1xDriverPose(S, a.sharedLeader, 0);
@@ -9086,7 +9113,10 @@ function sh1xDriverPose(S, i, inst) {
     let master = 0;
     for (let m = 0; m < S.anims.length; m++)
       if (S.anims[m].driver === 13) { master = S.anims[m].mvMaster; break; }
-    const ii = inst > 0 ? inst : 0;
+    /* v43 (rot0 fix): the GLOBAL horse index = the per-node inst +
+     * instRange[0] (fog_poc.c: the UMA1_HID family = engine-loop indices
+     * 6..9, the i>=6 phase branch) */
+    const ii = (inst > 0 ? inst : 0) + a.instBase;
     /* C: (i < 6) ? (int)(i * 4096 / 3) : (i * 2048 + 2048) */
     const phase = (ii < 6) ? sh1xDivT(ii * 4096, 3) : (ii * 2048 + 2048);
     const arg = master * 4 + phase;
