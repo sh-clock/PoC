@@ -8142,11 +8142,36 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
                  * that mixes STP classes (the V44 direct-color water tile
                  * is uniformly STP-set — every DR_WAVE CLUT entry has bit
                  * 15 — so this branch never fires for it); kept for the
-                 * rule's sake. */
-                int r = (((tr >> 3) * vr) >> 4) + orr;
-                int g = (((tg >> 3) * vg) >> 4) + og;
-                int b = (((tb >> 3) * vb) >> 4) + ob;
-                fb_put(fb, x, y, r, g, b, quantize, dither);
+                 * rule's sake.
+                 *
+                 * V45 (audit C2-1): the fog/veil composite here is the
+                 * engine's TWO-PRIM form — see the fall-through below
+                 * (the opaque texel write + the veil G4, each separately
+                 * 5-bit-quantized through the dither LUT, then
+                 * sat31(F5+V5)).                                            */
+                if (quantize) {
+                    int f5r = quantize8(((tr >> 3) * vr) >> 4, dither, x, y) >> 3;
+                    int f5g = quantize8(((tg >> 3) * vg) >> 4, dither, x, y) >> 3;
+                    int f5b = quantize8(((tb >> 3) * vb) >> 4, dither, x, y) >> 3;
+                    int v5r = quantize8(orr, dither, x, y) >> 3;
+                    int v5g = quantize8(og, dither, x, y) >> 3;
+                    int v5b = quantize8(ob, dither, x, y) >> 3;
+                    int or5 = f5r + v5r; if (or5 > 31) or5 = 31;
+                    int og5 = f5g + v5g; if (og5 > 31) og5 = 31;
+                    int ob5 = f5b + v5b; if (ob5 > 31) ob5 = 31;
+                    uint8_t *dp = fb->rgb + pi * 3;
+                    dp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+                    dp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+                    dp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+                } else {
+                    /* modern (non-15-bit-framebuffer) mode: unchanged fused
+                     * 8-bit composite — no GPU counterpart to be faithful
+                     * to.                                                     */
+                    int r = (((tr >> 3) * vr) >> 4) + orr;
+                    int g = (((tg >> 3) * vg) >> 4) + og;
+                    int b = (((tb >> 3) * vb) >> 4) + ob;
+                    fb_put(fb, x, y, r, g, b, quantize, dither);
+                }
                 continue;
             }
             if (pass == RP_ADD_TEX) {
@@ -8283,15 +8308,59 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
              * ((tr >> 3) * vr) >> 4 == (T5 * C8) >> 4 bit-for-bit.
              * The old v3 formula ((tr * vr) >> 7) used the expanded
              * 8-bit texel directly — a provable positive bias up to
-             * +2/31 per channel on bright texels. fb_put's dither +
-             * (V+D)>>3 clamp completes the engine chain (the LUT's >>3
-             * is the 8->5 bit step). The wallpaper engine already used
-             * this exact formula (its v4 audit fix) — the two engines
-             * are now bit-identical here again. */
-            int r = (((tr >> 3) * vr) >> 4) + orr;
-            int g = (((tg >> 3) * vg) >> 4) + og;
-            int b = (((tb >> 3) * vb) >> 4) + ob;
-            fb_put(fb, x, y, r, g, b, quantize, dither);
+             * +2/31 per channel on bright texels. The wallpaper engine
+             * already used this exact formula (its v4 audit fix) — the
+             * two engines are bit-identical here again.
+             *
+             * V45 (audit C2-1): the fog/veil COMPOSITE is the engine's
+             * TWO-PRIM form, not a fused truncation. Gfx_MeshDraw emits
+             * per fogged quad (fog branch, fogColor != 0) a PAIR of
+             * prims — the textured GT4 (poly3) + the fog G4 (poly1)
+             * (bodyprog_80056D8C.c:871-874: setSemiTrans(poly3,1);
+             * addPrim(poly3); addPrim(poly1); the STP branch mirrors it
+             * with the G4 semi-trans at :1159-1174) — and EACH prim is
+             * separately quantized to 5-bit through the dither LUT in
+             * swanstation ShadePixel:
+             *   F5 = s_dither_lut[dy][dx][(T5*C8)>>4]   (textured, :136-138)
+             *   V5 = s_dither_lut[dy][dx][color_r]      (the G4's u8
+             *        veil color, the same LUT, :148-150)
+             * then composited with the ABR-1 per-channel saturating add
+             * (BackgroundPlusForeground, blargg carry = sat31(B'+F5),
+             * :170-178; B' = the veil G4's own write below/above the
+             * textured quad — same sum either order): the veiled texel
+             * = min(31, F5 + V5). The old fused form ran ONE >>3 over
+             * (F8 + V8 + D) — a systematic +1/31 brightening whenever
+             * (F8&7)+(V8&7) >= 8 (28/64 = 43.75% of the residue pairs;
+             * e.g. F8=100, V8=100: fused 25 vs engine 24; never
+             * darker), and with --dither it counted the dither offset
+             * ONCE where the engine applies it to EACH prim's LUT
+             * (twice). quantize8(+DITHER4)+>>3 per prim IS that LUT
+             * chain (the same chain the opaque path runs through
+             * fb_put); the two-step pattern follows PR #107's
+             * RP_ADD_TEX fix.                                        */
+            if (quantize) {
+                int f5r = quantize8(((tr >> 3) * vr) >> 4, dither, x, y) >> 3;
+                int f5g = quantize8(((tg >> 3) * vg) >> 4, dither, x, y) >> 3;
+                int f5b = quantize8(((tb >> 3) * vb) >> 4, dither, x, y) >> 3;
+                int v5r = quantize8(orr, dither, x, y) >> 3;
+                int v5g = quantize8(og, dither, x, y) >> 3;
+                int v5b = quantize8(ob, dither, x, y) >> 3;
+                int or5 = f5r + v5r; if (or5 > 31) or5 = 31;
+                int og5 = f5g + v5g; if (og5 > 31) og5 = 31;
+                int ob5 = f5b + v5b; if (ob5 > 31) ob5 = 31;
+                uint8_t *dp = fb->rgb + pi * 3;
+                dp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+                dp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+                dp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+            } else {
+                /* modern (non-15-bit-framebuffer) mode: unchanged fused
+                 * 8-bit composite — no GPU counterpart to be faithful
+                 * to.                                                     */
+                int r = (((tr >> 3) * vr) >> 4) + orr;
+                int g = (((tg >> 3) * vg) >> 4) + og;
+                int b = (((tb >> 3) * vb) >> 4) + ob;
+                fb_put(fb, x, y, r, g, b, quantize, dither);
+            }
         }
     }
 }
