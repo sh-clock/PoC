@@ -9659,12 +9659,28 @@ static int   g_animBoundFor = -1;   /* v38-audit-A1: was a fn-local static */
  * animsFresh snapshot predates the first bind, so a reset WITHOUT this
  * invalidation would leave driver 9 reading zero live state (the beans
  * teleport to the room origin after R). The bind is deterministic — a
- * re-run re-derives the same item bindings and re-seeds driver 9. */
+ * re-run re-derives the same item bindings and re-seeds driver 9.
+ * v43 (E-12-1): that determinism holds ONLY against the AUTHORED item
+ * matrices. The bind's inputs read the LIVE it->model (world centroid,
+ * same-translation grouping, driver-9 liveVy/liveVz seeding), and
+ * sh1x_anim_apply leaves items ANIMATED at frame end — so a rebind fired
+ * after any applied frame (R restart, multi-shot) consumed the LAST
+ * FRAME'S poses. The restore-to-base below (before sh1x_anims_bind)
+ * re-aligns the rebind with a fresh run: restart == fresh again. */
 static void sh1x_anims_bind_invalidate(void) { g_animBoundFor = -1; }
 static void sh1x_anims_draw_apply(Scene *sc) {
     if (!sc || !sc->sh1x.nAnims) return;
     if (g_animBoundFor != (int)(size_t)(void *)sc ||
         g_animBaseN != sc->itemCount) {
+        /* v43 (E-12-1): restore the authored base BEFORE the rebind —
+         * the bind must read the same (authored) matrices a fresh run
+         * does, not the last applied frame's poses. Guard: the snapshot
+         * must already be sized for this scene (first-ever bind: items
+         * are still authored; item-count change: re-snapshotted below). */
+        if (g_animBase && g_animBaseN == sc->itemCount) {
+            for (int i = 0; i < sc->itemCount; i++)
+                sc->item[i].model = g_animBase[i];
+        }
         g_animBoundFor = (int)(size_t)(void *)sc;
         sh1x_anims_bind(sc);
     }
