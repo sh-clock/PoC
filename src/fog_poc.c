@@ -2673,7 +2673,28 @@ static int glb_accessor(Glb *g, int accIdx, AccView *out) {
     if (!out->comps || !compSize) return 0;
     out->byteStride = stride ? stride : out->comps * compSize;
     out->ptr += accOff;
-    if (bvOff + accOff + (size_t)out->count * (size_t)out->byteStride > g->binLen) return 0;
+    /* V45 audit (B-2): the glTF 2.0 spec bound (§5.24.2 + the official
+     * validator rule) — an accessor fits iff
+     *   byteOffset + (count - 1) * byteStride + components*componentSize
+     * fits the bufferView/buffer ("the offset of the element at index i is
+     * byteOffset + i * byteStride" — only the LAST element's DATA, not a
+     * full final stride, must fit). The old count*byteStride form was
+     * over-strict by (stride - elementSize) bytes for every INTERLEAVED
+     * accessor (byteStride > elementSize): a conformant
+     * VEC3-float/count-105/byteStride-16 accessor whose last element ends
+     * exactly at the buffer end (1676 = 104*16+12 bytes) was rejected ->
+     * the primitive was silently skipped -> the mesh dropped. Tightly
+     * packed accessors (byteStride 0 -> elementSize) are UNCHANGED:
+     * (count-1)*elem + elem == count*elem, so every shipped GLB
+     * (all byteStride 0, re-verified) parses identically. count==0 spans
+     * zero bytes. The V42 D-5 negative guards above are untouched.       */
+    {
+        size_t accSpan = out->count > 0
+            ? (size_t)(out->count - 1) * (size_t)out->byteStride +
+              (size_t)out->comps * (size_t)compSize
+            : 0;
+        if (bvOff + accOff + accSpan > g->binLen) return 0;
+    }
     return 1;
 }
 static double acc_get(const AccView *a, int i, int comp) {
