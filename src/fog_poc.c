@@ -9954,15 +9954,20 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
         case 3: {  /* translate/MOVACHES — map5_s03_2.c:712 placement
                     * (104.2225, -0.1683, 60.0667) static at engine-fresh
                     * (the shelf WorldObjects_Add carries the PLACEMENT
-                    * pose; only the cutscene cases move it — D_800D6F8C
-                    * = 0x3C720 target). v27.2 (B-4): cur[2] starts at the
-                    * authored pos (was 0 — a ~60m teleport on tick 1),
-                    * the crawl is cutscene/demo-only, clamp 0x3C720
-                    * raw = 60.3203m (the v27 60.35/60.44 were the decomp
-                    * TODO comment's wrong guesses). */
+                    * pose; only the cutscene cases move it). v27.2 (B-4):
+                    * cur[2] starts at the authored pos (was 0 — a ~60m
+                    * teleport on tick 1); the crawl is cutscene/demo-only
+                    * and CLAMPS at Q12(60.44f) = 247,562 raw
+                    * (map5_s03_2.c:676-681; step-5 trigger vz >
+                    * Q12(60.35f) = 247,193, :667). The old clamp 0x3C720
+                    * = 247,584 = 60.4453125 m is the flag-389 RESTING
+                    * pose Q12(60.4454f) (map5_s03_2.c:728) — 22 raw
+                    * counts (5.4 mm) PAST the crawl clamp; 60.35/60.44
+                    * are executable literals in the if-chain, not the
+                    * "wrong guesses" the v27 comment claimed. */
             if (g_animsDemo) {
                 float z = a->cur[2] + (float)dt * 0.14f;
-                float clampM = (float)0x3C720 / 4096.0f;
+                float clampM = (float)247562 / 4096.0f;  /* Q12(60.44f), map5_s03_2.c:676-681 */
                 if (z > clampM) z = clampM;
                 a->cur[2] = z;
             }
