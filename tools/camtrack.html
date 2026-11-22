@@ -1083,8 +1083,10 @@ const SHCore = (function () {
      All quads of the cluster share the SAME 4 colors; corner j <- colors[j].
      Port of fog_poc.c sh_billboard_colors (v17).                       */
   const SH_BB_NORMALS = [
-    [0, 2909, 2909], [-2909, 0, 2909], [2909, 0, 2909], [0, -2909, 2909]
-  ];   /* D_800AE500 = SVECTOR(Q12_ANGLE(255.65deg)) = (deg/360*4096)     */
+    [0, 2908, 2908], [-2908, 0, 2908], [2908, 0, 2908], [0, -2908, 2908]
+  ];   /* D_800AE500 = SVECTOR(Q12_ANGLE(255.65deg)) = (s32)((deg/360.0f)*4096)
+          — TO_FIXED truncation: float32(255.65)/360*4096 = 2908.7287 -> 2908
+          (v45 audit C1-2, the PR #83 Q12_ANGLE(70.0f)=796 precedent)        */
 
   /* GTE NCS — command 0x1E, sf=1 (shift 12), lm=1 (DuckStation gte.cpp
      NCS: MulMatVec x2 + PushRGBFromMAC/TruncateRGB)                      */
