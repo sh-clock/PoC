@@ -2727,3 +2727,17 @@ NEXT SESSION QUEUE (S25/V48, in order):
 5. The flashlight (user-programmable light, full camera-like movement).
 6. APU00FF/APUFFFE animation failures + the all-animations PoC suite.
 The commandments stay embedded at the head of this file.
+
+### 6. THE V46 BUMP-RACE REPAIR (found while verifying the mains)
+- The V46-final run (486a7cf, the worklog commit) was RED: the bump job
+  died at `fatal: tag 'v33.44' already exists` — the V46 merge burst raced
+  its bump runs and burned tag v33.44 at the ORPHAN f1c240b (NOT on main)
+  — the exact failure class S23 repaired on the wallpaper repo.
+- Repair executed: the orphaned tag deleted from the remote; the first
+  rerun of the 0cc1bfb run still failed (the runner's LOCAL clone had
+  fetched the tag before the deletion — the local `git tag` refused);
+  a fresh rerun (attempt 2) then completed GREEN: bump 33.43 -> 33.44
+  (main @ 9e168b5, version.txt 33.44), tag v33.44 ON main, the release
+  v33.44 built with all three assets (source + linux + win zips).
+- PoC main is GREEN at the V47 state. The version self-heal confirmed
+  (no manual version surgery needed — the S23 lesson applied).
