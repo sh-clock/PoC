@@ -9279,7 +9279,8 @@ typedef struct {
  * raster of the degenerate quad walks the major axis one pixel per step,
  * interpolating v (sprite rows 0..15) along it (u centers on the middle
  * texel column of the 3-wide sprite, matching the hardware's pixel-center
- * UV of a 1-px-wide quad).                                                      */
+ * UV of a 1-px-wide quad). The 1-ENGINE-px width (x0+1 edge) paints a
+ * scale-px-wide horizontal brush per step (v43 E-11-4).                        */
 static void rain_blit_streak(Frame *fb, const RainFlakeDraw *rd) {
     int scale = fb->w / 320;
     if (scale < 1) scale = 1;
@@ -9293,30 +9294,40 @@ static void rain_blit_streak(Frame *fb, const RainFlakeDraw *rd) {
         int v = (s * 16) / (len + 1);
         if (v < 0) v = 0;
         if (v > 15) v = 15;
-        if (px < 0 || px >= fb->w || py < 0 || py >= fb->h) continue;
+        if (py < 0 || py >= fb->h) continue;
         int idx = kRainStreak[v][1];   /* middle column of the 3-wide sprite */
         if (rd->clutRow < 104 || rd->clutRow > 111) continue;
         uint16_t entry = kRainClut[rd->clutRow - 104][idx];
         if (entry == 0x0000) continue;
         int t5r = entry & 31, t5g = (entry >> 5) & 31, t5b = (entry >> 10) & 31;
         int stp = (entry >> 15) & 1;
-        size_t pi = (size_t)py * fb->w + px;
-        if (rd->depth >= fb->z[pi]) continue;    /* occluded by opaque */
-        uint8_t *bp = fb->rgb + pi * 3;
         int fr = (t5r * rd->primR) >> 7; if (fr > 31) fr = 31;
         int fg = (t5g * rd->primG) >> 7; if (fg > 31) fg = 31;
         int fbb = (t5b * rd->primB) >> 7; if (fbb > 31) fbb = 31;
-        if (stp) {
-            int or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
-            int og5 = (bp[1] >> 3) + fg; if (og5 > 31) og5 = 31;
-            int ob5 = (bp[2] >> 3) + fbb; if (ob5 > 31) ob5 = 31;
-            bp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
-            bp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
-            bp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
-        } else {
-            bp[0] = (uint8_t)((fr << 3) | (fr >> 2));
-            bp[1] = (uint8_t)((fg << 3) | (fg >> 2));
-            bp[2] = (uint8_t)((fbb << 3) | (fbb >> 2));
+        /* v43 E-11-4: the engine quad is 1 ENGINE px wide (the x0+1 edge —
+         * particle.c:2857-2861 streak / 3102-3106 drip) -> a scale-wide
+         * horizontal brush in PoC px (the fb-scaled x0..x0+1 column).
+         * The 3 kRainStreak sprite columns are identical ({v,v,v}) so the
+         * whole brush samples the same middle texel column — the texel
+         * choice is output-neutral (rain_tim_data.h).                    */
+        for (int o = 0; o < scale; o++) {
+            int qx = px + o;
+            if (qx < 0 || qx >= fb->w) continue;
+            size_t pi = (size_t)py * fb->w + qx;
+            if (rd->depth >= fb->z[pi]) continue;    /* occluded by opaque */
+            uint8_t *bp = fb->rgb + pi * 3;
+            if (stp) {
+                int or5 = (bp[0] >> 3) + fr; if (or5 > 31) or5 = 31;
+                int og5 = (bp[1] >> 3) + fg; if (og5 > 31) og5 = 31;
+                int ob5 = (bp[2] >> 3) + fbb; if (ob5 > 31) ob5 = 31;
+                bp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+                bp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+                bp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+            } else {
+                bp[0] = (uint8_t)((fr << 3) | (fr >> 2));
+                bp[1] = (uint8_t)((fg << 3) | (fg >> 2));
+                bp[2] = (uint8_t)((fbb << 3) | (fbb >> 2));
+            }
         }
     }
 }
