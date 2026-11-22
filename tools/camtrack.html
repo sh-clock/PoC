@@ -8199,6 +8199,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       /* fanArray */
       bladeCount: 16, alternate: 0, fanAng: new Array(16).fill(0),
       fanSplit: 7, rotY180From: 7, posPerInstN: 0, posPerInst: [],
+      /* V44 (C-2): the carousel per-instance yaw step (rotStepDeg) + the
+       * engine loop-index base (instRange[0]) — fog_poc.c parse verbatim */
+      rotStepDeg: 0, instBase: 0,
       /* v43 (rot0 fix): the carousel per-instance fields (fog_poc.c v36
        * parse, restored pre-parse — was missing from the twin entirely) */
       instBase: 0, rot0PerInstN: 0, rot0PerInst: [],
@@ -8439,9 +8442,17 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.rwMask = sh1xJi(e, 'dirMask', 0x1F);
     a.rwBias = sh1xJi(e, 'dirBias', 0x20);
     a.isCabin = sh1xJb(e, 'cabin', false) ? 1 : 0;
-    /* v43 (rot0 fix): instRange[0] = the sineBob GLOBAL horse index base
-     * (UMA1_HID 6..9) + rot0PerInst = the D_800EBAFC yaws — the C parse
-     * (fog_poc.c), verbatim; the twin never carried them */
+    /* V44 (C-2): rotStepDeg — the per-instance yaw step (SAK_POL_ 45 deg
+     * x7 fence sectors / MGR_DRL_ + DRL2_ILI 90 deg x4 dolls; the ripper
+     * writes NO node rotation for posed emissions, so it is the ONLY
+     * per-instance carrier) + instRange[0] = the engine loop-index base
+     * (the posed nodes carry the LOCAL animInst 0..N-1; engine
+     * i = animInst + instBase — fog_poc.c, the case-12 precedent). */
+    a.rotStepDeg = sh1xJn(e, 'rotStepDeg', 0);
+    /* v43 (rot0 fix) + V44 (C-2) shared: instRange[0] = the engine loop-index
+     * base (the sineBob UMA1_HID global horse index 6..9 AND the carousel
+     * fence's sector base 1) — one parse, two consumers; rot0PerInst = the
+     * D_800EBAFC per-horse yaws (fog_poc.c verbatim) */
     a.instBase = 0;
     {
       const ir = Array.isArray(e.instRange) ? e.instRange : null;
@@ -9346,8 +9357,13 @@ function sh1xDriverPose(S, i, inst) {
     out.mask = 2;
     break;
   }
-  case 13:  /* carouselSpin: rot.vy = master + the per-object rot0 offset */
-    out.rotDeg[1] = a.rot0[1] + a.mvMaster * R2D;
+  case 13:  /* carouselSpin: rot.vy = master + the per-object rot0 offset
+               + the per-instance rotStepDeg fan (V44 C-2: map6_s04_2.c
+               :3664-3693 fence master+90+i*45 i=1..7, :3696-3716 dolls
+               master+i*90 i=0..3 — engine i = animInst + instBase) */
+    out.rotDeg[1] = a.rot0[1] +
+                    a.rotStepDeg * ((inst > 0 ? inst : 0) + a.instBase) +
+                    a.mvMaster * R2D;
     break;
   case 14: { /* ferrisWheel — map6_s04_2.c:3814-3845 */
     let ii = inst > 0 ? inst : 0;
