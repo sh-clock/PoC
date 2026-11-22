@@ -10377,6 +10377,7 @@ function sh1xDriverReset(rec) {
                               { animsDemo: true, tvPaint: rec.sh1xTvPaint || null });
   sh1xDriverBind(rec.sh1xSt, rec.sh1xItems);
   rec.sh1xSt.steps = 0;
+  sh1xDriverTick(rec.sh1xSt, 0);   /* v44 F-1: the C's boot-frame prime (fog_poc.c:14869-14881) — dt=0 gate eval + the prime's RNG draws; NO water pair (v38-audit-A2) */
 }
 
 /* T7 (v13.5)/v41 (CT-IMPL fix 4): the USER LIGHT gizmo — the authored pose
