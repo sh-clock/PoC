@@ -9869,9 +9869,9 @@ static void sh1x_waterfall_tick(Sh1x *sx, const CamPose *cam,
                 a->wfAlong[q] += temp_s4;              /* water.c:180  */
             } else {
                 /* water.c:328-340 — the vertical fall (map1_s03's drain
-                 * cutscene; 1336 = the engine's per-tick g_GravitySpeed
+                 * cutscene; 1337 = the engine's per-tick g_GravitySpeed
                  * raw — the prior session's documented value)          */
-                a->wfVyAcc[q] += (1336 * a->wfVy[q]) >> 7;
+                a->wfVyAcc[q] += (1337 * a->wfVy[q]) >> 7;
                 if (a->wfVyAcc[q] > 24576) a->wfVyAcc[q] = 24576;
                 int temp_s4 = (int)(((int64_t)dtRaw *
                         a->wfVyAcc[q]) >> 12);
@@ -10052,7 +10052,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
         case 9: {  /* gravityScatter — map7_s02_2.c:1167-1188 VERBATIM:
                     * one discrete step per 30Hz frame; the fall velocity
                     * D_800E9ED0 += g_GravitySpeed (= Q12_MULT(vCount,
-                    * 10419) = 1336 raw at the 30Hz tick, vCount 526 —
+                    * 10419) = 1337 raw at the 30Hz tick, vCount 526 —
                     * game_main.c:295; v27.2 (B-5): was 10419 = 7.8x),
                     * clamped Q12(5.0)=20480; PER-INSTANCE scatter
                     * (map7_s02_2.c:1179-1180): vy += Q12_MULT_PRECISE(dt,
@@ -10320,7 +10320,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
                     * falls after EventFlag_320): first armed frame does
                     * D_800E05AE += Q12(1.0); then timer += dt;
                     * var = ratan2(Q12_ANGLE(360), FP_FROM(g_GravitySpeed*
-                    * Math_Cos(rot.vx), 12)) with g_GravitySpeed = 1336
+                    * Math_Cos(rot.vx), 12)) with g_GravitySpeed = 1337
                     * raw (game_main.c Q12_MULT(526,10419)); damping
                     * var_a0 = MAX(0, Q12(1) - timer*2); torque =
                     * MULT_PRECISE(var_a0, torque + var); rot.vx +=
@@ -10337,7 +10337,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
             {
                 int rotVx = (int)(a->cur[0] * (4096.0f / 360.0f));
                 int cosV = sh_math_cos(rotVx);
-                int gx = (int)(((int64_t)1336 * cosV) >> 12);
+                int gx = (int)(((int64_t)1337 * cosV) >> 12);
                 int var = fx_q12_angle(atan2f(4096.0f, (float)gx)
                                       * (180.0f / (float)M_PI));
                 int varA0 = 4096 - (int)(a->mvTimer * 2.0f * 4096.0f);
@@ -10348,7 +10348,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
                 if (rotVx > 1024) rotVx = 1024;          /* Q12_ANGLE(90) */
                 a->cur[0] = (float)rotVx * (360.0f / 4096.0f);
             }
-            a->fallVel += 1336 + (1336 >> 4);            /* MIN(Q12(15),..) */
+            a->fallVel += 1337 + (1337 >> 4);            /* MIN(Q12(15),..) */
             if (a->fallVel > 61440) a->fallVel = 61440;
             a->cur[1] += (float)(((int64_t)dtRaw * a->fallVel) >> 12)
                          / 4096.0f;
@@ -10414,7 +10414,7 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
                 break;
             }
             case 4: {
-                a->stoneVel += 1336;
+                a->stoneVel += 1337;
                 int rz = (int)(a->cur[0] * (4096.0f / 360.0f));
                 rz += (int)(((int64_t)dtRaw * -1365) >> 12);
                 /* dt*Q12_ANGLE(-120) = -1365 raw */

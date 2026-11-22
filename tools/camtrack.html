@@ -8911,7 +8911,7 @@ function sh1xDriverTick(S, dt) {
       {
         let rotVx = Math.trunc(a.cur[0] * (4096 / 360));  /* C (int) cast */
         const cosV = sh1xCosQ12(rotVx);
-        const gx = sh1xMulSh(1336, cosV, 12);
+        const gx = sh1xMulSh(1337, cosV, 12);
         /* fx_q12_angle(atan2f(4096, gx)*180/PI) — the one float-libm site
          * (f32 vs f64: a ±1-count wobble at the trunc boundary is possible) */
         const degVar = Math.atan2(4096, gx) * (180 / Math.PI);
@@ -8923,7 +8923,7 @@ function sh1xDriverTick(S, dt) {
         if (rotVx > 1024) rotVx = 1024;           /* Q12_ANGLE(90) */
         a.cur[0] = rotVx * (360 / 4096);
       }
-      a.fallVel += 1336 + (1336 >> 4);            /* MIN(Q12(15),..) */
+      a.fallVel += 1337 + (1337 >> 4);            /* MIN(Q12(15),..) */
       if (a.fallVel > 61440) a.fallVel = 61440;
       a.cur[1] += sh1xMulSh(dtRaw, a.fallVel, 12) / 4096;
       break;
@@ -8972,7 +8972,7 @@ function sh1xDriverTick(S, dt) {
           break;
         }
         case 4: {
-          a.stoneVel += 1336;
+          a.stoneVel += 1337;
           let rz = Math.trunc(a.cur[0] * (4096 / 360));
           rz += sh1xMulSh(dtRaw, -1365, 12);      /* dt*Q12_ANGLE(-120) */
           rz &= 0xFFF;
@@ -9741,8 +9741,8 @@ function sh1xWaterfallTick(S, cam, sessionT) {
         a.wfAlong[q] += temp_s4;                /* water.c:180 */
       } else {
         /* water.c:328-340 — the vertical fall (map1_s03's drain cutscene;
-         * 1336 = the engine's g_GravitySpeed raw) */
-        a.wfVyAcc[q] += sh1xMulSh(1336, a.wfVy[q], 7);
+         * 1337 = the engine's g_GravitySpeed raw) */
+        a.wfVyAcc[q] += sh1xMulSh(1337, a.wfVy[q], 7);
         if (a.wfVyAcc[q] > 24576) a.wfVyAcc[q] = 24576;   /* MIN(Q12(6)) */
         const temp_s4 = sh1xMulSh(dtRaw, a.wfVyAcc[q], 12);
         if (a.wfAlong[q] + temp_s4 >=
