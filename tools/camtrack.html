@@ -4294,7 +4294,12 @@ window.SHUI = (function () {
       <span>Flashlight</span><span class="sub" id="flash-sub">independent</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-psx" checked>
       <span>PSX wobble</span><span class="sub">GTE snap + 15-bit</span></label>
-    <label class="tgl-row"><input type="checkbox" id="tgl-dither">
+    <!-- v45 audit (F-7): checked — the engine default is DITHER ON (SHView V.dither = true,
+         the PSX hardware DTE behavior, DuckStation gpu.cpp:2988-2994 — every default-ON
+         sibling toggle carries checked; this one booted unchecked and desynced the panel
+         from the engine until a dither-bearing env applied). syncFxUI re-asserts it after
+         applyUrlParams (?dither=0 / ?no-dither boots). -->
+    <label class="tgl-row"><input type="checkbox" id="tgl-dither" checked>
       <span>Ordered dither</span><span class="sub">PSX dither matrix</span></label>
     <label class="tgl-row"><input type="checkbox" id="tgl-snow" checked>
       <span>Snow / rain</span><span class="sub">engine particles</span></label>
@@ -4770,6 +4775,16 @@ window.SHUI = (function () {
     host.classList.toggle('fxoff', U.effectsOff);
     const row = host.querySelector('#fxoff-row');
     if (row) row.classList.toggle('on', U.effectsOff);
+    /* v45 audit (F-7): the dither checkbox follows the ENGINE state. The
+     * static checked attribute fixes the boot default (V.dither = true,
+     * the PSX hardware DTE); this sync — init runs it AFTER
+     * applyUrlParams — keeps the toggle truthful through ?dither=0 /
+     * ?no-dither boots too. The old panel synced it only when a
+     * dither-bearing env applied (applyModelEnv / the fx-off registration
+     * path), so fresh sessions and legacy GLBs showed the default-ON
+     * engine with an UNCHECKED toggle, the CLI mirror line emitted
+     * --dither against it, and turning dither off took two clicks. */
+    if (SV) host.querySelector('#tgl-dither').checked = SV.V.dither;
   }
 
   /* ------------------------------------------------------------------ */
