@@ -5474,10 +5474,33 @@ static void sh_billboard_colors(const ShEnv *env, const int anchorQ8[3],
     }
 
     /* fogAlpha = Q12(1) - Q8_TO_Q12(min(func_80055A50(Q12 view depth),1))
-     * = 4096 - ramp(anchorQ8)<<4  (billboard_draw.c:131-138) */
+     * = 4096 - ramp(anchorQ8)<<4  (billboard_draw.c:131-138).
+     * V44 (D-3) — FAMILY HEAD NOTE, the GTE-SZ float->Q8 sites: every one
+     * of them TRUNCATES now (floorf, NO +0.5). The engine's SZ is
+     * floor((T<<12 + Sum R*V) >> 12) off the s16-quantized view matrix
+     * (RTPS PushSZ, swanstation gte.cpp:649-659) and every downstream step
+     * is an arithmetic shift: gte_stszotz sra 2 (inline_o.h:883-889), the
+     * mesh bucket (SZ>>otShift)>>2 (bodyprog_80056D8C.c:855), the fog
+     * ramp index (fogRamp[(sz<<7)>>shift], bodyprog_80056D8C.c:564-578),
+     * the AABB check RotTransPers(...)-1 (vw_calc.c:447-481), the bill-
+     * board OTZ<<2 (billboard.c:263-266). Sites in this file: t2q8 here,
+     * the billboard per-quad veil zq8 + the mesh per-vertex fog zq8 (the
+     * per-vertex pass), the TV paint bucket, the subcell AABB szQ8, the
+     * mesh per-vertex q8 + MASK cq8 OT buckets, the snow/rain particle
+     * otz (D-2). The integer-grid RECONSTRUCTION sites (camera curPosX/Z,
+     * billboard anchorQ8, R2/rot constants) KEEP round-to-nearest — they
+     * rebuild exact engine integers from near-grid floats; round is the
+     * right estimator there. RESIDUAL, documented: dropping the +0.5 does
+     * NOT make these sites bit-exact — the port's FLOAT view matrix
+     * carries ~±0.6 Q8 counts of noise at 20 m (0.5/4096 per matrix entry
+     * x depth) vs the engine's s16 Q12 rotation + Q8 translation matrix,
+     * the same order as the round-vs-floor difference itself. Full
+     * bit-exactness needs the integer MAC chain (the pattern already used
+     * by sh_mesh_light_vertex / sh_billboard_colors) — a possible
+     * follow-up, out of this change's scope.                            */
     int fogAlpha = 4096;
     if (fogOn) {
-        int t2q8 = (int)floorf(anchorDepth * 256.0f + 0.5f);
+        int t2q8 = (int)floorf(anchorDepth * 256.0f);
         int ramp = engine_fog_vertex(&env->fog, t2q8);
         if (ramp > 4096) ramp = 4096;
         fogAlpha = 4096 - (ramp << 4);
@@ -8338,7 +8361,7 @@ static void transform_item2(const Renderer *R, const DrawItem *it,
                 float qz = M->m[2]*bq[0] + M->m[6]*bq[1] + M->m[10]*bq[2] + M->m[14];
                 float qd = -(view->m[2]*qx + view->m[6]*qy + view->m[10]*qz
                              + view->m[14]);
-                int zq8 = (int)floorf(qd * 256.0f + 0.5f);
+                int zq8 = (int)floorf(qd * 256.0f);   /* V44 D-3: SZ truncates */
                 int ramp = engine_fog_vertex(R->fog, zq8);
                 int fq12 = ramp * 16 + R->fog->fogIntensity;
                 if (fq12 > 4096) fq12 = 4096;
@@ -8404,8 +8427,10 @@ static void transform_item2(const Renderer *R, const DrawItem *it,
             } else {
             int ramp = 0, fq12 = 0, Tq12 = 4096;
             if (fogOn) {
-                /* GTE SZ is Q8 (256/m) view depth — engine value for fogRamp */
-                int zq8 = (int)floorf(o->z * 256.0f + 0.5f);
+                /* GTE SZ is Q8 (256/m) view depth — engine value for fogRamp
+                 * (V44 D-3: truncates — the engine indexes fogRamp with the
+                 * raw shifted SZ integer, bodyprog_80056D8C.c:564-578)      */
+                int zq8 = (int)floorf(o->z * 256.0f);
                 ramp = engine_fog_vertex(R->fog, zq8);            /* 0..255 */
                 fq12 = ramp * 16 + R->fog->fogIntensity;           /* Q12    */
                 if (fq12 > 4096) fq12 = 4096;
@@ -12855,10 +12880,12 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                         }
                         q->tex = tex;
                         q->bright = var_s2;
-                        /* the sub-quad OTZ: MAX corner SZ (Q8) >> 3 */
+                        /* the sub-quad OTZ: MAX corner SZ (Q8) >> 3.
+                         * V44 (D-3): the corner SZ is RotTransPers()<<2
+                         * (map4_s03.c:1292) — truncates, no +0.5            */
                         float zm = fmaxf(fmaxf(q->v[0].z, q->v[1].z),
                                          fmaxf(q->v[2].z, q->v[3].z));
-                        int bucket = (int)floorf(zm * 256.0f + 0.5f) >> 3;
+                        int bucket = (int)floorf(zm * 256.0f) >> 3;
                         if (!(bucket > 0 && bucket < 2047)) continue;
                         PostEnt pe;
                         memset(&pe, 0, sizeof(pe));
@@ -12881,7 +12908,7 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                 q->bright = var_s2;
                 float zm = fmaxf(fmaxf(rv[0].z, rv[1].z),
                                  fmaxf(rv[2].z, rv[3].z));
-                int bucket = (int)floorf(zm * 256.0f + 0.5f) >> 3;
+                int bucket = (int)floorf(zm * 256.0f) >> 3;  /* V44 D-3: SZ truncates */
                 if (!(bucket > 0 && bucket < 2047)) {
                     (*nTvq)--;               /* the engine drops this quad */
                     continue;
@@ -12918,6 +12945,24 @@ static void sh_tvpaint_draw_quad(Frame *fb, const Renderer *R,
     raster_tri(fb, &q->v[2], &q->v[1], &q->v[3], q->tex, 256, 256,
                RP_OPAQUE, &R->opts, R->opts.ps1, R->dither,
                R->enginePixScale, R->enginePixScaleY);
+}
+
+/* ---- V44 (D-2 companion): the particle Q8 input lattice ----------------
+ * The engine never projects a raw Q12 weather-particle position: every
+ * gte_ldv0/rtps input is particlePosQ8 = Q12_TO_Q8(pos) (particle.c:2562-
+ * 2571 snow, :2773-2782 rain streak tail/head, :2907-2921 splash corners;
+ * fixed_point.h:399-400 = pos>>4, arithmetic shift), and gte_ldv3/rtpt of
+ * the splash corners likewise feeds Q12_TO_Q8(position0 -/+ c). This snap
+ * (Q12 -> Q8 -> back to Q12) puts the port's float world position on that
+ * exact lattice before projection — it moves BOTH the screen xy (stsxy of
+ * the same rtps) and the depth chain. RESIDUAL, documented: the RTPS-
+ * internal ((T<<12) + Sum R*V) >> 12 truncation (swanstation gte.cpp:659)
+ * is NOT modeled — it is sub-count here (< 1 Q8 unit of depth); and the
+ * port's float view matrix carries ~±0.6 Q8 counts of noise at 20 m vs
+ * the engine's s16-quantized matrix (see the D-3 family note at
+ * sh_billboard_colors). Bit-exactness would need the integer MAC chain. */
+static inline float sh_particle_pos_q8_snap(float pos_q12) {
+    return floorf(pos_q12 / 16.0f) * 16.0f;  /* Q12_TO_Q8, then back to Q12 */
 }
 
 static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
@@ -13088,10 +13133,13 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             /* world pos: engine x/z are camera-relative to the box origin;
              * y is engine-absolute (y-down, 0 = room floor datum) -> glTF
              * y-up: glTF_y = datumM - engine_y (datum = the walkway the
-             * camera track runs on — engine y=0, see AUDIT.md)            */
-            float wx = (float)(S->boxX + p->pos[0]) * (1.0f / 4096.0f);
-            float wy = S->datumM - (float)(p->pos[1]) * (1.0f / 4096.0f);
-            float wz = (float)(S->boxZ + p->pos[2]) * (1.0f / 4096.0f);
+             * camera track runs on — engine y=0, see AUDIT.md).
+             * V44 (D-2 companion): snapped to the Q8 lattice FIRST — the
+             * engine projects particlePosQ8 = Q12_TO_Q8(pos) (>>4), never
+             * the raw Q12 (see sh_particle_pos_q8_snap)                    */
+            float wx = sh_particle_pos_q8_snap((float)(S->boxX + p->pos[0])) * (1.0f / 4096.0f);
+            float wy = S->datumM - sh_particle_pos_q8_snap((float)(p->pos[1])) * (1.0f / 4096.0f);
+            float wz = sh_particle_pos_q8_snap((float)(S->boxZ + p->pos[2])) * (1.0f / 4096.0f);
             float cx = viewProj.m[0]*wx + viewProj.m[4]*wy + viewProj.m[8]*wz  + viewProj.m[12];
             float cy = viewProj.m[1]*wx + viewProj.m[5]*wy + viewProj.m[9]*wz  + viewProj.m[13];
             float cw = viewProj.m[3]*wx + viewProj.m[7]*wy + viewProj.m[11]*wz + viewProj.m[15];
@@ -13105,8 +13153,15 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             if (R->opts.ps1)
                 gte_snap_screen(&sx, &sy, R->enginePixScale, R->enginePixScaleY);
 
-            /* GTE: SZ = Q8 view depth (256/m); OTZ (stszotz) = SZ>>2 = 64/m */
-            int otz = (int)floorf(depth * 64.0f + 0.5f);
+            /* GTE: SZ = Q8 view depth (256/m); OTZ (stszotz) = SZ>>2 = 64/m.
+             * V44 (D-2): every step of the engine chain TRUNCATES —
+             * Q12_TO_Q8 >>4 (fixed_point.h:399), PushSZ(z>>12) (swanstation
+             * gte.cpp:659), gte_stszotz sra 2 (inline_o.h:883-889),
+             * zScreenStart >>= 1 (particle.c:2601). The old +0.5 rounded
+             * ~50% of flakes one otz step near (zHalf bucket ties vs mesh
+             * quads, the fog term one step farther, the cull/tier/clut
+             * edges flipping one step early).                             */
+            int otz = (int)floorf(depth * 64.0f);
             /* D_800C39A0 == 1 branch: prim = snowBase - (fog(OTZ) >> 2).
              * v4: snowBase = func_8003EDB8 = field_1C[isFlashlightOn].field_21.r
              * (the slot by flashlight BOOLEAN — day 48, night-off 16,
@@ -13159,13 +13214,16 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
             const SnowPart *p = &S->p[i];
             if (p->state == 0) continue;          /* Spawn state not drawn  */
             /* world positions — engine Q12, y-down; glTF y = datum - y.
-             * pos = the streak HEAD (position0_0), pos1 = the TAIL.       */
-            float hx = (float)(S->boxX + p->pos[0]) * (1.0f / 4096.0f);
-            float hy = S->datumM - (float)(p->pos[1]) * (1.0f / 4096.0f);
-            float hz = (float)(S->boxZ + p->pos[2]) * (1.0f / 4096.0f);
-            float tx = (float)(S->boxX + p->pos1[0]) * (1.0f / 4096.0f);
-            float ty = S->datumM - (float)(p->pos1[1]) * (1.0f / 4096.0f);
-            float tz = (float)(S->boxZ + p->pos1[2]) * (1.0f / 4096.0f);
+             * pos = the streak HEAD (position0_0), pos1 = the TAIL.
+             * V44 (D-2 companion): Q8 lattice snap first (the engine pro-
+             * jects sp20/sp28 = Q12_TO_Q8(position1/position0), never the
+             * raw Q12 — see sh_particle_pos_q8_snap)                        */
+            float hx = sh_particle_pos_q8_snap((float)(S->boxX + p->pos[0])) * (1.0f / 4096.0f);
+            float hy = S->datumM - sh_particle_pos_q8_snap((float)(p->pos[1])) * (1.0f / 4096.0f);
+            float hz = sh_particle_pos_q8_snap((float)(S->boxZ + p->pos[2])) * (1.0f / 4096.0f);
+            float tx = sh_particle_pos_q8_snap((float)(S->boxX + p->pos1[0])) * (1.0f / 4096.0f);
+            float ty = S->datumM - sh_particle_pos_q8_snap((float)(p->pos1[1])) * (1.0f / 4096.0f);
+            float tz = sh_particle_pos_q8_snap((float)(S->boxZ + p->pos1[2])) * (1.0f / 4096.0f);
             /* project the TAIL first (the engine's first rtps — its OTZ
              * becomes the depth), then the HEAD                              */
             float tcx = viewProj.m[0]*tx + viewProj.m[4]*ty + viewProj.m[8]*tz  + viewProj.m[12];
@@ -13187,8 +13245,10 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                 gte_snap_screen(&tsx, &tsy, R->enginePixScale, R->enginePixScaleY),
                 gte_snap_screen(&hsx, &hsy, R->enginePixScale, R->enginePixScaleY);
             /* GTE SZ = Q8 view depth; OTZ (stszotz) = SZ>>2 -> 64/m; the
-             * engine's rain depth comes from the FIRST projection (tail)  */
-            int otz = (int)floorf(tDepth * 64.0f + 0.5f);
+             * engine's rain depth comes from the FIRST projection (tail).
+             * V44 (D-2): the chain truncates — no +0.5 (snow note above);
+             * particle.c:2785 gte_stszotz then :2809 depth >>= 1            */
+            int otz = (int)floorf(tDepth * 64.0f);
             int zHalf = otz >> 1;
             if (!(zHalf > 32 && zHalf < 2047)) continue;
             /* clut: far 0x1A30 (row 104) / mid rows 104+(depth>>5) */
@@ -13232,9 +13292,13 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                 int ok = 1;
                 static const int sgn[4][2] = { {-1,-1}, {-1,1}, {1,-1}, {1,1} };
                 for (int k = 0; k < 4; k++) {
-                    float wx = (float)(S->boxX + p->pos[0] + sgn[k][0] * c) * (1.0f / 4096.0f);
+                    /* V44 (D-2 companion): the engine projects the corners
+                     * as Q12_TO_Q8(position0.vx -/+ colorComp) etc.
+                     * (particle.c:2907-2921) — snap the corner Q12 to the
+                     * Q8 lattice first (see sh_particle_pos_q8_snap)       */
+                    float wx = sh_particle_pos_q8_snap((float)(S->boxX + p->pos[0] + sgn[k][0] * c)) * (1.0f / 4096.0f);
                     float wy = hy;   /* the engine uses pos.vy for all 4 */
-                    float wz = (float)(S->boxZ + p->pos[2] + sgn[k][1] * c) * (1.0f / 4096.0f);
+                    float wz = sh_particle_pos_q8_snap((float)(S->boxZ + p->pos[2] + sgn[k][1] * c)) * (1.0f / 4096.0f);
                     float ccx = viewProj.m[0]*wx + viewProj.m[4]*wy + viewProj.m[8]*wz  + viewProj.m[12];
                     float ccy = viewProj.m[1]*wx + viewProj.m[5]*wy + viewProj.m[9]*wz  + viewProj.m[13];
                     float ccw = viewProj.m[3]*wx + viewProj.m[7]*wy + viewProj.m[11]*wz + viewProj.m[15];
@@ -13441,7 +13505,10 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                     float vy = view.m[1]*wx + view.m[5]*wy + view.m[9]*wz + view.m[13];
                     float vz = view.m[2]*wx + view.m[6]*wy + view.m[10]*wz + view.m[14];
                     float d = -vz;                 /* PoC forward depth (m)  */
-                    int szQ8 = (int)floorf(d * 256.0f + 0.5f);
+                    /* V44 (D-3): the engine corner depth is the GTE
+                     * RotTransPers OTZ (integer, truncating — vw_calc.c:478
+                     * uses it as screenDepth-1); no +0.5                   */
+                    int szQ8 = (int)floorf(d * 256.0f);
                     /* Engine units (vw_calc.c:619-623, cross-calibrated with
                      * the sibling Vw_AabbVisibleInScreenCheck's 0x3FFE depth
                      * guard = 63 m at Q8): transformedZ = RotTransPers*4 =
@@ -13658,7 +13725,7 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                     float cz = 0.0f;
                     for (int q = 0; q < nv; q++) cz += xv[it->vbase + vi[q]].z;
                     cz /= (float)nv;
-                    int cq8 = (int)floorf(cz * 256.0f + 0.5f);
+                    int cq8 = (int)floorf(cz * 256.0f);  /* V44 D-3: RotTransPers OTZ<<2 truncates (billboard.c:263-266) */
                     int cq6 = cq8 >> 2;                 /* Q8 -> Q6 (Q6>>1 == Q8>>3) */
                     if (cq6 > 32 && (cq8 & ~3) < farCullQ8) /* engine: >32, STRICT far cull */
                         bucket = cq6 >> 1;
@@ -13667,7 +13734,10 @@ static void render_frame(Frame *fb, const Renderer *R, const CamPose *cam) {
                      * SZ (Q8); the engine far cull drops the WHOLE quad. */
                     int mz = 0;
                     for (int q = 0; q < nv; q++) {
-                        int q8 = (int)floorf(xv[it->vbase + vi[q]].z * 256.0f + 0.5f);
+                        /* V44 (D-3): per-vertex SZ = gte_stsz3 raw FIFO
+                         * (Q8, truncating — bodyprog_80056D8C.c:526-537,
+                         * consumed at :706-730 as the MAX-vertex cull)     */
+                        int q8 = (int)floorf(xv[it->vbase + vi[q]].z * 256.0f);
                         if (q8 > mz) mz = q8;
                     }
                     if (mz > 0 && mz <= farCullQ8) {    /* engine: <=0 skip; >field_1C skip */
