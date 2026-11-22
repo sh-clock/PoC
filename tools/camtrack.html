@@ -8090,7 +8090,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       wfLastT: 0,
       scatterAng: new Array(16).fill(0), scatterAmp: new Array(16).fill(0),
       liveVy: new Array(16).fill(0), liveVz: new Array(16).fill(0),
-      seeded: 0, isCabin: 0
+      seeded: 0, isCabin: 0,
+      /* v44 (C-6): the driveGate PLAYER_NEAR_POS rects (fog_poc.c mirror) */
+      dgNear: 0, dgBaseXQ12: 0, dgTolXQ12: 0, dgBaseZQ12: 0, dgTolZQ12: 0
     };
     a.object = sh1xJs(e, 'object', '');
     const drv = sh1xJs(e, 'driver', '');
@@ -8218,6 +8220,39 @@ function sh1xDriverInit(propAnims, header, opts) {
     if (a.eventGate2) {
       const p2 = sh1xJs(e, 'eventGate2Polarity', 'set');
       a.eventGate2Pol = (p2 === 'clear') ? 1 : 0;
+    }
+    /* v44 (C-6): the driveGate PLAYER_NEAR_POS rects — the ripper emits the
+     * engine literals verbatim in the driveGate doc string (ferris
+     * (vx,8.0,20.0)/(vz,-28.0,22.0), lissajous (vx,-16.0,20.0)/(vz,-64.0,
+     * 20.0); map6_s04_2.c:3493-3508). Quantized to engine Q12 raw counts
+     * (Math.trunc = the C (int) TO_FIXED truncation). Fog_poc.c mirror. */
+    a.dgNear = 0;
+    {
+      const dg = sh1xJs(e, 'driveGate', '');
+      const mx = /PLAYER_NEAR_POS\(vx,(-?[\d.]+),(-?[\d.]+)\)/.exec(dg);
+      const mz = /PLAYER_NEAR_POS\(vz,(-?[\d.]+),(-?[\d.]+)\)/.exec(dg);
+      if (mx && mz) {
+        a.dgBaseXQ12 = Math.trunc(parseFloat(mx[1]) * 4096);
+        a.dgTolXQ12 = Math.trunc(parseFloat(mx[2]) * 4096);
+        a.dgBaseZQ12 = Math.trunc(parseFloat(mz[1]) * 4096);
+        a.dgTolZQ12 = Math.trunc(parseFloat(mz[2]) * 4096);
+        a.dgNear = 1;
+      }
+    }
+    /* The ripper carries the driveGate field only on the FIVE ferris
+     * entries (ipd2gltf.py:1441/1452/1464/1488/1511) — the lissajous
+     * WHEEL_BA entry was never given one. Default both ride families to
+     * the ENGINE literals (map6_s04_2.c:3494 ferris / :3501 lissajous);
+     * an explicit driveGate field wins (fog_poc.c mirror). */
+    if (!a.dgNear && (a.driver === 14 || a.driver === 15)) {
+      if (a.driver === 14) {           /* ferris (vx,8.0,20.0)/(vz,-28.0,22.0) */
+        a.dgBaseXQ12 = Math.trunc(8 * 4096);   a.dgTolXQ12 = Math.trunc(20 * 4096);
+        a.dgBaseZQ12 = Math.trunc(-28 * 4096); a.dgTolZQ12 = Math.trunc(22 * 4096);
+      } else {                         /* lissajous (vx,-16.0,20.0)/(vz,-64.0,20.0) */
+        a.dgBaseXQ12 = Math.trunc(-16 * 4096); a.dgTolXQ12 = Math.trunc(20 * 4096);
+        a.dgBaseZQ12 = Math.trunc(-64 * 4096); a.dgTolZQ12 = Math.trunc(20 * 4096);
+      }
+      a.dgNear = 1;
     }
     {
       const pol = sh1xJs(e, 'eventGatePolarity', 'set');
@@ -8613,7 +8648,7 @@ function shTvState3(a, si, dtRaw) {
  * The shared S.rngSeed advances exactly like the engine's global g_propRngSeed:
  * the per-anim draw order (gated anims skipped before any draw, followers
  * skipped) is part of the deterministic contract. */
-function sh1xDriverTick(S, dt) {
+function sh1xDriverTick(S, dt, cam) {
   const dtRaw = Math.trunc(dt * 4096);          /* C: (int)(dt * 4096.0) */
   for (let i = 0; i < S.anims.length; i++) {
     const a = S.anims[i];
@@ -8628,6 +8663,23 @@ function sh1xDriverTick(S, dt) {
       continue;                                  /* engine: update gated off */
     }
     if (a.sharedLeader >= 0) continue;           /* follower: leader's state */
+    /* v44 (C-6): the driveGate proximity freeze (fog_poc.c mirror) — the
+     * engine runs the ferris/lissajous update ONLY inside its two
+     * PLAYER_NEAR_POS rects (map6_s04_2.c:3493-3508, strict < per the
+     * PLAYER_NEAR_POS macro game.h:67-69); the WorldObjects_Adds live
+     * INSIDE those funcs (:3817-3845) so a gated ride never advances.
+     * The camera is the player stand-in (engine x identity, z = -glTF z),
+     * Q12 raw counts. Freeze the tick ONLY — the draw stays (the engine's
+     * gated-ADD is design question C-U1; the cabin parity
+     * g_WorldObject7[(D_800EBB34+i)&1] :3838 stays unmodeled — see the
+     * C comment). null cam (no track) = no player stand-in: tick. */
+    if (a.dgNear && cam) {
+      const dx = Math.trunc(cam.x * 4096) - a.dgBaseXQ12;
+      const dz = Math.trunc(-cam.z * 4096) - a.dgBaseZQ12;
+      const nearX = (dx >= 0) ? (dx < a.dgTolXQ12) : (-dx < a.dgTolXQ12);
+      const nearZ = (dz >= 0) ? (dz < a.dgTolZQ12) : (-dz < a.dgTolZQ12);
+      if (!(nearX && nearZ)) continue;           /* outside: the ride FREEZES */
+    }
     switch (a.driver) {
     case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264 */
       let d;
@@ -11434,9 +11486,10 @@ function applySh1xPropAnims(t) {
    * re-construction must reproduce (V-b experiment: per-tick sampling
    * is bit-identical to the engine discipline). */
   while (S.steps < want) {
-    sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
     const stepT = (S.steps + 1) / 30;
-    sh1xWaterfallTick(S, sh1xWaterCamPose(stepT), stepT);
+    const camP = sh1xWaterCamPose(stepT);  /* v44 (C-6): the tick's camera (the player stand-in, the waterfall precedent) */
+    sh1xDriverTick(S, 1 / 30, camP);       /* the 30Hz grid */
+    sh1xWaterfallTick(S, camP, stepT);
     S.steps++;
   }
   S.lastT = t;
