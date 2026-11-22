@@ -8565,12 +8565,35 @@ static int fd_depth_ge_z(float depth, const Frame *fb, int px, int py) {
  * snap (engine Particle_SnowDraw: gte_rtps + gte_stsxy -> integer sXY2).
  * Affine texture mapping + 15-bit framebuffer quantization are part of the
  * same authentic GTE/GPU package (the PS1 hardware always does all three
- * together). */
+ * together).
+ * v43 (E-11-2): PushSXY SATURATES every RTPS/RTPT screen coordinate to
+ * the GTE's signed screen-FIFO range [-1024, 1023] (gte.cpp:353-380:
+ *   if (x < -1024) { FLAG.sx2_saturated = 1; x = -1024; }
+ *   else if (x > 1023) { FLAG.sx2_saturated = 1; x = 1023; }
+ * ditto y — "ScrX FIFO -400h..+3FFh", gte.cpp:661-662) AFTER the >>16
+ * truncation and BEFORE the 16-bit SXY2 store, so no vertex the engine
+ * draws ever carries a screen coordinate beyond that range — geometry
+ * projecting past the screen edge is pinned to it (the PS1 near-edge
+ * warp). The light-path emulations below already implement the clamp
+ * (fog_poc.c:5323-5324, 5535-5536); this extends it to the whole
+ * transform pipeline (transform_item2 + every particle projection). The
+ * clamp runs in ENGINE-pixel space (after the floor, before the rescale)
+ * so it is resolution-independent, exactly like the GTE. (Written with
+ * float intermediates: the sketch's (int)floorf() cast is undefined for
+ * the near-plane mega-projections this float pipeline can feed it —
+ * |sx/scaleX| > 2^31 — and [-1024,1023] is exactly representable, so
+ * the float form is the same clamp on the whole input domain.)        */
 static void gte_snap_screen(float *sx, float *sy, float scaleX, float scaleY) {
     if (scaleX < 1e-6f) scaleX = 1e-6f;
     if (scaleY < 1e-6f) scaleY = 1e-6f;
-    *sx = floorf(*sx / scaleX) * scaleX;   /* Sx >> 16: TRUNCATE toward  */
-    *sy = floorf(*sy / scaleY) * scaleY;   /* -inf == hardware floor     */
+    float ex = floorf(*sx / scaleX);      /* Sx >> 16: TRUNCATE toward  */
+    float ey = floorf(*sy / scaleY);      /* -inf == hardware floor     */
+    if (ex < -1024.0f) ex = -1024.0f;     /* PushSXY saturation,        */
+    else if (ex > 1023.0f) ex = 1023.0f;  /* gte.cpp:353-380 — v43 E-11-2 */
+    if (ey < -1024.0f) ey = -1024.0f;
+    else if (ey > 1023.0f) ey = 1023.0f;
+    *sx = ex * scaleX;
+    *sy = ey * scaleY;
 }
 
 /* full transform with explicit view matrix (fog needs view-space depth).
