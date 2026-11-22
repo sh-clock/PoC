@@ -7925,10 +7925,12 @@ function glbSceneSh1xExtras(buf) {
  *  - C int division truncates toward zero: TRUNC sites use Math.trunc,
  *    floor sites (arithmetic shifts) use Math.floor — each call site is
  *    labeled with its C semantics;
- *  - the C float32 accumulators (spin cur[], mvTimer, stone cur[]) are
- *    kept as JS doubles: the ±1-count wobble vs the engine's f32 rounding
- *    is bounded far below the Q12/Q10/Q8 quantizer steps and the
- *    [animstate]/APPLY tolerance (verified in the tick-match harness).
+ *  - the C float32 accumulators (mvTimer, stone cur[]) are kept as JS
+ *    doubles: the ±1-count wobble vs the engine's f32 rounding is bounded
+ *    far below the Q12/Q10/Q8 quantizer steps and the [animstate]/APPLY
+ *    tolerance (verified in the tick-match harness); the driver-0 spin
+ *    accumulator cur[axis] is now RAW Q12 angle counts (V44 C-7 — integer
+ *    exact in JS doubles, matching fog_poc.c's float-slot raw counts);
  */
 
 /* The engine's VERBATIM sine LUT (g_SineTable, 5120 s16 Q3.12 entries —
@@ -8278,6 +8280,12 @@ function sh1xDriverInit(propAnims, header, opts) {
     }
     /* live state init (verbatim drivers start at rot0/pos) */
     a.cur = [a.rot0[0], a.rot0[1], a.rot0[2]];
+    /* V44 C-7: driver 0's accumulator is the RAW Q12 angle count (the
+     * engine's D_800E3AAC.vz / g_ObjRotC[i].vz / g_WorldObject[i].rotation.vy
+     * start at the WorldObject placement rot — Q12_ANGLE of the authored
+     * degrees; every shipped entry has rot0[axis]=0 = the engine's 0). */
+    if (a.driver === 0)
+      a.cur[a.axis] = Math.trunc(a.rot0[a.axis] / 360 * 4096);
     if (a.driver === 3) a.cur[2] = a.pos[2];        /* B-4: MOVACHES */
     if (a.driver === 16) a.cur[2] = a.pos[2];
     if (a.driver === 18) a.cur[1] = a.pos[1];
@@ -8629,16 +8637,20 @@ function sh1xDriverTick(S, dt) {
     }
     if (a.sharedLeader >= 0) continue;           /* follower: leader's state */
     switch (a.driver) {
-    case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264 */
-      let d;
+    case 0: {  /* spinRng / spinConst — map0_s00_2.c:1238, map1_s02.c:1564-1570,
+                * map1_s05.c:383-387: the RAW Q12 angle-count accumulator
+                * (D_800E3AAC.vz &c.) with the per-frame Q12_MULT_PRECISE
+                * truncation — V44 C-7 (was float degrees; the truncation
+                * residue compounded into a visible phase drift) */
+      let rateRaw;
       if (a.hasRng) {
-        d = a.rngBase;
+        rateRaw = Math.trunc(a.rngBase / 360 * 4096);  /* Q12_ANGLE */
         if (a.rngMask)
-          d -= (sh1xRngNext(S) & a.rngMask) * (360 / 4096);
+          rateRaw -= sh1xRngNext(S) & a.rngMask;
       } else {
-        d = a.rate;
+        rateRaw = Math.trunc(a.rate / 360 * 4096);     /* Q12_ANGLE */
       }
-      a.cur[a.axis] += dt * d;
+      a.cur[a.axis] += sh1xMulSh(dtRaw, rateRaw, 12);
       break;
     }
     case 1: {  /* fanArray — map4_s02.c:131,140-149 */
@@ -8913,9 +8925,14 @@ function sh1xDriverTick(S, dt) {
         const cosV = sh1xCosQ12(rotVx);
         const gx = sh1xMulSh(1336, cosV, 12);
         /* fx_q12_angle(atan2f(4096, gx)*180/PI) — the one float-libm site
-         * (f32 vs f64: a ±1-count wobble at the trunc boundary is possible) */
-        const degVar = Math.atan2(4096, gx) * (180 / Math.PI);
-        const varr = Math.trunc(degVar / 360 * 4096);
+         * (f32 vs f64: a ±1-count wobble at the trunc boundary is possible).
+         * V44 C-7: the engine's ratan2(Q12_ANGLE(360), gx) is the PSX BIOS
+         * A(8F) 257-entry arc-tan TABLE (extern-only in the decomp,
+         * psyq/libgte.h:446; no BIOS image in the repos) — the documented
+         * deviation stands: the C twin routes through r2_ratan2 (float
+         * atan2 truncated to the Q12 grid); this is the identical value
+         * (args y=4096>0, x=gx>=0 → [0,1024] counts, no wrap). */
+        const varr = Math.trunc(Math.atan2(4096, gx) / (Math.PI * 2) * 4096);
         let varA0 = 4096 - Math.trunc(a.mvTimer * 2 * 4096);
         if (varA0 < 0) varA0 = 0;
         a.fallTorque = sh1xMulSh(varA0, a.fallTorque + varr, 12);
@@ -9047,8 +9064,10 @@ function sh1xDriverPose(S, i, inst) {
     return out;
   }
   switch (a.driver) {
-  case 0:   /* spinRng / spinConst: live angle on the anim axis */
-    out.rotDeg[a.axis] = a.cur[a.axis];
+  case 0:   /* spinRng / spinConst: live angle on the anim axis
+             * (cur[axis] holds RAW Q12 counts — V44 C-7; the deg->raw
+             * round-trip in the apply below is exact) */
+    out.rotDeg[a.axis] = a.cur[a.axis] * R2D;
     break;
   case 1: { /* fanArray — map4_s02.c:140-155 */
     let ii = inst > 0 ? inst : 0;
@@ -9108,11 +9127,14 @@ function sh1xDriverPose(S, i, inst) {
     } else {
       out.rotDeg[0] = ang * R2D;
     }
-    const rad = ang * R2D * Math.PI / 180;
-    const radius = a.isCabin ? 11.25 : 10.0;
-    out.posEng[0] = 8.7;
-    out.posEng[1] = radius * Math.cos(rad) - 13.8;
-    out.posEng[2] = radius * Math.sin(rad) - 28.0;
+    /* engine map6_s04_2.c:3816-3828 — the LUT + integer product:
+     * vy = Q12_MULT(Math_Cos(ang), Q12(10.0f|11.25f)) - Q12(13.8f),
+     * vz = Q12_MULT(Math_Sin(ang), ...) - Q12(28.0f); Q12(x)=(s32)(x*4096)
+     * trunc → 46080/40960/56524/114688/35635. V44 C-7: was Math.cos/sin. */
+    const radQ = a.isCabin ? 46080 : 40960;   /* Q12(11.25f)|Q12(10.0f) */
+    out.posEng[0] = 35635 / 4096;             /* Q12(8.7f) */
+    out.posEng[1] = (sh1xMulSh(sh1xCosQ12(ang), radQ, 12) - 56524) / 4096;
+    out.posEng[2] = (sh1xMulSh(sh1xSinQ12(ang), radQ, 12) - 114688) / 4096;
     out.mask = 7;
     break;
   }
@@ -9122,11 +9144,17 @@ function sh1xDriverPose(S, i, inst) {
     const aq = sh1xDivT(sh1xSinQ12(a.mvMaster + (ii << 10)), 30);
     const ryCnt = sh1xDivT(ii << 12, 12);
     out.rotDeg[1] = (a.mvMaster2 + ryCnt) * R2D;
-    const ry = out.rotDeg[1] * Math.PI / 180;
-    const temp = sh1xSinQ12(aq + 1024) / 4096 * 4.0;   /* cos */
-    out.posEng[0] = temp * Math.sin(ry) - 16.0;
-    out.posEng[1] = sh1xSinQ12(aq) / 4096 * 4.0 - 1.5;
-    out.posEng[2] = temp * Math.cos(ry) - 64.0;
+    /* engine map6_s04_2.c:3859-3866 — the LUT + integer chain:
+     * temp_s0 = Q12_MULT(Math_Cos(angle), Q12(4.0f));
+     * vx = Q12_MULT(temp_s0, Math_Sin(rot.vy)) - Q12(16.0f);
+     * vz = Q12_MULT(temp_s0, Math_Cos(rot.vy)) - Q12(64.0f);
+     * vy = Q12_MULT(Math_Sin(angle), Q12(4.0f)) - Q12(1.5f)
+     * (16384/65536/262144/6144). V44 C-7: was Math.sin/cos on the ry
+     * product; rot.vy = D_800EBB38 + (i<<12)/12 feeds the LUT directly. */
+    const tempS0 = sh1xMulSh(sh1xCosQ12(aq), 16384, 12);   /* Q12(4.0f) */
+    out.posEng[0] = (sh1xMulSh(tempS0, sh1xSinQ12(a.mvMaster2 + ryCnt), 12) - 65536) / 4096;
+    out.posEng[1] = (sh1xMulSh(sh1xSinQ12(aq), 16384, 12) - 6144) / 4096;
+    out.posEng[2] = (sh1xMulSh(tempS0, sh1xCosQ12(a.mvMaster2 + ryCnt), 12) - 262144) / 4096;
     out.rotDeg[0] = -aq * R2D;
     out.mask = 7;
     break;

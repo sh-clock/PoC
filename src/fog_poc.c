@@ -2284,6 +2284,17 @@ static void sh1x_load(Sh1x *sx, const JValue *json) {
         a->cur[0] = a->rot0[0];
         a->cur[1] = a->rot0[1];
         a->cur[2] = a->rot0[2];
+        /* V44 C-7: driver 0's accumulator is the RAW Q12 angle count
+         * (the engine's D_800E3AAC.vz / g_ObjRotC[i].vz /
+         * g_WorldObject[i].rotation.vy start at the WorldObject
+         * placement rot — Q12_ANGLE of the authored degrees; every
+         * shipped entry has rot0[axis]=0 = the engine's 0). The
+         * raw counts are exact in the float slot (|counts| < 2^24).
+         * Q12_ANGLE(deg) = (int)(deg/360*4096) trunc — fx_q12_angle's
+         * body, inlined here (the helper is declared further down). */
+        if (a->driver == 0)
+            a->cur[a->axis] =
+                (float)(int)(a->rot0[a->axis] / 360.0f * 4096.0f);
         /* v27.2 (B-4): translate/MOVACHES cur[2] starts at the authored
          * PLACEMENT z (60.0667) — the shelf sits static at engine-fresh. */
         if (a->driver == 3) a->cur[2] = a->pos[2];
@@ -5197,6 +5208,11 @@ static const int SH_LIGHT_DIR_CAM_Q12[3] = { 0, SH_SIN_M15, -SH_COS_M15 };
 
 /* fwd decl: fx_q12_angle lives in the v26 FX helpers below (file order) */
 static int fx_q12_angle(float deg);
+/* fwd decl: r2_ratan2 lives in the R2 self-view block below (file order) —
+ * the sh1x fallOnce tick calls it (V44 C-7 case 18: the engine's BIOS
+ * ratan2(Q12_ANGLE(360), gx) is approximated by the port's documented
+ * helper; see the case-18 comment) */
+static int32_t r2_ratan2(int32_t y, int32_t x);
 
 /* T7 (v35): the AUTHORED light-aim direction — func_8003F4DC's Custom
  * branch generalized from the fixed -15deg lightRotation to the USER's
@@ -9045,8 +9061,10 @@ static void sh1x_anim_pose(const Sh1x *sx, const Sh1xPropAnim *a, int inst,
         return;
     }
     switch (a->driver) {
-    case 0:   /* spinRng / spinConst: live angle on the anim axis */
-        rotDeg[a->axis] = a->cur[a->axis];
+    case 0:   /* spinRng / spinConst: live angle on the anim axis
+               * (cur[axis] holds RAW Q12 angle counts — V44 C-7; the
+               * deg->raw round-trip in sh1x_anim_apply is exact) */
+        rotDeg[a->axis] = a->cur[a->axis] * R2D;
         break;
     case 1: { /* fanArray — map4_s02.c:140-155 VERBATIM: rot.vx = the
                * PER-FAN raw angle D_800ED8B0[i]; rot.vy = 180 for the
@@ -9129,11 +9147,18 @@ static void sh1x_anim_pose(const Sh1x *sx, const Sh1xPropAnim *a, int inst,
             rotDeg[0] = (float)ang * R2D;
         }
         {
-            float rad = (float)ang * R2D * (float)M_PI / 180.0f;
-            float radius = a->isCabin ? 11.25f : 10.0f;
-            posEng[0] = 8.7f;
-            posEng[1] = radius * cosf(rad) - 13.8f;
-            posEng[2] = radius * sinf(rad) - 28.0f;
+            /* engine map6_s04_2.c:3816-3828 — the LUT + integer product:
+             * vy = Q12_MULT(Math_Cos(ang), Q12(10.0f|11.25f)) - Q12(13.8f),
+             * vz = Q12_MULT(Math_Sin(ang), ...) - Q12(28.0f), with
+             * Q12(x) = (s32)(x*4096) trunc: 46080/40960/56524/114688/
+             * 35635. V44 C-7: was float cosf/sinf — measured up to 6-7
+             * Q12 counts (1-2 LUT counts x the 10/11.25 radius). */
+            int radQ = a->isCabin ? 46080 : 40960; /* Q12(11.25f)|Q12(10.0f) */
+            posEng[0] = (float)35635 / 4096.0f;    /* Q12(8.7f)             */
+            posEng[1] = (float)((int)(((int64_t)sh_cos_q12(ang) * radQ) >> 12)
+                             - 56524) / 4096.0f;   /* - Q12(13.8f)          */
+            posEng[2] = (float)((int)(((int64_t)sh_sin_q12(ang) * radQ) >> 12)
+                             - 114688) / 4096.0f;  /* - Q12(28.0f)          */
         }
         *posReplaceMask = 7;
         break;
@@ -9144,11 +9169,23 @@ static void sh1x_anim_pose(const Sh1x *sx, const Sh1xPropAnim *a, int inst,
         int ryCnt = (int)((i << 12) / 12);
         rotDeg[1] = (float)(a->mvMaster2 + ryCnt) * R2D;
         {
-            float ry = rotDeg[1] * (float)M_PI / 180.0f;
-            float temp = (float)sh_sin_q12(aq + 1024) / 4096.0f * 4.0f; /*cos*/
-            posEng[0] = temp * sinf(ry) - 16.0f;
-            posEng[1] = (float)sh_sin_q12(aq) / 4096.0f * 4.0f - 1.5f;
-            posEng[2] = temp * cosf(ry) - 64.0f;
+            /* engine map6_s04_2.c:3859-3866 — the LUT + integer chain:
+             * temp_s0 = Q12_MULT(Math_Cos(angle), Q12(4.0f));
+             * vx = Q12_MULT(temp_s0, Math_Sin(rot.vy)) - Q12(16.0f);
+             * vz = Q12_MULT(temp_s0, Math_Cos(rot.vy)) - Q12(64.0f);
+             * vy = Q12_MULT(Math_Sin(angle), Q12(4.0f)) - Q12(1.5f)
+             * (Q12(4)=16384, Q12(16)=65536, Q12(64)=262144, Q12(1.5)=6144).
+             * V44 C-7: was float sinf/cosf on the ry product; rot.vy =
+             * D_800EBB38 + (i<<12)/12 is fed to the LUT directly. */
+            int temp_s0 = (int)(((int64_t)sh_cos_q12(aq) * 16384) >> 12);
+            posEng[0] = (float)((int)(((int64_t)temp_s0 *
+                          sh_sin_q12(a->mvMaster2 + ryCnt)) >> 12)
+                         - 65536) / 4096.0f;
+            posEng[1] = (float)((int)(((int64_t)sh_sin_q12(aq) * 16384) >> 12)
+                         - 6144) / 4096.0f;
+            posEng[2] = (float)((int)(((int64_t)temp_s0 *
+                          sh_cos_q12(a->mvMaster2 + ryCnt)) >> 12)
+                         - 262144) / 4096.0f;
             rotDeg[0] = -(float)aq * R2D;
         }
         *posReplaceMask = 7;
@@ -9356,9 +9393,15 @@ static void sh1x_anims_draw_apply(Scene *sc) {
 }
 
 /* ---- v27: prop anim drivers — the per-frame engine Update ------------
- * VERBATIM math per driver, ALL in the engine's own units:
- *   * raw Q12 angle ints (4096 = 360deg) for the swing family state,
+ * VERBATIM math per driver, in the engine's own units:
+ *   * raw Q12 angle ints (4096 = 360deg) for the swing family state
+ *     AND the spin accumulators (driver 0 — V44 C-7: raw counts with
+ *     the per-frame Q12_MULT_PRECISE truncation, was float degrees),
  *   * raw Q12 meters/accumulators for the movement drivers,
+ *   * the trig PRODUCTS run through the engine's own sine LUT + int64
+ *     Q12_MULT exactly like the engine (cases 12/14/15 — V44 C-7;
+ *     the ONE documented deviation is case 18's ratan2: the BIOS
+ *     A(8F) table is extern-only, r2_ratan2 stands in — see there),
  *   * the discrete per-frame drivers (doorRattle, kickSwing) step once
  *     per 1/30s of elapsed time exactly like the 30Hz game frames.
  * Gates: chunkGate (the engine's PLAYER_IN_MAP_CHUNK — for a single-room
@@ -9924,21 +9967,30 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
         }
         if (a->sharedLeader >= 0) continue;  /* follower: leader's state */
         switch (a->driver) {
-        case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264:
-                    * vz += Q12_MULT_PRECISE(dt, Q12_ANGLE(rngBase) -
-                    * (Rng_Rand16() & mask)); spinConst (map1_s05.c:398-402)
-                    * carries ONLY rate — v27.2 (B-2): no parse-default
-                    * RNG poisoning for rate-only entries. */
-            float d;
+        case 0: {  /* spinRng / spinConst — map0_s00_2.c:1238,
+                    * map1_s02.c:1564-1570, map1_s05.c:383-387: the
+                    * accumulator is the engine's RAW Q12 angle count
+                    * (D_800E3AAC.vz / g_ObjRotC[i].vz / g_WorldObject[i]
+                    * .rotation.vy) and the increment is
+                    * Q12_MULT_PRECISE(g_DeltaTime, rate) with the per-frame
+                    * >>12 truncation — rate = Q12_ANGLE(rngBase) -
+                    * (Rng_Rand16() & mask); spinConst (map1_s05.c:383-387)
+                    * carries ONLY rate = Q12_ANGLE(rate) — v27.2 (B-2): no
+                    * parse-default RNG poisoning for rate-only entries.
+                    * V44 C-7: was float-degree accumulation ((float)dt*deg
+                    * — the ~0.13 counts/frame truncation residue at
+                    * -90deg/s compounded into a visible phase drift). */
+            int rateRaw;
             if (a->hasRng) {
-                d = a->rngBase;
+                rateRaw = fx_q12_angle(a->rngBase);
                 if (a->rngMask)
-                    d -= (float)(sh_rng_next() & a->rngMask)
-                         * (360.0f / 4096.0f);
+                    rateRaw -= (int)(sh_rng_next() & a->rngMask);
             } else {
-                d = a->rate;
+                rateRaw = fx_q12_angle(a->rate);
             }
-            a->cur[a->axis] += (float)dt * d;
+            /* cur[axis] holds the RAW Q12 angle count (bind init above) */
+            a->cur[a->axis] +=
+                (float)((int)(((int64_t)dtRaw * rateRaw) >> 12));
             break;
         }
         case 1: {  /* fanArray — map4_s02.c:131,140-149 VERBATIM: per-fan
@@ -10338,8 +10390,16 @@ static void sh1x_anims_tick(Sh1x *sx, double dt) {
                 int rotVx = (int)(a->cur[0] * (4096.0f / 360.0f));
                 int cosV = sh_math_cos(rotVx);
                 int gx = (int)(((int64_t)1336 * cosV) >> 12);
-                int var = fx_q12_angle(atan2f(4096.0f, (float)gx)
-                                      * (180.0f / (float)M_PI));
+                /* engine map4_s03.c:1701: var = ratan2(Q12_ANGLE(360)=4096,
+                 * gx) — the PSX BIOS A(8F) 257-entry quarter-wave arc-tan
+                 * table. That table is EXTERN-ONLY in the decomp
+                 * (psyq/libgte.h:446) and no BIOS image ships with the
+                 * repos, so the port routes through the codebase's
+                 * documented r2_ratan2 approximation (float atan2
+                 * truncated to the same Q12 grid, sub-count) — V44 C-7
+                 * documented deviation (identical policy to the R2
+                 * self-view trackers that use the helper). */
+                int var = r2_ratan2(4096, gx);
                 int varA0 = 4096 - (int)(a->mvTimer * 2.0f * 4096.0f);
                 if (varA0 < 0) varA0 = 0;
                 a->fallTorque = (int)(((int64_t)varA0 *
