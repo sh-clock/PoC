@@ -4918,7 +4918,12 @@ class GltfBuilder:
     def write_glb(self, path):
         self.json["extensionsUsed"] = sorted(self.extensions_used)
         self._pad()                       # pad BIN first, then record exact length
-        self.json["buffers"].append({"byteLength": len(self.bin)})
+        # v43 (RIP-3-3): an empty-BIN GLB (e.g. a zero-mesh room: no
+        # bufferViews) must NOT emit buffer 0 — glTF 2.0 requires
+        # buffer.byteLength >= 1 and the GLB container binds buffer 0 to
+        # the BIN chunk, which is absent when self.bin is empty.
+        if self.bin:
+            self.json["buffers"].append({"byteLength": len(self.bin)})
         js = json.dumps(self.json, separators=(",", ":"), ensure_ascii=False)
         jb = js.encode("utf-8")
         padj = (4 - len(jb) % 4) % 4
@@ -7413,11 +7418,17 @@ def validate_glb(path, tex_aliases=None):
             if blen % 4:
                 checks["warnings"].append("BIN length not multiple of 4")
     ok("chunks")
+    views = doc.get("bufferViews", [])
     buf = doc.get("buffers", [])
-    if not buf or buf[0].get("byteLength") != len(bin_data):
+    if not buf:
+        # v43 (RIP-3-3): a GLB with no bufferViews and no BIN chunk carries
+        # no buffer at all (the empty-room form; glTF 2.0's
+        # buffer.byteLength minimum is 1 and GLB binds buffer 0 to BIN).
+        if views or bin_data:
+            checks["errors"].append("no buffer but bufferViews/BIN present")
+    elif buf[0].get("byteLength") != len(bin_data):
         checks["errors"].append("buffer[0].byteLength != BIN size")
     ok("buffer")
-    views = doc.get("bufferViews", [])
     for i, v in enumerate(views):
         if v["buffer"] != 0:
             checks["errors"].append(f"bufferView {i}: buffer != 0")
