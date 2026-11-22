@@ -9259,6 +9259,7 @@ function sh1xDriverBind(S, items) {
      * groups only fill the remaining slots (clamped to want-1). */
     {
       const want = (a.count > 1) ? a.count : 1;
+      let posedBound = 0;      /* C-1: posed groups pass 1 binds   */
       let posedAvail = 0;
       for (let q = 0; q < grps.length; q++)
         if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) posedAvail++;
@@ -9274,15 +9275,15 @@ function sh1xDriverBind(S, items) {
           }
           grps[q].n = 0;                  /* mark used */
           posedAvail--;
+          posedBound++;
         }
       }
       /* pass 2: unposed groups fill the remaining slots by distance
-       * (verbatim: the took-loop guard leaves took at 0 — fill = want) */
-      let took = 0;
-      for (let q = 0; q < grps.length && posedAvail > 0; q++) {
-        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) took++;
-      }
-      const fill = want - took;
+       * (C-1: the old took loop was dead — posedAvail == 0 after pass 1
+       * and bound groups have n === 0, so fill was always `want` and pass 2
+       * over-bound phantom animated baked copies; the engine draws exactly
+       * `count` copies — fill = the slots pass 1 left open) */
+      const fill = Math.max(0, want - posedBound);
       let nth = 0;
       for (let taken = 0; taken < fill; ) {
         let bg = -1, bd = 1e30;
