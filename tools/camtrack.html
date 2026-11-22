@@ -1124,10 +1124,20 @@ const SHCore = (function () {
     const L = env.light;
     const colors = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
 
-    /* fogAlpha = 4096 - Q8_TO_Q12(min(func_80055A50(Q12 view depth), 1)) */
+    /* fogAlpha = 4096 - Q8_TO_Q12(min(func_80055A50(Q12 view depth), 1))
+       V44 (D-3): the GTE-SZ float->Q8 sites TRUNCATE (no +0.5) — the
+       engine's SZ is floor((T<<12+Sum R*V)>>12) off the s16-quantized
+       view matrix (swanstation gte.cpp:649-659) and every downstream
+       step is an arithmetic shift (stszotz sra 2, the fog ramp index,
+       the OT buckets). Sites mirrored here: t2q8 (this), the veil zq8,
+       the per-vertex zq8, the TV bucket/subBucket, the snow/rain otz
+       (D-2). The RECONSTRUCTION sites (anchorQ8 below, cam Q12, rotQ12)
+       keep round-to-nearest. Residual: the float view matrix carries
+       ~±0.6 Q8 counts of noise at 20 m vs the engine's quantized matrix
+       (see fog_poc.c sh_billboard_colors for the family head note). */
     let fogAlpha = 4096;
     if (fogOn) {
-      const t2q8 = Math.floor(anchorDepth * 256 + 0.5) | 0;
+      const t2q8 = Math.floor(anchorDepth * 256) | 0;   /* V44 D-3: truncate */
       let ramp = env.fog.fogVertex(t2q8);
       if (ramp > 4096) ramp = 4096;
       fogAlpha = 4096 - (ramp << 4);
@@ -2317,9 +2327,11 @@ if (typeof module !== 'undefined' && module.exports) {
       uses WebGL additive blending on replicated-8-bit colors (the C++
       reads the quantized framebuffer and adds in 5-bit — a sub-LSB
       compositor difference only, positions/colors engine-exact).
-   5. POST PASS (exact math): screen-brightness overlay (5-bit additive,
-      WorldGfx_2dEffectsDraw order) + ordered dither + 15-bit replication
-      quantization over the 640x360 track-cam render target (the C++
+   5. POST PASS (exact math — V44 E-5 order): the C quantizes at RASTER
+      time (fb_put: ordered dither, clamp(c+d,0,255) >> 3 + repl5) and the
+      screen-brightness overlay (WorldGfx_2dEffectsDraw, frame END) adds
+      br5 in 5-bit on the already-quantized fb — dst5 = min(31,dst5+br5),
+      no re-dither; over the 640x360 track-cam render target (the C++
       default --res), blitted into the TRACK CAM rect with nearest
       filtering (the crisp PSX look).
    6. EDITOR ORBIT VIEW (approximation, documented): the orbit camera keeps
@@ -2567,17 +2579,20 @@ window.SHView = (function () {
   const SH_VERT = `
     attribute vec3 shVcol;
     attribute vec3 shOcol;
+    attribute float shQcull;   /* v44 (E-1): per-QUAD backface-cull flag (1 = skip) */
     varying vec3 vVcol;
     varying vec3 vOcol;
     varying vec2 vUv;
     varying float vDepth;
     varying float vW;      /* v5: the noperspective (affine) unwrap weight */
+    varying float vQcull;  /* v44 (E-1): flat per quad — constant under any interpolation */
     uniform float uPsx;
     uniform vec2 uPixScale;     /* (RT_W/320, RT_H/224) — the GTE grid (v40: NTSC gsScreenHeight=224; the old 240 was the PAL/SCREEN_HEIGHT reading — see the PoC v21/v40 engine-truth grid) */
     void main() {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       float depth = -mvPosition.z;
       vec4 clip = projectionMatrix * mvPosition;
+      vQcull = shQcull;   /* v44 (E-1): the per-quad nclip verdict, CPU-side */
       if (uPsx > 0.5 && clip.w > 0.0) {
         /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
            (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor)          */
@@ -2641,6 +2656,7 @@ window.SHView = (function () {
     varying vec2 vUv;
     varying float vDepth;
     varying float vW;      /* v5: the noperspective (affine) unwrap weight */
+    varying float vQcull;  /* v44 (E-1): the per-QUAD backface-cull flag */
     void main() {
       float iw = 1.0 / vW;         /* v5: unwrap the affine (PSX) varyings */
       float depth = vDepth * iw;
@@ -2648,6 +2664,15 @@ window.SHView = (function () {
       vec3 vcolf = vVcol * iw;
       vec3 ocolf = vOcol * iw;
       if (depth <= 0.05) discard;                 /* engine near discard  */
+      /* v44 (E-1): the engine's per-quad gte_NormalClip verdict. The flag
+         is 1 exactly on verts used ONLY by engine-culled quads, so any
+         positive interpolation means this fragment's quad was culled —
+         drop it; kept quads carry exactly 0 on every vertex and never
+         discard. (> 0.0, not > 0.5: a culled quad sharing corners with a
+         kept one must still die whole — the engine drops the QUAD, not
+         half of it. The measure-zero shared-edge line is the only
+         residue a per-vertex flag can never express.)                    */
+      if (vQcull > 0.0) discard;
       if (depth > uFarCullM) discard;             /* engine far cull      */
       vec4 texel = texture2D(map, uvf);
       /* v3 engine-exact per-texel rule (DuckStation gpu_sw_rasterizer.inl:
@@ -2681,21 +2706,29 @@ window.SHView = (function () {
     float repl5(float v5) { return floor(v5 * 255.0 / 31.0 + 0.5); }
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb * 255.0;
-      if (uBright > 0.5) {
-        /* WorldGfx_2dEffectsDraw brightness overlay: dst5 = min(31,dst5+br5) */
-        float br5 = floor(uBright / 8.0);
-        for (int i = 0; i < 3; i++) {
-          float d5 = floor(c[i] / 8.0);
-          c[i] = repl5(min(31.0, d5 + br5));
-        }
-      }
       if (uQuantize > 0.5) {
         vec2 fc = vUv * vec2(640.0, 360.0);       /* engine raster coords  */
         ivec2 p = ivec2(int(fc.x) & 3, int(fc.y) & 3);
         float d = DITHER4[p.x][p.y];              /* == C DITHER4[y][x]    */
+        /* V44 (E-5, CT-2#10): the C dithers + quantizes at RASTER time
+           (fb_put -> quantize8 clamps c+d to 0..255, rgb_to_15bit_expand
+           >> 3 + repl5) and the frame-end brightness overlay
+           (WorldGfx_2dEffectsDraw) adds br5 in 5-bit on the ALREADY-
+           quantized fb — dst5 = min(31, dst5+br5), repl5, NO re-dither.
+           Dither FIRST, then the 5-bit add (the old bright-then-dither
+           re-quantize diverged on 580/2048 (c,d) pairs at br5=3).       */
+        float br5 = (uBright > 0.5) ? floor(uBright / 8.0) : 0.0;
         for (int i = 0; i < 3; i++) {
-          float v = clamp(c[i] + (uDither > 0.5 ? d : 0.0), 0.0, 255.0);
-          c[i] = repl5(floor(v / 8.0));           /* 8->5 truncate + repl  */
+          float d5 = floor(clamp(c[i] + (uDither > 0.5 ? d : 0.0), 0.0, 255.0) / 8.0);
+          c[i] = repl5(min(31.0, d5 + br5));
+        }
+      } else if (uBright > 0.5) {
+        /* WorldGfx_2dEffectsDraw brightness overlay on the UNQUANTIZED fb
+           (uQuantize = 0): dst5 = min(31,dst5+br5) — the C overlay form  */
+        float br5 = floor(uBright / 8.0);
+        for (int i = 0; i < 3; i++) {
+          float d5 = floor(c[i] / 8.0);
+          c[i] = repl5(min(31.0, d5 + br5));
         }
       }
       gl_FragColor = vec4(c / 255.0, 1.0);
@@ -2768,11 +2801,24 @@ window.SHView = (function () {
     attribute vec3 iPos; attribute float iScale; attribute float iClut;
     attribute vec3 iCol;
     varying vec2 vUvS; varying vec3 vColS;
+    uniform float uPsx;
+    uniform vec2 uPixScale;
     void main() {
       vColS = iCol;
       vUvS = vec2(uv.x, (iClut + uv.y) / 8.0);
       vec3 p = iPos + position * iScale;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      /* V44 (E-3): the C snaps ALL 4 splash ground corners
+         (gte_snap_screen under opts.ps1, fog_poc.c:13244-13245) —
+         the FLAKE_VERT snap branch verbatim.                        */
+      if (uPsx > 0.5 && clip.w > 0.0) {
+        vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
+                           (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
+        screen = floor(screen / uPixScale) * uPixScale;
+        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
+                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+      }
+      gl_Position = clip;
     }`;
   const SPLASH_FRAG = `
     uniform sampler2D map;
@@ -2892,7 +2938,11 @@ window.SHView = (function () {
       geo.setAttribute('iCol', new three.InstancedBufferAttribute(new Float32Array(N * 3), 3));
       const mat = new three.ShaderMaterial({
         vertexShader: SPLASH_VERT, fragmentShader: SPLASH_FRAG,
-        uniforms: { map: { value: buildSplashAtlas(three) } },
+        uniforms: {
+          map: { value: buildSplashAtlas(three) },
+          uPsx: { value: 1 },
+          uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) }    /* v40: NTSC 224 */
+        },
         transparent: true, depthWrite: false,
         blending: three.AdditiveBlending
       });
@@ -2940,6 +2990,13 @@ window.SHView = (function () {
       const ocol = new three.BufferAttribute(new Float32Array(n * 3), 3);
       geo.setAttribute('shVcol', vcol);
       geo.setAttribute('shOcol', ocol);
+      /* v44 (E-1): the per-QUAD backface-cull flag (written per frame by
+         perVertexPass' index walk) + the per-vertex GTE screen scratch the
+         walk's nclip runs on (post-snap — exactly SH_VERT's coords)      */
+      const qcull = new three.BufferAttribute(new Float32Array(n), 1);
+      const qsx = new Float32Array(n), qsy = new Float32Array(n);
+      const qok = new Uint8Array(n);
+      geo.setAttribute('shQcull', qcull);
 
       /* CLONE the texture (read-only asset discipline: the source texture
          and its sRGB decode stay untouched for the editor view; the clone
@@ -2976,7 +3033,13 @@ window.SHView = (function () {
           uPsx: { value: V.psxWobble ? 1 : 0 },
           uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) }    /* v40: NTSC 224 */
         },
-        side: three.DoubleSide,     /* engine accepts both windings      */
+        /* v44 (E-1): v11 emits ONE order per quad — glTF CCW = the void
+           side (ipd2gltf "v11 EMISSION CONTRACT") — and the engine culls
+           the other side per quad via gte_NormalClip (ported as the
+           shQcull walk in perVertexPass), NOT by the raster: the C's
+           raster_tri draws any winding it is handed, so the material
+           stays DoubleSide.                                              */
+        side: three.DoubleSide,
         /* v5: LESS — an exact bucket tie keeps the FIRST-submitted quad
            (the engine's within-bucket LIFO: earlier-added prim on top)   */
         depthFunc: three.LessDepth
@@ -3011,7 +3074,7 @@ window.SHView = (function () {
       }
       rec.meshes.push(o);
       rec.shMats.push(shMat);
-      rec.attrs.set(o, { vcol, ocol, n, isMaskBB, srcMat });
+      rec.attrs.set(o, { vcol, ocol, n, isMaskBB, srcMat, qcull, qsx, qsy, qok });
     });
 
     /* the ground probe grid (one-time; the walkable surface under the
@@ -3072,6 +3135,15 @@ window.SHView = (function () {
     let farCullQ8 = 0x79C << 2;
     if (V.enabled && fog.isFogEnabled && fog.farQ8 < farCullQ8) farCullQ8 = fog.farQ8;
     V.farCullM = farCullQ8 / 256;
+
+    /* v44 (E-1): the GTE screen projection for the quad-cull walk below —
+       rtCam's projection IS the RT render's projection for these meshes
+       (syncAndDraw updates it before this pass and renders after it), on
+       the SAME uPixScale grid and under the SAME uPsx (psxWobble) gate
+       the shMat's SH_VERT snap uses.                                       */
+    const projE = V.rtCam.projectionMatrix.elements;
+    const gteScaleX = V.RT_W / 320, gteScaleY = V.RT_H / 224;
+    const gteSnap = V.psxWobble;
 
     let ml = null;
     if (lightMode === 1 || lightMode === 2) {
@@ -3146,7 +3218,7 @@ window.SHView = (function () {
             const qz = me[2]*bx + me[6]*by + me[10]*bz + me[14];
             const qd = -(viewE[2]*qx + viewE[6]*qy + viewE[10]*qz
                          + viewE[14]);
-            const zq8 = Math.floor(qd * 256 + 0.5) | 0;
+            const zq8 = Math.floor(qd * 256) | 0;   /* V44 D-3: SZ truncates */
             const ramp = fog.fogVertex(zq8);
             let fq12 = ramp * 16 + fogIntensity;
             if (fq12 > 4096) fq12 = 4096;
@@ -3176,10 +3248,34 @@ window.SHView = (function () {
         const depth = -vz;
         const o3 = i * 3;
 
+        /* v44 (E-1) — the per-vertex GTE screen coords for the cull walk
+         * below: the C's RVert sx/sy (transform_item2, fog_poc.c) — the
+         * SAME clip projection SH_VERT uses and the SAME floor snap
+         * gte_snap_screen applies when ps1 is on; the engine's nclip
+         * reads these POST-SNAP coords. A w <= 0 corner (behind the
+         * camera) has no shader snap value — the walk skips such quads
+         * (qok = 0) rather than guess a wrapped projection.             */
+        const mvx = viewE[0]*wx + viewE[4]*wy + viewE[8]*wz + viewE[12];
+        const mvy = viewE[1]*wx + viewE[5]*wy + viewE[9]*wz + viewE[13];
+        const cw = projE[3]*mvx + projE[7]*mvy + projE[11]*vz + projE[15];
+        if (cw > 0) {
+          const cx = projE[0]*mvx + projE[4]*mvy + projE[8]*vz + projE[12];
+          const cy = projE[1]*mvx + projE[5]*mvy + projE[9]*vz + projE[13];
+          let sx = (cx / cw + 1.0) * 0.5 * 320 * gteScaleX;
+          let sy = (1.0 - (cy / cw + 1.0) * 0.5) * 224 * gteScaleY;
+          if (gteSnap) {
+            sx = Math.floor(sx / gteScaleX) * gteScaleX;
+            sy = Math.floor(sy / gteScaleY) * gteScaleY;
+          }
+          a.qsx[i] = sx; a.qsy[i] = sy; a.qok[i] = 1;
+        } else {
+          a.qok[i] = 0;
+        }
+
         if (fogEnabled) {
           let ramp = 0, fq12 = 0, Tq12 = 4096;
           if (fogOn) {
-            const zq8 = Math.floor(depth * 256 + 0.5) | 0;
+            const zq8 = Math.floor(depth * 256) | 0; /* V44 D-3: SZ truncates */
             ramp = fog.fogVertex(zq8);
             fq12 = ramp * 16 + fogIntensity;
             if (fq12 > 4096) fq12 = 4096;
@@ -3261,6 +3357,72 @@ window.SHView = (function () {
           ocol[o3] = ocol[o3 + 1] = ocol[o3 + 2] = 0;
         }
       }
+
+      /* v44 (E-1) — THE ENGINE'S gte_NormalClip BACKFACE CULL, CPU-side.
+       * Gfx_MeshDraw nclip-culls every MESH quad BEFORE the OT insert
+       * (bodyprog_80056D8C.c:1363-1379, re-derived against psyq
+       * inline_c.h:166-185 — gte_ldsxy0 reloads ONLY $12 — and
+       * swanstation pgxp.cpp:393-395 — the NCLIP itself):
+       *   gte_ldsxy3(xy[v0],xy[v1],xy[v2]); nclip; if (<= 0) {
+       *     gte_ldsxy0(xy[v3]); nclip; if (>= 0) SKIP THE QUAD; }
+       * the second test is therefore NCLIP(v3,v1,v2). The v11 emission
+       * contract (ipd2gltf.py, the "v11 EMISSION CONTRACT" block) emits
+       * each quad as tris (v0,v2,v1)+(v2,v3,v1); the walk reconstructs
+       * vi = (v0,v2,v1,v3) = (A,B,C,D) from that pattern, so
+       *   n1 = cross(B-A, C-A)      = -NCLIP(v0,v1,v2)
+       *   n2 = cross(C-D, B-D)      = +NCLIP(v3,v1,v2)  (anchored at D=v3)
+       * and the engine's skip == (n1 >= 0 AND n2 >= 0) — the exact form
+       * of the C fix (PR #110, audit-v43/quad-cull-dv3, fog_poc.c
+       * :13534-13544). Degenerate packs (v3:=v2, D==B) need no special
+       * case: n2 == 0 -> cull iff n1 >= 0 (the plain front-face rule,
+       * engine-identical). MASK (isMaskBB) items are EXEMPT — the engine
+       * never nclip-culls the billboard leaf quads (Gfx_BillboardDraw
+       * has no nclip test; the C gate is ams != 1). Quads with a corner
+       * behind the camera (qok=0) keep the GPU's near-plane clip. Corners
+       * shared between quads (the converter's (pos,nrm,uv) corner cache)
+       * resolve KEEP — never drop a quad the engine keeps: a vert ends at
+       * 1 exactly when EVERY quad through it was culled, so SH_FRAG's
+       * vQcull > 0.0 kills each culled quad whole (up to the measure-zero
+       * shared-edge line) while kept quads carry exactly 0 everywhere.   */
+      if (!a.isMaskBB) {
+        const qcull = a.qcull.array;
+        qcull.fill(0);
+        const qsx = a.qsx, qsy = a.qsy, qok = a.qok;
+        const idxA = geo.index ? geo.index.array : null;
+        const ic = idxA ? idxA.length : (n - (n % 3));
+        const dropQ = [], keepQ = [];
+        for (let k = 0; k + 2 < ic;) {
+          let vi0, vi1, vi2, vi3 = -1;
+          if (idxA) {
+            vi0 = idxA[k]; vi1 = idxA[k + 1]; vi2 = idxA[k + 2];
+            if (k + 5 < ic && idxA[k + 3] === vi1 && idxA[k + 5] === vi2)
+              vi3 = idxA[k + 4];                       /* the quad's 4th corner */
+          } else {          /* non-indexed fallback: consecutive triples */
+            vi0 = k; vi1 = k + 1; vi2 = k + 2;
+          }
+          if (vi0 >= n || vi1 >= n || vi2 >= n || vi3 >= n) break;
+          const nv = vi3 >= 0 ? 4 : 3;
+          let drop = 0;
+          if (nv === 4 && qok[vi0] && qok[vi1] && qok[vi2] && qok[vi3]) {
+            const Ax = qsx[vi0], Ay = qsy[vi0];
+            const Bx = qsx[vi1], By = qsy[vi1];
+            const Cx = qsx[vi2], Cy = qsy[vi2];
+            const Dx = qsx[vi3], Dy = qsy[vi3];
+            const n1 = (Bx - Ax) * (Cy - Ay) - (Cx - Ax) * (By - Ay);
+            if (n1 >= 0) {
+              const n2 = (Cx - Dx) * (By - Dy) - (Bx - Dx) * (Cy - Dy);
+              if (n2 >= 0) drop = 1;   /* engine: quad skipped */
+            }
+          }
+          const out = drop ? dropQ : keepQ;
+          out.push(vi0, vi1, vi2);
+          if (nv === 4) out.push(vi3);
+          k += nv === 4 ? 6 : 3;
+        }
+        for (let q = 0; q < dropQ.length; q++) qcull[dropQ[q]] = 1;
+        for (let q = 0; q < keepQ.length; q++) qcull[keepQ[q]] = 0;
+        a.qcull.needsUpdate = true;
+      }
       a.vcol.needsUpdate = true;
       a.ocol.needsUpdate = true;
     }
@@ -3269,7 +3431,12 @@ window.SHView = (function () {
   }
 
   /* ------------------------------------------------------------------ */
-  /* particle collection — the render_frame collect port                   */
+  /* particle collection — the render_frame collect port */
+  /* V44 (D-2 companion): the engine feeds the GTE the particles on the
+   * Q8 lattice — particlePosQ8 = Q12_TO_Q8(pos) = pos>>4 (particle.c:
+   * 2562-2571/2773-2782/2907-2921; fixed_point.h:399-400) — never the
+   * raw Q12. fog_poc.c sh_particle_pos_q8_snap twin. */
+  const q8Snap = (q12) => Math.floor(q12 / 16) * 16;
   function collectParticles(env, snow, viewE) {
     const flakes = [], streaks = [], splashes = [];
     if (!snow || !snow.enabled || !V.particlesOn)
@@ -3281,13 +3448,14 @@ window.SHView = (function () {
       const p = snow.p[i];
       if (p.hide) continue;
       if (p.state === 0) continue;
-      const wx = (snow.boxX + p.pos[0]) / 4096;
-      const wy = datumM - p.pos[1] / 4096;
-      const wz = (snow.boxZ + p.pos[2]) / 4096;
+      /* V44 (D-2 companion): Q8 lattice snap first (q8Snap above) */
+      const wx = q8Snap(snow.boxX + p.pos[0]) / 4096;
+      const wy = datumM - q8Snap(p.pos[1]) / 4096;
+      const wz = q8Snap(snow.boxZ + p.pos[2]) / 4096;
       const vz = viewE[2]*wx + viewE[6]*wy + viewE[10]*wz + viewE[14];
       const depth = -vz;
       if (depth <= 0.05) continue;
-      const otz = Math.floor(depth * 64 + 0.5) | 0;
+      const otz = Math.floor(depth * 64) | 0;   /* V44 D-2: the chain truncates */
       const snowBase = env.snowBase()[0];
       let prim = ((snowBase - (fog.fog80055A50(otz) >> 2)) & 0xFF) >>> 0;
       const zHalf = otz >> 1;
@@ -3311,16 +3479,17 @@ window.SHView = (function () {
          i < snow.addedCount + snow.addedCount1 && i < SC.SNOW_COUNT_MAX; i++) {
       const p = snow.p[i];
       if (p.state === 0) continue;
-      const hx = (snow.boxX + p.pos[0]) / 4096;
-      const hy = datumM - p.pos[1] / 4096;
-      const hz = (snow.boxZ + p.pos[2]) / 4096;
-      const tx = (snow.boxX + p.pos1[0]) / 4096;
-      const ty = datumM - p.pos1[1] / 4096;
-      const tz = (snow.boxZ + p.pos1[2]) / 4096;
+      /* V44 (D-2 companion): Q8 lattice snap first (q8Snap above) */
+      const hx = q8Snap(snow.boxX + p.pos[0]) / 4096;
+      const hy = datumM - q8Snap(p.pos[1]) / 4096;
+      const hz = q8Snap(snow.boxZ + p.pos[2]) / 4096;
+      const tx = q8Snap(snow.boxX + p.pos1[0]) / 4096;
+      const ty = datumM - q8Snap(p.pos1[1]) / 4096;
+      const tz = q8Snap(snow.boxZ + p.pos1[2]) / 4096;
       const tDepth = -(viewE[2]*tx + viewE[6]*ty + viewE[10]*tz + viewE[14]);
       const hDepth = -(viewE[2]*hx + viewE[6]*hy + viewE[10]*hz + viewE[14]);
       if (tDepth <= 0.05 || hDepth <= 0.05) continue;
-      const otz = Math.floor(tDepth * 64 + 0.5) | 0;
+      const otz = Math.floor(tDepth * 64) | 0; /* V44 D-2: the chain truncates */
       const zHalf = otz >> 1;
       if (!(zHalf > 32 && zHalf < 2047)) continue;
       const clutRow = (zHalf > 63 && zHalf < 256) ? 104 + (zHalf >> 5) : 104;
@@ -3482,6 +3651,7 @@ window.SHView = (function () {
     }
     V.flakes.material.uniforms.uHalfFovTan.value = Math.tan(cam.fov * Math.PI / 360);
     V.flakes.material.uniforms.uPsx.value = V.psxWobble ? 1 : 0;
+    V.splashes.material.uniforms.uPsx.value = V.psxWobble ? 1 : 0;   /* V44 E-3: the snap gate */
 
     const cr = V.enabled ? env.fog.fogColor[0] : 16;
     const cg = V.enabled ? env.fog.fogColor[1] : 16;
@@ -8032,6 +8202,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       /* V44 (C-2): the carousel per-instance yaw step (rotStepDeg) + the
        * engine loop-index base (instRange[0]) — fog_poc.c parse verbatim */
       rotStepDeg: 0, instBase: 0,
+      /* v43 (rot0 fix): the carousel per-instance fields (fog_poc.c v36
+       * parse, restored pre-parse — was missing from the twin entirely) */
+      instBase: 0, rot0PerInstN: 0, rot0PerInst: [],
       /* tvNoise (catalog constants; the engine's own literals). v36: the
        * ALL-TEN-SCREEN state (the engine s_800E06A0 x 10 — fog_poc.c
        * :1253-1267): tvSub/tvDur/tvSlot/tvU/tvV/tvPat/tvPatT/tvDone per
@@ -8093,7 +8266,9 @@ function sh1xDriverInit(propAnims, header, opts) {
       wfLastT: 0,
       scatterAng: new Array(16).fill(0), scatterAmp: new Array(16).fill(0),
       liveVy: new Array(16).fill(0), liveVz: new Array(16).fill(0),
-      seeded: 0, isCabin: 0
+      seeded: 0, isCabin: 0,
+      /* v44 (C-6): the driveGate PLAYER_NEAR_POS rects (fog_poc.c mirror) */
+      dgNear: 0, dgBaseXQ12: 0, dgTolXQ12: 0, dgBaseZQ12: 0, dgTolZQ12: 0
     };
     a.object = sh1xJs(e, 'object', '');
     const drv = sh1xJs(e, 'driver', '');
@@ -8179,7 +8354,7 @@ function sh1xDriverInit(propAnims, header, opts) {
     a.kick = sh1xJn(e, 'kick', 0.0);
     a.restAngle = sh1xJn(e, 'rest', sh1xJn(e, 'restAngle', 0.0));
     a.angVelMax = sh1xJn(e, 'angVelMax', 0.0);
-    a.rawVyFloor = sh1xJi(e, 'vyFloorRaw', 0);
+    a.rawVyFloor = sh1xJi(e, 'vyFloorRaw', -91);
     a.rawAngAccel = sh1xJi(e, 'angAccelRaw', -113);
     a.rawAngVelFloor = sh1xJi(e, 'angVelFloorRaw', -56);
     a.rawKickVel = sh1xJi(e, 'kickVelRaw', -128);
@@ -8222,6 +8397,39 @@ function sh1xDriverInit(propAnims, header, opts) {
       const p2 = sh1xJs(e, 'eventGate2Polarity', 'set');
       a.eventGate2Pol = (p2 === 'clear') ? 1 : 0;
     }
+    /* v44 (C-6): the driveGate PLAYER_NEAR_POS rects — the ripper emits the
+     * engine literals verbatim in the driveGate doc string (ferris
+     * (vx,8.0,20.0)/(vz,-28.0,22.0), lissajous (vx,-16.0,20.0)/(vz,-64.0,
+     * 20.0); map6_s04_2.c:3493-3508). Quantized to engine Q12 raw counts
+     * (Math.trunc = the C (int) TO_FIXED truncation). Fog_poc.c mirror. */
+    a.dgNear = 0;
+    {
+      const dg = sh1xJs(e, 'driveGate', '');
+      const mx = /PLAYER_NEAR_POS\(vx,(-?[\d.]+),(-?[\d.]+)\)/.exec(dg);
+      const mz = /PLAYER_NEAR_POS\(vz,(-?[\d.]+),(-?[\d.]+)\)/.exec(dg);
+      if (mx && mz) {
+        a.dgBaseXQ12 = Math.trunc(parseFloat(mx[1]) * 4096);
+        a.dgTolXQ12 = Math.trunc(parseFloat(mx[2]) * 4096);
+        a.dgBaseZQ12 = Math.trunc(parseFloat(mz[1]) * 4096);
+        a.dgTolZQ12 = Math.trunc(parseFloat(mz[2]) * 4096);
+        a.dgNear = 1;
+      }
+    }
+    /* The ripper carries the driveGate field only on the FIVE ferris
+     * entries (ipd2gltf.py:1441/1452/1464/1488/1511) — the lissajous
+     * WHEEL_BA entry was never given one. Default both ride families to
+     * the ENGINE literals (map6_s04_2.c:3494 ferris / :3501 lissajous);
+     * an explicit driveGate field wins (fog_poc.c mirror). */
+    if (!a.dgNear && (a.driver === 14 || a.driver === 15)) {
+      if (a.driver === 14) {           /* ferris (vx,8.0,20.0)/(vz,-28.0,22.0) */
+        a.dgBaseXQ12 = Math.trunc(8 * 4096);   a.dgTolXQ12 = Math.trunc(20 * 4096);
+        a.dgBaseZQ12 = Math.trunc(-28 * 4096); a.dgTolZQ12 = Math.trunc(22 * 4096);
+      } else {                         /* lissajous (vx,-16.0,20.0)/(vz,-64.0,20.0) */
+        a.dgBaseXQ12 = Math.trunc(-16 * 4096); a.dgTolXQ12 = Math.trunc(20 * 4096);
+        a.dgBaseZQ12 = Math.trunc(-64 * 4096); a.dgTolZQ12 = Math.trunc(20 * 4096);
+      }
+      a.dgNear = 1;
+    }
     {
       const pol = sh1xJs(e, 'eventGatePolarity', 'set');
       a.eventGatePol = (pol === 'clear') ? 1 : (pol === 'clear-or') ? 2 : 0;
@@ -8241,12 +8449,24 @@ function sh1xDriverInit(propAnims, header, opts) {
      * (the posed nodes carry the LOCAL animInst 0..N-1; engine
      * i = animInst + instBase — fog_poc.c, the case-12 precedent). */
     a.rotStepDeg = sh1xJn(e, 'rotStepDeg', 0);
+    /* v43 (rot0 fix) + V44 (C-2) shared: instRange[0] = the engine loop-index
+     * base (the sineBob UMA1_HID global horse index 6..9 AND the carousel
+     * fence's sector base 1) — one parse, two consumers; rot0PerInst = the
+     * D_800EBAFC per-horse yaws (fog_poc.c verbatim) */
     a.instBase = 0;
     {
       const ir = Array.isArray(e.instRange) ? e.instRange : null;
-      if (ir && ir.length >= 1) {
-        const n0 = +ir[0];
-        if (isFinite(n0)) a.instBase = Math.trunc(n0);
+      if (ir && ir.length >= 1) { const n0 = +ir[0]; if (isFinite(n0)) a.instBase = Math.trunc(n0); }
+    }
+    a.rot0PerInstN = 0;
+    {
+      const rpi = Array.isArray(e.rot0PerInst) ? e.rot0PerInst : [];
+      for (let q = 0; q < rpi.length && q < 16; q++) {
+        const rp = rpi[q];
+        if (Array.isArray(rp) && rp.length >= 3) {
+          a.rot0PerInst[q] = [+rp[0], +rp[1], +rp[2]];
+          a.rot0PerInstN++;
+        }
       }
     }
     {
@@ -8631,7 +8851,7 @@ function shTvState3(a, si, dtRaw) {
  * The shared S.rngSeed advances exactly like the engine's global g_propRngSeed:
  * the per-anim draw order (gated anims skipped before any draw, followers
  * skipped) is part of the deterministic contract. */
-function sh1xDriverTick(S, dt) {
+function sh1xDriverTick(S, dt, cam) {
   const dtRaw = Math.trunc(dt * 4096);          /* C: (int)(dt * 4096.0) */
   for (let i = 0; i < S.anims.length; i++) {
     const a = S.anims[i];
@@ -8646,6 +8866,23 @@ function sh1xDriverTick(S, dt) {
       continue;                                  /* engine: update gated off */
     }
     if (a.sharedLeader >= 0) continue;           /* follower: leader's state */
+    /* v44 (C-6): the driveGate proximity freeze (fog_poc.c mirror) — the
+     * engine runs the ferris/lissajous update ONLY inside its two
+     * PLAYER_NEAR_POS rects (map6_s04_2.c:3493-3508, strict < per the
+     * PLAYER_NEAR_POS macro game.h:67-69); the WorldObjects_Adds live
+     * INSIDE those funcs (:3817-3845) so a gated ride never advances.
+     * The camera is the player stand-in (engine x identity, z = -glTF z),
+     * Q12 raw counts. Freeze the tick ONLY — the draw stays (the engine's
+     * gated-ADD is design question C-U1; the cabin parity
+     * g_WorldObject7[(D_800EBB34+i)&1] :3838 stays unmodeled — see the
+     * C comment). null cam (no track) = no player stand-in: tick. */
+    if (a.dgNear && cam) {
+      const dx = Math.trunc(cam.x * 4096) - a.dgBaseXQ12;
+      const dz = Math.trunc(-cam.z * 4096) - a.dgBaseZQ12;
+      const nearX = (dx >= 0) ? (dx < a.dgTolXQ12) : (-dx < a.dgTolXQ12);
+      const nearZ = (dz >= 0) ? (dz < a.dgTolZQ12) : (-dz < a.dgTolZQ12);
+      if (!(nearX && nearZ)) continue;           /* outside: the ride FREEZES */
+    }
     switch (a.driver) {
     case 0: {  /* spinRng / spinConst — map0_s00_2.c:1263-1264 */
       let d;
@@ -8929,7 +9166,7 @@ function sh1xDriverTick(S, dt) {
       {
         let rotVx = Math.trunc(a.cur[0] * (4096 / 360));  /* C (int) cast */
         const cosV = sh1xCosQ12(rotVx);
-        const gx = sh1xMulSh(1336, cosV, 12);
+        const gx = sh1xMulSh(1337, cosV, 12);
         /* fx_q12_angle(atan2f(4096, gx)*180/PI) — the one float-libm site
          * (f32 vs f64: a ±1-count wobble at the trunc boundary is possible) */
         const degVar = Math.atan2(4096, gx) * (180 / Math.PI);
@@ -8941,7 +9178,7 @@ function sh1xDriverTick(S, dt) {
         if (rotVx > 1024) rotVx = 1024;           /* Q12_ANGLE(90) */
         a.cur[0] = rotVx * (360 / 4096);
       }
-      a.fallVel += 1336 + (1336 >> 4);            /* MIN(Q12(15),..) */
+      a.fallVel += 1337 + (1337 >> 4);            /* MIN(Q12(15),..) */
       if (a.fallVel > 61440) a.fallVel = 61440;
       a.cur[1] += sh1xMulSh(dtRaw, a.fallVel, 12) / 4096;
       break;
@@ -8990,7 +9227,7 @@ function sh1xDriverTick(S, dt) {
           break;
         }
         case 4: {
-          a.stoneVel += 1336;
+          a.stoneVel += 1337;
           let rz = Math.trunc(a.cur[0] * (4096 / 360));
           rz += sh1xMulSh(dtRaw, -1365, 12);      /* dt*Q12_ANGLE(-120) */
           rz &= 0xFFF;
@@ -9056,6 +9293,11 @@ function sh1xDriverPose(S, i, inst) {
     posEng: [a.pos[0], a.pos[1], a.pos[2]],
     mask: 0
   };
+  /* v43 (rot0 fix): the per-instance authored rot0 (the carousel horses'
+   * D_800EBAFC yaws — fog_poc.c sh1x_anim_pose, v36 restored) */
+  if (a.rot0PerInstN > inst && inst >= 0) {
+    out.rotDeg = [a.rot0PerInst[inst][0], a.rot0PerInst[inst][1], a.rot0PerInst[inst][2]];
+  }
   if (a.sharedLeader >= 0 && a.sharedLeader < S.anims.length) {
     /* follower: the leader's live rotation vector, its own pos */
     const lp = sh1xDriverPose(S, a.sharedLeader, 0);
@@ -9104,7 +9346,10 @@ function sh1xDriverPose(S, i, inst) {
     let master = 0;
     for (let m = 0; m < S.anims.length; m++)
       if (S.anims[m].driver === 13) { master = S.anims[m].mvMaster; break; }
-    const ii = inst > 0 ? inst : 0;
+    /* v43 (rot0 fix): the GLOBAL horse index = the per-node inst +
+     * instRange[0] (fog_poc.c: the UMA1_HID family = engine-loop indices
+     * 6..9, the i>=6 phase branch) */
+    const ii = (inst > 0 ? inst : 0) + a.instBase;
     /* C: (i < 6) ? (int)(i * 4096 / 3) : (i * 2048 + 2048) */
     const phase = (ii < 6) ? sh1xDivT(ii * 4096, 3) : (ii * 2048 + 2048);
     const arg = master * 4 + phase;
@@ -9282,6 +9527,7 @@ function sh1xDriverBind(S, items) {
      * groups only fill the remaining slots (clamped to want-1). */
     {
       const want = (a.count > 1) ? a.count : 1;
+      let posedBound = 0;      /* C-1: posed groups pass 1 binds   */
       let posedAvail = 0;
       for (let q = 0; q < grps.length; q++)
         if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) posedAvail++;
@@ -9297,15 +9543,15 @@ function sh1xDriverBind(S, items) {
           }
           grps[q].n = 0;                  /* mark used */
           posedAvail--;
+          posedBound++;
         }
       }
       /* pass 2: unposed groups fill the remaining slots by distance
-       * (verbatim: the took-loop guard leaves took at 0 — fill = want) */
-      let took = 0;
-      for (let q = 0; q < grps.length && posedAvail > 0; q++) {
-        if (grps[q].n && grps[q].posed >= 0 && grps[q].posed < a.count) took++;
-      }
-      const fill = want - took;
+       * (C-1: the old took loop was dead — posedAvail == 0 after pass 1
+       * and bound groups have n === 0, so fill was always `want` and pass 2
+       * over-bound phantom animated baked copies; the engine draws exactly
+       * `count` copies — fill = the slots pass 1 left open) */
+      const fill = Math.max(0, want - posedBound);
       let nth = 0;
       for (let taken = 0; taken < fill; ) {
         let bg = -1, bd = 1e30;
@@ -9608,14 +9854,25 @@ function sh1xTvPaintFromExtras(tvp) {
     strip: []
   };
   const scr = tvp.screens;
+  /* v44 (F-3): the C's element coercion — fog_poc.c:1905-1913
+   * `(int)jat(ca, i)->num` over the CALLOC'd JValue (jnew, fog_poc.c
+   * :358-362): only JV_NUM (strtod, :519) and JV_BOOL-true (:496) ever
+   * set `num`, so a STRING (JV_STR) or false/null element reads the
+   * calloc zero — `(int)`-truncated here via `| 0`. The old `x | 0`
+   * coerced a numeric string ("5") to 5 through ToNumber instead of 0.
+   * The same rule the file's own vec3 el (:6117) and sh1xJib (:7984)
+   * already implement (booleans coincide: true|0 === 1). Latent in the
+   * shipped corpus (the ripper emits JSON numbers — ipd2gltf.py's
+   * tvPaint literals) — only a hand-edited/hashed GLB triggers it. */
+  const tvEl = (x) => (typeof x === 'number' ? x : x === true ? 1 : 0) | 0;
   for (let k = 0; k < scr.length && k < TV_SCREENS; k++) {
     const s = scr[k];
     if (!s) continue;
     out.big[k] = sh1xJib(s, 'big', 0);   /* the ripper emits numbers 0/1 */
     if (Array.isArray(s.cA) && s.cA.length >= 3)
-      out.cA[k] = [s.cA[0] | 0, s.cA[1] | 0, s.cA[2] | 0];
+      out.cA[k] = [tvEl(s.cA[0]), tvEl(s.cA[1]), tvEl(s.cA[2])];
     if (Array.isArray(s.cB) && s.cB.length >= 3)
-      out.cB[k] = [s.cB[0] | 0, s.cB[1] | 0, s.cB[2] | 0];
+      out.cB[k] = [tvEl(s.cB[0]), tvEl(s.cB[1]), tvEl(s.cB[2])];
   }
   const sty = Array.isArray(tvp.styles) ? tvp.styles : [];
   for (let k = 0; k < sty.length && k < TV_STYLES; k++) {
@@ -9635,8 +9892,12 @@ function sh1xTvPaintFromExtras(tvp) {
   for (let r = 0; r < ps.length && r < 12; r++) {
     const row = Array.isArray(ps[r]) ? ps[r] : [];
     const rr = new Uint16Array(256);
+    /* v44 (F-3): the C :1950 `(unsigned short)(int)v->num` — the same
+     * calloc-zero element rule as cA/cB above, then the u16 wrap
+     * ((int)-1 -> 65535). The old `(row[c] & 0xFFFF) | 0` coerced a
+     * numeric string ("5") to 5 instead of the C's 0. */
     for (let c = 0; c < row.length && c < 256; c++)
-      rr[c] = (row[c] & 0xFFFF) | 0;
+      rr[c] = ((typeof row[c] === 'number' ? row[c] : row[c] === true ? 1 : 0) & 0xFFFF) >>> 0;
     out.strip.push(rr);
   }
   while (out.strip.length < 12) out.strip.push(new Uint16Array(256));
@@ -9764,8 +10025,8 @@ function sh1xWaterfallTick(S, cam, sessionT) {
         a.wfAlong[q] += temp_s4;                /* water.c:180 */
       } else {
         /* water.c:328-340 — the vertical fall (map1_s03's drain cutscene;
-         * 1336 = the engine's g_GravitySpeed raw) */
-        a.wfVyAcc[q] += sh1xMulSh(1336, a.wfVy[q], 7);
+         * 1337 = the engine's g_GravitySpeed raw) */
+        a.wfVyAcc[q] += sh1xMulSh(1337, a.wfVy[q], 7);
         if (a.wfVyAcc[q] > 24576) a.wfVyAcc[q] = 24576;   /* MIN(Q12(6)) */
         const temp_s4 = sh1xMulSh(dtRaw, a.wfVyAcc[q], 12);
         if (a.wfAlong[q] + temp_s4 >=
@@ -10400,6 +10661,7 @@ function sh1xDriverReset(rec) {
                               { animsDemo: true, tvPaint: rec.sh1xTvPaint || null });
   sh1xDriverBind(rec.sh1xSt, rec.sh1xItems);
   rec.sh1xSt.steps = 0;
+  sh1xDriverTick(rec.sh1xSt, 0);   /* v44 F-1: the C's boot-frame prime (fog_poc.c:14869-14881) — dt=0 gate eval + the prime's RNG draws; NO water pair (v38-audit-A2) */
 }
 
 /* T7 (v13.5)/v41 (CT-IMPL fix 4): the USER LIGHT gizmo — the authored pose
@@ -11010,10 +11272,11 @@ function sh1xWaterDepthPass(SV) {
        * (the C's 1183-px A/B). With DoubleSide here the bed's underside
        * wrote ~1.3m over the ENTIRE window and rejected ~the whole
        * strip (the measured 1-px A/B). The faithful shMats stay
-       * DoubleSide (the converter emits either triangle order — the
-       * C raster_tri's both-windings note covers the WINDING, not the
-       * facing); the depth reference mirrors the C's culled-draw
-       * semantics instead. */
+       * DoubleSide — v11 emits ONE order per quad (the "v11 EMISSION
+       * CONTRACT", ipd2gltf), and the facing is decided by the engine's
+       * per-quad gte_NormalClip cull (ported v44: the shQcull walk in
+       * perVertexPass), not by the raster's winding; the depth reference
+       * mirrors the C's culled-draw semantics instead. */
       side: THREE.FrontSide,
       depthTest: true, depthWrite: true
     });
@@ -11028,6 +11291,32 @@ function sh1xWaterDepthPass(SV) {
   for (const c of scene.children) {
     if (c !== root && c.visible) { hidden.push(c); c.visible = false; }
   }
+  /* v44 (E-4): the C's fb->z depth reference is written ONLY by
+   * RP_OPAQUE / RP_MASK_TEX raster prims — fog_poc.c:7738-7739
+   * `if (pass == RP_OPAQUE || pass == RP_MASK_TEX) fb->z[pi] = z;`
+   * sits AFTER the ta==0 hole skip (:7726) and an RP_BLEND_TEX
+   * (GLB alphaMode BLEND -> three.js mat.transparent === true) quad
+   * NEVER takes it. The override material below writes depth for
+   * every visible mesh, so a semi-trans BLEND decal over-wrote the
+   * ditch bed's true depth in this reference and could starve the
+   * water strip through WATER_FRAG's `if (roomD < vBkt) discard`
+   * gate. Hide the room root's transparent meshes for the pass
+   * (SPU0401 alone carries 11 BLEND materials — the class is live in
+   * the flagship room). NOT hidden: MASK materials (mat.alphaTest —
+   * the engine's MASK_TEX texels DO write fb->z, V41 C-5) and the
+   * opaque geometry. KNOWN-UNFIXED here, documented: (1) 0x0000 hole
+   * TEXELS of opaque/MASK quads — the C raster skips ta==0 before
+   * the z-write, so a texel hole leaves fb->z untouched; this pass
+   * writes whole triangles (exactness needs the texture-aware
+   * discard). (2) far-culled geometry — beyond-farCullQ8 quads never
+   * enter the C's OT (:13663/:13673), so fb->z keeps its 1e30
+   * no-data sentinel (:12942) there; this pass still rasterizes them
+   * (exactness needs the CT-2#4 per-quad qcull far flag). */
+  root.traverse(o => {
+    if (!o.isMesh || !o.visible) return;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (m && m.transparent === true) { hidden.push(o); o.visible = false; }
+  });
   const prevOverride = scene.overrideMaterial;
   const prevAutoClear = r.autoClear;
   const prevRT = r.getRenderTarget();
@@ -11370,7 +11659,7 @@ function sh1xTvPaintUpdate() {
       /* the OT bucket bound: 0 < (maxZ*256)>>3 < 2047 — the whole quad
        * (both the small POLY_FT4 and each big sub-quad uses its own max) */
       const zm = Math.max(depth[0], depth[1], depth[2], depth[3]);
-      const bucket = Math.floor(zm * 256 + 0.5) >> 3;
+      const bucket = Math.floor(zm * 256) >> 3;   /* V44 D-3: corner SZ truncates */
       if (!(bucket > 0 && bucket < 2047)) continue;
       if (tv.big[si]) {
         /* the 3x3 subdivided near screen (sp10 -> sp30 midpoints,
@@ -11404,7 +11693,7 @@ function sh1xTvPaintUpdate() {
             if (tvQuads >= TV_MAX_QUADS) continue;
             const q = [gi(jj, kk), gi(jj, kk + 1), gi(jj + 1, kk), gi(jj + 1, kk + 1)];
             const subZm = Math.max(md[q[0]], md[q[1]], md[q[2]], md[q[3]]);
-            const subBucket = Math.floor(subZm * 256 + 0.5) >> 3;
+            const subBucket = Math.floor(subZm * 256) >> 3;  /* V44 D-3 */
             if (!(subBucket > 0 && subBucket < 2047)) continue;
             tvEmitQuad(tvQuads,
               [mx[q[0]], mx[q[1]], mx[q[2]], mx[q[3]]],
@@ -11457,9 +11746,10 @@ function applySh1xPropAnims(t) {
    * re-construction must reproduce (V-b experiment: per-tick sampling
    * is bit-identical to the engine discipline). */
   while (S.steps < want) {
-    sh1xDriverTick(S, 1 / 30);          /* the 30Hz grid */
     const stepT = (S.steps + 1) / 30;
-    sh1xWaterfallTick(S, sh1xWaterCamPose(stepT), stepT);
+    const camP = sh1xWaterCamPose(stepT);  /* v44 (C-6): the tick's camera (the player stand-in, the waterfall precedent) */
+    sh1xDriverTick(S, 1 / 30, camP);       /* the 30Hz grid */
+    sh1xWaterfallTick(S, camP, stepT);
     S.steps++;
   }
   S.lastT = t;
