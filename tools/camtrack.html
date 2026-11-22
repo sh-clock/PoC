@@ -6128,7 +6128,13 @@ function trackToJSON(tr) {
     if (tr.lookMode === 'fixed') { o.yawDeg = r4(tr.yawDeg); o.pitchDeg = r4(tr.pitchDeg); }
     if (tr.lookMode === 'lazy') o.lazyRateDegS = r4(tr.lazyRateDegS == null ? 25 : tr.lazyRateDegS);   /* v9 + v9.1 default */
   } else if (tr.type === 'curve') {
-    o.points = tr.points.map(v3j);
+    /* v45 audit (F-3): both C consumers take the FIRST 64 anchors
+     * (fog_poc.c:3366-3368 `if (n > 64) n = 64;`) — the same rule as the
+     * import sanitize's Math.min(rp.length, 64) below. The preview draws
+     * every authored anchor (curveLUT is unbounded), so clamp at write
+     * time: the exported camdat must match what the engine actually
+     * reads. exportCamdat/EMBED.save warn when anchors fall past the cap. */
+    o.points = tr.points.slice(0, 64).map(v3j);
     o.speedMS = r4(tr.speedMS);
     o.lookMode = tr.lookMode;
     if (tr.lookMode === 'normal') o.normalDirection = tr.normalDirection === 'backward' ? 'backward' : 'forward';
@@ -6136,7 +6142,10 @@ function trackToJSON(tr) {
     if (tr.lookMode === 'fixed') { o.yawDeg = r4(tr.yawDeg); o.pitchDeg = r4(tr.pitchDeg); }
     if (tr.lookMode === 'lazy') o.lazyRateDegS = r4(tr.lazyRateDegS == null ? 25 : tr.lazyRateDegS);   /* v9 + v9.1 default */
   } else if (tr.type === 'polyline') {
-    o.points = tr.points.map(v3j);
+    /* v45 audit (F-3): the polyline twin of the curve clamp above —
+     * fog_poc.c:3366-3368 `if (n > 64) n = 64;` (first 64 RAW entries,
+     * the same rule as the import sanitize's Math.min(rp.length, 64)). */
+    o.points = tr.points.slice(0, 64).map(v3j);
     o.speedMS = r4(tr.speedMS);
     o.lookMode = tr.lookMode;
     if (tr.lookMode === 'normal') o.normalDirection = tr.normalDirection === 'backward' ? 'backward' : 'forward';
@@ -6640,6 +6649,26 @@ function warnTracklessModels() {
     toast('No tracks: ' + tl.map(m => m.file).join(', ') +
           ' — the engine exits with "no usable track" when booted with that GLB', 'warn');
 }
+/* v45 audit (F-3): >64 curve/polyline anchors are authorable and the
+ * preview draws them all (curveLUT/polylineLUT are unbounded), but the
+ * engine takes the FIRST 64 (fog_poc.c:3366-3368 `if (n > 64) n = 64;`)
+ * and the editor's own import sanitize truncates the same way
+ * (Math.min(rp.length, 64)) — a 70-anchor corridor polyline previewed
+ * fine but played a different (truncated) path in the engine, and
+ * re-importing the export visibly jumped. trackToJSON now clamps the
+ * export to the same first 64; warn at the moment of writing when
+ * authored anchors fall beyond the cap, so the author knows anchors
+ * 65+ never reach the engine. */
+function warnAnchorCap64() {
+  const capped = [];
+  for (const m of state.doc.models)
+    for (const tr of m.tracks)
+      if ((tr.type === 'curve' || tr.type === 'polyline') && tr.points && tr.points.length > 64)
+        capped.push((tr.name || tr.type) + ': ' + tr.points.length + ' points -> 64');
+  if (capped.length)
+    toast('Anchor cap 64 (' + capped.join(', ') +
+          ') — the engine reads only the first 64 curve/polyline points; the export is clamped to match', 'warn');
+}
 function exportCamdat() {
   const json = JSON.stringify(docToJSON(), null, 2);
   const blob = new Blob([json + '\n'], { type: 'application/json' });
@@ -6654,6 +6683,7 @@ function exportCamdat() {
   const n = state.doc.models.reduce((a, m) => a + m.tracks.length, 0);
   toast('Exported camdat.json (' + state.doc.models.length + ' model(s), ' + n + ' track(s))');
   warnTracklessModels();   /* v40 audit (B-B5) */
+  warnAnchorCap64();       /* v45 audit (F-3) */
 }
 async function newDoc() {
   if (state.dirty && !state.exported) {
@@ -13320,6 +13350,7 @@ const EMBED = {
       toast('Saved — the wallpaper camdat.json was updated');
       try { this.bridge.toast('camdat.json saved — the wallpaper will reload'); } catch (e) {}
       warnTracklessModels();   /* v40 audit (B-B5) */
+      warnAnchorCap64();       /* v45 audit (F-3) */
     } else {
       toast('Save failed — the app reported an error', 'err');
     }
