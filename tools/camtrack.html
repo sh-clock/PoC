@@ -11005,6 +11005,32 @@ function sh1xWaterDepthPass(SV) {
   for (const c of scene.children) {
     if (c !== root && c.visible) { hidden.push(c); c.visible = false; }
   }
+  /* v44 (E-4): the C's fb->z depth reference is written ONLY by
+   * RP_OPAQUE / RP_MASK_TEX raster prims — fog_poc.c:7738-7739
+   * `if (pass == RP_OPAQUE || pass == RP_MASK_TEX) fb->z[pi] = z;`
+   * sits AFTER the ta==0 hole skip (:7726) and an RP_BLEND_TEX
+   * (GLB alphaMode BLEND -> three.js mat.transparent === true) quad
+   * NEVER takes it. The override material below writes depth for
+   * every visible mesh, so a semi-trans BLEND decal over-wrote the
+   * ditch bed's true depth in this reference and could starve the
+   * water strip through WATER_FRAG's `if (roomD < vBkt) discard`
+   * gate. Hide the room root's transparent meshes for the pass
+   * (SPU0401 alone carries 11 BLEND materials — the class is live in
+   * the flagship room). NOT hidden: MASK materials (mat.alphaTest —
+   * the engine's MASK_TEX texels DO write fb->z, V41 C-5) and the
+   * opaque geometry. KNOWN-UNFIXED here, documented: (1) 0x0000 hole
+   * TEXELS of opaque/MASK quads — the C raster skips ta==0 before
+   * the z-write, so a texel hole leaves fb->z untouched; this pass
+   * writes whole triangles (exactness needs the texture-aware
+   * discard). (2) far-culled geometry — beyond-farCullQ8 quads never
+   * enter the C's OT (:13663/:13673), so fb->z keeps its 1e30
+   * no-data sentinel (:12942) there; this pass still rasterizes them
+   * (exactness needs the CT-2#4 per-quad qcull far flag). */
+  root.traverse(o => {
+    if (!o.isMesh || !o.visible) return;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (m && m.transparent === true) { hidden.push(o); o.visible = false; }
+  });
   const prevOverride = scene.overrideMaterial;
   const prevAutoClear = r.autoClear;
   const prevRT = r.getRenderTarget();
