@@ -6379,6 +6379,9 @@ typedef struct {
     uint8_t   spawnCount;      /* g_ParticleSpawnCount (per tick)      */
     int32_t   boxX, boxZ;      /* g_Particle_Position x/z (Q12)        */
     int32_t   prevX, prevZ;    /* g_Particle_PrevPosition x/z (Q12)    */
+    int32_t   prevRotY;       /* g_WeatherParticle_PrevRotationY (Q12
+                               * angle; written each WeatherParticle_
+                               * Update tail, particle.c:1424)        */
     int       camMoved;        /* g_ParticleCameraMoved                */
     int       ticksDone;       /* 30Hz ticks simulated so far          */
     double    lastTickT;       /* track time at the last tick          */
@@ -7316,6 +7319,7 @@ static void snow_reset_seed(Snow *S, unsigned seed) {
     S->ticksDone = 0;
     S->lastTickT = 0.0;
     S->prevX = 0; S->prevZ = 0;        /* g_Particle_PrevPosition at load   */
+    S->prevRotY = 0;                   /* PrevRotationY (BSS 0 at load)      */
     S->boxX  = 0; S->boxZ = 0;
     S->camMoved = 0;
 }
@@ -7359,13 +7363,30 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
         S->prevX = S->boxX; S->prevZ = S->boxZ;   /* first-tick adoption   */
     }
 
-    /* Particle_CameraMovedCheck: dist > 10000 Q12 (~2.44m);
-     * the rotY check is dead in the engine (g_Particle_RotationY is never
-     * written — BSS zero — so ABS_DIFF is always 0)                        */
+    /* Particle_CameraMovedCheck — 1:1 (particle.c:640-656):
+     * dist = hypot(ABS_DIFF(prev.x, box.x), ABS_DIFF(prev.z, box.z));
+     * rotY = ABS_DIFF(PrevRotationY, Vectors0.viewRotation.vy);
+     * moved = dist > 10000 || rotY > Q12_ANGLE(45).
+     * S20 audit F2: the rotY term was dropped on a false "PrevRotationY
+     * is never written" premise — it IS written every WeatherParticle_
+     * Update tail (particle.c:1424: PrevRotationY = Vectors0.
+     * viewRotation.vy), and Vectors0 is refreshed per tick (vwGetViewAngle,
+     * particle.c:180). The PoC's yaw stand-in: the engine's rot.vy =
+     * ratan2(dx, dz) of the look vector (vw_main.c:54) — the horizontal
+     * heading of camFwd, Q12-wrapped to [0, 360).                       */
     {
         int32_t dx = S->prevX - S->boxX, dz = S->prevZ - S->boxZ;
         int64_t d2 = (int64_t)dx * dx + (int64_t)dz * dz;
-        S->camMoved = snow_isqrt((uint32_t)(d2 > 0xFFFFFFFFll ? 0xFFFFFFFFull : (uint64_t)d2)) > 10000;
+        int moved = snow_isqrt((uint32_t)(d2 > 0xFFFFFFFFll ? 0xFFFFFFFFull : (uint64_t)d2)) > 10000;
+        int32_t rotY = (int32_t)(fx_q12_angle(atan2f(camFwd.x, camFwd.z)
+                                              * (180.0f / (float)M_PI)));
+        int32_t dyaw = S->prevRotY - rotY;
+        if (dyaw < 0) dyaw = -dyaw;
+        /* Q12 wrap: the engine's angles are 0..4095 (one turn); the diff
+         * must fold through the wrap (e.g. 359deg vs 1deg = 2deg)      */
+        if (dyaw > 2048) dyaw = 4096 - dyaw;
+        if (dyaw > fx_q12_angle(45.0f)) moved = 1;
+        S->camMoved = moved;
     }
 
     /* v12 VERBATIM (D4): the engine draws the per-tick rand BEFORE the
@@ -7513,6 +7534,12 @@ static void snow_tick(Snow *S, v3 camPos, v3 camFwd) {
 
     /* g_Particle_PrevPosition = current position                         */
     S->prevX = S->boxX; S->prevZ = S->boxZ;
+    /* S20 audit F2: g_WeatherParticle_PrevRotationY = Vectors0.
+     * viewRotation.vy (the WeatherParticle_Update tail, particle.c:1424)
+     * — the rotY > 45deg term of CameraMovedCheck compares against THIS
+     * stored value on the NEXT tick. */
+    S->prevRotY = (int32_t)(fx_q12_angle(atan2f(camFwd.x, camFwd.z)
+                                         * (180.0f / (float)M_PI)));
     /* v8: g_ParticleVectors1 = g_ParticleVectors0 (end of SystemUpdate)  */
     S->prevViewX = curViewX;
     S->prevViewZ = curViewZ;
