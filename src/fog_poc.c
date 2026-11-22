@@ -7840,17 +7840,54 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
                  * BackgroundMinusForeground, gpu_sw_backend.cpp:182-189:
                  * the blargg per-channel B5-F5 saturating at 0), bits 7-8
                  * = 2 = 15-bit DIRECT COLOR. F = modulate(liveTile T5,
-                 * flat 56) — F8 = (T5*56)>>4, the same pre-dither
-                 * 8-bit-ish domain as the add path; fb_put's quantize8
-                 * clamps the negative at 0 = the 5-bit subtract's
-                 * saturation. All live-tile texels are STP-set -> every
-                 * texel blends (subtracts). No veil, no depth write
-                 * (semi-trans prims never occlude the flakes). */
+                 * flat 56) — F8 = (T5*56)>>4 (the LUT INDEX is exact:
+                 * ((tr>>3)*vr)>>4 == (T5*C8)>>4 bit-for-bit).
+                 * All live-tile texels are STP-set -> every texel blends
+                 * (subtracts). No veil, no depth write (semi-trans prims
+                 * never occlude the flakes).
+                 *
+                 * V45 (audit A-F1): the subtract is the GPU's TWO-STEP
+                 * 5-bit form — swanstation ShadePixel quantizes the
+                 * modulated foreground to 5-bit THROUGH THE DITHER LUT
+                 * FIRST (s_dither_lut[dy][dx][(texture_color.r *
+                 * color_r) >> 4] = clamp5((F8 + D) >> 3),
+                 * gpu_sw_backend.cpp:69-70/136-139 — the dither-off
+                 * entry [2][3] = 0), THEN does the ABR-2 per-5-bit-
+                 * channel saturating subtract (BackgroundMinusForeground,
+                 * :181-189) = max(0, B5 - F5). The old one-step 8-bit
+                 * form subtracted F8 from expand(B5) = 8*B5 + B5>>2
+                 * BEFORE the single >>3, so the background's replication
+                 * low bits leaked through the truncation: one 5-bit level
+                 * too dark whenever (B5>>2) < (F8&7) while B5 > F8>>3
+                 * (e.g. T5=31 -> F8=108, f5=13: B5=14 gives PoC 0 vs
+                 * engine 1); never brighter than the hardware. Same
+                 * two-step pattern as PR #107's RP_ADD_TEX fix;
+                 * expand(B5) >> 3 == B5 losslessly, so the readback is
+                 * exact, and quantize8(+DITHER4)+>>3 is the SAME dither
+                 * chain the opaque path runs through fb_put (with
+                 * --dither the engine dithers the fg LUT only, never the
+                 * subtracted result — the old form did the latter).     */
                 const uint8_t *bg = fb->rgb + pi * 3;
-                int r = (int)bg[0] - (((tr >> 3) * vr) >> 4);
-                int g = (int)bg[1] - (((tg >> 3) * vg) >> 4);
-                int b = (int)bg[2] - (((tb >> 3) * vb) >> 4);
-                fb_put(fb, x, y, r, g, b, quantize, dither);
+                if (quantize) {
+                    int f5r = quantize8(((tr >> 3) * vr) >> 4, dither, x, y) >> 3;
+                    int f5g = quantize8(((tg >> 3) * vg) >> 4, dither, x, y) >> 3;
+                    int f5b = quantize8(((tb >> 3) * vb) >> 4, dither, x, y) >> 3;
+                    int or5 = (bg[0] >> 3) - f5r; if (or5 < 0) or5 = 0;
+                    int og5 = (bg[1] >> 3) - f5g; if (og5 < 0) og5 = 0;
+                    int ob5 = (bg[2] >> 3) - f5b; if (ob5 < 0) ob5 = 0;
+                    uint8_t *dp = fb->rgb + pi * 3;
+                    dp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
+                    dp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
+                    dp[2] = (uint8_t)((ob5 << 3) | (ob5 >> 2));
+                } else {
+                    /* modern (non-15-bit-framebuffer) mode: unchanged 8-bit
+                     * one-step subtract — no GPU counterpart to be
+                     * faithful to.                                             */
+                    int r = (int)bg[0] - (((tr >> 3) * vr) >> 4);
+                    int g = (int)bg[1] - (((tg >> 3) * vg) >> 4);
+                    int b = (int)bg[2] - (((tb >> 3) * vb) >> 4);
+                    fb_put(fb, x, y, r, g, b, quantize, dither);
+                }
                 continue;
             }
             /* v28.1 (audit C-M1, unified with the wallpaper engine):
