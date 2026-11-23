@@ -7452,8 +7452,13 @@ function registerModel(name, gltf) {
     sh1xEnv: (sh1x && sh1x.env) || null,
     /* v48: THE DR WATER — the SH1X.envEffects.waterRefract payload (the
      * DR_WAVE sheet + the live-tile contract) + the SH1X.waterZones (the
-     * engine's s_WaterZone list, map_info.c:389-402, decoded at load)      */
-    sh1xDrWave: sh1xDrWaveFromExtras(sh1x && sh1x.envEffects && sh1x.envEffects.waterRefract),
+     * engine's s_WaterZone list, map_info.c:389-402, decoded at load).
+     * v4b (F14): gated on effectTexFlag == "WaterRefract" like the C
+     * (fog_poc.c:1940 `ee && ee->type == JV_OBJ && sx->envFlagIsWaterRefract`,
+     * the flag from envEffects.effectTexFlag, :1815) — the payload alone
+     * must not arm the feature under a different effect flag.           */
+    sh1xDrWave: (sh1x && sh1x.envEffects && sh1x.envEffects.effectTexFlag === 'WaterRefract')
+      ? sh1xDrWaveFromExtras(sh1x.envEffects.waterRefract) : null,
     sh1xWaterZones: sh1xWaterZonesFromExtras(sh1x && sh1x.waterZones),
     /* v39: the school-water sheet — the SH1X.waterTex EXTRAs decoded at
      * load (fog_poc.c:1801-1833; absent/malformed = null -> the
