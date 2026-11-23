@@ -11962,15 +11962,26 @@ function sh1xDrWaveFromExtras(wr) {
   } catch (e) { return null; }
 }
 /* the SH1X.waterZones decode (map_info.c:389-402 verbatim — the engine
- * bounds are ENGINE meters; illumination raw q11_4 -> meters /16).   */
+ * bounds are ENGINE meters; illumination raw q11_4 -> meters /16).
+ * v4b (F6): disabled entries are KEPT — the engine's zone search
+ * TERMINATES at the first disabled entry (LensFlare_WaterZoneGet,
+ * lens_flare.c:513 `for (cur = zones; cur->isEnabled; cur++)`; the C
+ * twin keeps them and breaks, fog_poc.c:12523) — a zone listed AFTER a
+ * disabled one is unreachable on hardware. The old filter dropped the
+ * disabled entries, making those later zones reachable. The parse also
+ * caps at the C's 4-slot array (fog_poc.c:1568/1852 `k < 4`).        */
 function sh1xWaterZonesFromExtras(zs) {
   if (!Array.isArray(zs) || !zs.length) return null;
   const out = [];
   for (const z of zs) {
-    if (!z || z.enabled !== true) continue;
-    const illumM = typeof z.illuminationMeters === 'number' ? z.illuminationMeters
-                 : ((z.illumination || 0) / 16);
-    out.push({ enabled: true, illumM, minX: z.minX, maxX: z.maxX, minZ: z.minZ, maxZ: z.maxZ });
+    const enabled = !!(z && z.enabled === true);
+    const illumM = (z && typeof z.illuminationMeters === 'number') ? z.illuminationMeters
+                 : ((z && z.illumination || 0) / 16);
+    out.push({ enabled, illumM,
+               minX: z ? z.minX : 0, maxX: z ? z.maxX : 0,
+               minZ: z ? z.minZ : 0, maxZ: z ? z.maxZ : 0 });
+    if (!enabled) break;          /* the list ENDS here on hardware */
+    if (out.length >= 4) break;   /* the C's waterZones[4] */
   }
   return out.length ? out : null;
 }
