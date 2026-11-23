@@ -3587,9 +3587,17 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
          * format itself stores only arcMinDeg/arcMaxDeg — trackToJSON never
          * writes an "arcBounds" field):
          *   arcBounds = raw.arcMinDeg != null && raw.arcMaxDeg != null &&
-         *               num(raw.arcMaxDeg, 1) > num(raw.arcMinDeg, 0)      */
-        t->arcBounds = jget(raw, "arcMinDeg") != NULL &&
-                       jget(raw, "arcMaxDeg") != NULL &&
+         *               num(raw.arcMaxDeg, 1) > num(raw.arcMinDeg, 0)
+         * v48 audit (A18-1): the JS `!= null` gate rejects an EXPLICIT JSON
+         * null too (camtrack.html:6621; the Java twin CamtrackDoc.java:1382
+         * `if (mn == null || mx == null) return false;` likewise), but the C
+         * presence gate jget()!=NULL passes a JV_NULL node through — so
+         * {"arcMinDeg": null, "arcMaxDeg": null} parsed as arcBounds=TRUE
+         * with the -90/90 defaults (bounded/ricochet) here while the editor
+         * and the Java twin give false (free rotation). A key must be present
+         * AND non-null to count. */
+        t->arcBounds = jget(raw, "arcMinDeg") != NULL && jget(raw, "arcMinDeg")->type != JV_NULL &&
+                       jget(raw, "arcMaxDeg") != NULL && jget(raw, "arcMaxDeg")->type != JV_NULL &&
                        jnum(raw, "arcMaxDeg", 1.0) > jnum(raw, "arcMinDeg", 0.0);
         t->arcMinDeg = (float)jnum(raw, "arcMinDeg", -90.0);
         t->arcMaxDeg = (float)jnum(raw, "arcMaxDeg", 90.0);
@@ -3691,12 +3699,15 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
         t->pitchSpeedDegS = (float)jnum(raw, "pitchSpeedDegS", 0.0);
         /* sanitizeTrack reconstruction (same rule as the circle arc):
          *   yawBounds = raw.yawMinDeg != null && raw.yawMaxDeg != null &&
-         *               num(raw.yawMaxDeg, 1) > num(raw.yawMinDeg, 0)       */
-        t->yawBounds = jget(raw, "yawMinDeg") != NULL &&
-                       jget(raw, "yawMaxDeg") != NULL &&
+         *               num(raw.yawMaxDeg, 1) > num(raw.yawMinDeg, 0)
+         * v48 audit (A18-1): the JS `!= null` gate (camtrack.html:6767) also
+         * rejects an explicit JSON null — see the arcBounds note above. */
+        t->yawBounds = jget(raw, "yawMinDeg") != NULL && jget(raw, "yawMinDeg")->type != JV_NULL &&
+                       jget(raw, "yawMaxDeg") != NULL && jget(raw, "yawMaxDeg")->type != JV_NULL &&
                        jnum(raw, "yawMaxDeg", 1.0) > jnum(raw, "yawMinDeg", 0.0);
-        t->pitchBounds = jget(raw, "pitchMinDeg") != NULL &&
-                         jget(raw, "pitchMaxDeg") != NULL &&
+        /* camtrack.html:6769 — same `!= null` semantics for the pitch pair. */
+        t->pitchBounds = jget(raw, "pitchMinDeg") != NULL && jget(raw, "pitchMinDeg")->type != JV_NULL &&
+                         jget(raw, "pitchMaxDeg") != NULL && jget(raw, "pitchMaxDeg")->type != JV_NULL &&
                          jnum(raw, "pitchMaxDeg", 1.0) > jnum(raw, "pitchMinDeg", 0.0);
         t->yawMinDeg = (float)jnum(raw, "yawMinDeg", -45.0);
         t->yawMaxDeg = (float)jnum(raw, "yawMaxDeg", 45.0);
