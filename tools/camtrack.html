@@ -9336,10 +9336,16 @@ function sh1xDriverTick(S, dt, cam) {
         a.fanAng[q] += (q < a.fanSplit) ? -tmp0 : tmp0;
       break;
     }
-    case 3: {  /* translate/MOVACHES — cutscene/demo-only crawl */
+    case 3: {  /* translate/MOVACHES — map5_s03_2.c:712 placement (the shelf
+       WorldObjects_Add carries the PLACEMENT pose; only the cutscene cases
+       move it). The crawl is cutscene/demo-only and CLAMPS at Q12(60.44f)
+       = 247,562 raw (map5_s03_2.c:676-681; step-5 trigger vz > Q12(60.35f)
+       = 247,193, :667). V44 C-5: the old clamp 0x3C720 = 247,584 =
+       60.4453125 m is the flag-389 RESTING pose Q12(60.4454f)
+       (map5_s03_2.c:728) — 22 raw counts (5.4 mm) PAST the crawl clamp. */
       if (S.animsDemo) {
         let z = a.cur[2] + dt * 0.14;
-        const clampM = 0x3C720 / 4096;
+        const clampM = 247562 / 4096;   /* Q12(60.44f), map5_s03_2.c:676-681 */
         if (z > clampM) z = clampM;
         a.cur[2] = z;
       }
