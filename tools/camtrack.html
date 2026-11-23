@@ -2044,6 +2044,7 @@ const SHCore = (function () {
     S.ticksDone = 0;
     S.lastTickT = 0.0;
     S.prevX = 0; S.prevZ = 0;
+    S.prevYawQ12 = 0;                 /* PrevRotationY (BSS 0 at load) */
     S.boxX = 0; S.boxZ = 0;
     S.camMoved = 0;
   }
@@ -2061,19 +2062,59 @@ const SHCore = (function () {
     S.boxX = ox; S.boxZ = oz;
   }
 
+  /* r2_ratan2 (fog_poc.c:15579) — the port's established engine-ratan2
+     stand-in: float atan2 truncated to the Q12 4096-circle, then the
+     SIGNED R2_ANGNORM wrap ((a<<20)>>20 — [-2048, 2047]; the unsigned
+     0..4095 wrap would corrupt every downstream comparison).          */
+  function shR2Ratan2(y, x) {
+    if (x === 0 && y === 0) return 0;
+    const r = Math.trunc(Math.atan2(y, x) / (Math.PI * 2) * 4096);
+    return (r << 20) >> 20;              /* R2_ANGNORM: [-2048, 2047] */
+  }
+
+  /* v43 (E-09-1): the engine's per-tick view yaw on the Q12-angle grid —
+     vwGetViewAngle -> vwMatrixToAngleYXZ -> ratan2(mat->m[0][2],
+     mat->m[2][2]) (vw_calc.c:260). Math_Sin(yaw) ∝ fwd.x and
+     Math_Cos(yaw) ∝ fwd.z — the same relation snowBoxOrigin consumes
+     (particle.c:859-860) — so the yaw is atan2(fwd.x, fwd.z)·4096/2π
+     with the ±2048 seam KEPT (the consumer's ABS_DIFF has no wrap
+     normalization). fog_poc.c:7522-7526.                              */
+  function snowViewYawQ12(camFwd) {
+    const y = Math.floor(camFwd[0] * 4096 + 0.5) | 0;
+    const x = Math.floor(camFwd[2] * 4096 + 0.5) | 0;
+    return shR2Ratan2(y, x);
+  }
+
   /* Particle_Update — the full two-bank steady-state tick (fog_poc.c:4757) */
   function snowTick(S, camPos, camFwd) {
     shParticleWeatherTick(S);
     snowBoxOrigin(S, camPos, camFwd);
 
+    /* this tick's viewRotation.vy (vwGetViewAngle at the head of
+       SystemUpdate — particle.c:180) */
+    const yawQ12 = snowViewYawQ12(camFwd);
+
     if (S.prevX === 0 && S.prevZ === 0) {
       S.prevX = S.boxX; S.prevZ = S.boxZ;
     }
 
+    /* Particle_CameraMovedCheck (particle.c:641-655): dist > 10000 Q12
+     * (~2.44m) OR rotY > Q12_ANGLE(45°) = 512 (fixed_point.h:450-451).
+     * g_WeatherParticle_PrevRotationY IS written every tick at the end
+     * of WeatherParticle_Update (particle.c:1424). ABS_DIFF = ABS(a-b)
+     * with NO wrap normalization (arithmetic.h:147-148): a yaw change
+     * > 45°/tick (camera cuts, the fixed-cam override, lookAt jumps)
+     * fires, and so does any ±180° seam crossing (prev 2047, cur -2047
+     * -> ABS_DIFF 4094 > 512) — a 2-unit turn — which full-circle
+     * lookAt tracks hit once per revolution while the translation
+     * clause stays false. (V43 E-09-1, C commit c9ffea8.)            */
     {
       const dx = (S.prevX - S.boxX) | 0, dz = (S.prevZ - S.boxZ) | 0;
       const d2 = dx * dx + dz * dz;
-      S.camMoved = snowIsqrt(d2 > 0xFFFFFFFF ? 0xFFFFFFFF : d2) > 10000 ? 1 : 0;
+      let dyaw = (S.prevYawQ12 - yawQ12) | 0;
+      if (dyaw < 0) dyaw = -dyaw;        /* ABS_DIFF semantics */
+      S.camMoved = ((snowIsqrt(d2 > 0xFFFFFFFF ? 0xFFFFFFFF : d2) > 10000) ||
+                    (dyaw > 512)) ? 1 : 0;
     }
 
     /* v12 D4: the per-tick rand draw BEFORE the wind ramp */
@@ -2181,6 +2222,8 @@ const SHCore = (function () {
     }
 
     S.prevX = S.boxX; S.prevZ = S.boxZ;
+    /* g_WeatherParticle_PrevRotationY = viewRotation.vy (particle.c:1424) */
+    S.prevYawQ12 = yawQ12;
     S.prevViewX = curViewX;
     S.prevViewZ = curViewZ;
     S.ticksDone++;
@@ -2191,7 +2234,9 @@ const SHCore = (function () {
     const S = {
       p: Array.from({ length: SNOW_COUNT_MAX }, newSnowPart),
       addedCount: 0, addedCount1: 0, spawnCount: 0,
-      boxX: 0, boxZ: 0, prevX: 0, prevZ: 0, camMoved: 0,
+      boxX: 0, boxZ: 0, prevX: 0, prevZ: 0,
+      prevYawQ12: 0,          /* g_WeatherParticle_PrevRotationY (BSS 0) */
+      camMoved: 0,
       ticksDone: 0, lastTickT: 0.0, enabled: true,
       rngSeed: SNOW_SEED_DEFAULT >>> 0,
       weatherClass: 0, windFlag: 0,
