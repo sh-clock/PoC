@@ -5201,6 +5201,20 @@ window.SHUI = (function () {
     const phaseLens = U.phase !== 'scene' && U.phasePair;
     const sp = phaseLens ? U.phasePair : [V.envPair0, V.envPair1];
     const sf = phaseLens ? U.phaseFlash === true : V.env.isFlashlightOn === 1;
+    /* v48 CAM2-5: carry the imported models[].env.animsDemo through the
+     * rebuild — read from the OLD m.env BEFORE the assignment below
+     * overwrites it. The field is round-trip data, not a live control:
+     * the import parse (sanitizeEnv) and the export whitelist both keep
+     * it, and the PoC C parses it for compatibility (cd->envAnimsDemo,
+     * fog_poc.c:3816) — the v34/S21 rule never folds it into playback
+     * (fog_poc.c:19005-19016: the GLB EXTRAS + the --anims-demo /
+     * --no-anims CLI flags are authoritative), but the editor must not
+     * SILENTLY DESTROY authored camdat data (the v13.5 light-panel
+     * discipline: legacy fields are MAPPED, never dropped). Before this
+     * fix any World&Weather control firing syncModel() wiped it and the
+     * next export dropped the field.                                     */
+    const keepAnimsDemo = m.env && typeof m.env.animsDemo === 'boolean'
+      ? m.env.animsDemo : undefined;
     m.env = {
       pair: [sp[0], sp[1]],
       dayEnv: U.dayEnv,
@@ -5214,7 +5228,8 @@ window.SHUI = (function () {
       psxWobble: V.psxWobble,
       dither: V.dither,
       particles: V.particlesOn,
-      engine: V.enabled
+      engine: V.enabled,
+      animsDemo: keepAnimsDemo
     };
     /* the legacy per-model flags (kept for the v12 C++ consumer): derived
        from the live engine state — the new panel SUPERSEDES them as the
