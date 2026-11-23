@@ -762,7 +762,12 @@ def _tv_paint_extras(room, resolver=None, report=None):
         a 4bpp CLUT TIM (PMODE bits 0-1 == 0, CLT bit 3 — the same gate as
         TimFile), or None on any structural mismatch. The returned rows are
         RAW VRAM halfwords (bpp-agnostic byte copies)."""
-        if len(raw) < 20 or raw[0] != 0x10:
+        # v48 (RIP-1): _resolve_bytes() returns None for an unresolvable
+        # TIM (both call sites below pass it straight through) — len(None)
+        # raised TypeError and killed the ENTIRE room export (whole-map
+        # mode then silently dropped the room), leaving the documented
+        # "not resolved/4bpp" report+continue handler below unreachable.
+        if raw is None or len(raw) < 20 or raw[0] != 0x10:
             return None
         flags = u32(raw, 4)
         if not (flags & 8) or (flags & 3) != 0:   # need 4bpp CLUT TIM
