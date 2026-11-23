@@ -12061,11 +12061,17 @@ function sh1xDrWaveAtlas(wr) {
  * samples the live tile directly. renderOrder 10 = the FIXED bucket 640
  * slot (between the opaque room pass and the additive FX at 20).       */
 const WATERLIVE_VERT = `
+  attribute float shQcull;   /* v4b (F4): the per-QUAD nclip+far-cull verdict (the
+                                CT-2#4/E-1 walk — the C applies BOTH to the
+                                waterLive quads in the same collect loop,
+                                fog_poc.c:14514-14526 + :14889) */
   varying vec2 vUv;
+  varying float vQcull;
   uniform float uPsx;
   uniform vec2 uPixScale;
   void main() {
     vUv = uv;
+    vQcull = shQcull;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vec4 clip = projectionMatrix * mvPosition;
     if (uPsx > 0.5 && clip.w > 0.0) {
@@ -12083,8 +12089,33 @@ const WATERLIVE_VERT = `
   }`;
 const WATERLIVE_FRAG = `
   uniform sampler2D map;     /* the 32x32 live tile (repl5 RGB) */
+  uniform sampler2D uRoomDepth;  /* v4b (F5): the room true-depth reference (wfDepthRT) */
+  uniform vec2 uRtSize;
   varying vec2 vUv;
+  varying float vQcull;
   void main() {
+    /* v4b (F4): the engine's per-quad culls — func_80059E34 drops the quad
+     * at :1500-1503 `if (var_t9 < var_t2) continue;` (var_t9 =
+     * MIN(Q8(7.61)<<(otShift+2), fog.farDistance), var_t2 = the quad's Q8
+     * depth — the field_1C FAR CULL; bodyprog_80056D8C.c:1475-1476), and
+     * the C twin applies the gte_NormalClip backface cull in the SAME
+     * collect loop (fog_poc.c:14514-14526) before the waterLive bucket
+     * branch (:14891-14904). The shQcull attribute carries both verdicts
+     * (the perVertexPass walk — the established SH_FRAG gate form). The
+     * v48 comment claimed "the far-cull never applies" — false. */
+    if (vQcull > 0.0) discard;
+    /* v4b (F5): the FIXED bucket-640 occlusion contract (func_80059E34
+     * arg0==1 addPrim org[640], bodyprog_80056D8C.c:1455): the floor
+     * paints UNDER all opaque geometry NEARER than the bucket's far edge
+     * and OVER everything farther — NOT at its own true depth. The v48
+     * depthTest:true subtracted the dapple onto walls FARTHER than the
+     * water plane but nearer than 20.03 m — geometry the engine paints
+     * OVER the floor un-dappled. The gate = the glint/cone fixed-depth
+     * discipline (641/32 = 20.03125 m, the bucket far edge — the same
+     * (B+1)/32 convention as the 641->20.0625 / 639->20.0 gates). */
+    vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
+    float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
+    if (roomD < 20.03125) discard;
     vec4 texel = texture2D(map, vUv);
     /* the 0x2E383838 flat modulate: F5 = (T5 * 56) >> 7 (the direct
        15-bit tile view — func_80059E34 case 1; the PoC twin
@@ -12121,10 +12152,11 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
         uniforms: {
           map: { value: tex },
           /* uFarCullM: synced by perVertexPass on EVERY shMat slot
-             (:3605) — the water floor ignores it (the engine's
-             func_80059E34 case-1 quads draw at the FIXED bucket 640,
-             the far-cull never applies) but the slot must exist. */
+             (:3605) — the water floor's far cull rides the shQcull walk
+             (F4), the uniform stays informational. */
           uFarCullM: { value: 60.875 },
+          uRoomDepth: { value: null },   /* v4b (F5): wired per frame */
+          uRtSize: { value: new THREE.Vector2(SV.V.RT_W, SV.V.RT_H) },
           uPsx: { value: SV.V.psxWobble ? 1 : 0 },
           uPixScale: { value: new THREE.Vector2(SV.V.RT_W / 320, SV.V.RT_H / 224) }
         },
@@ -12137,7 +12169,13 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
            raw dapple — both inverted. GL clamps to [0,1] = the C's
            saturate-at-0. depthWrite false (the PS1 has no depth buffer;
            the C's water floor never writes fb->z).    */
-        transparent: true, depthWrite: false, depthTest: true,
+        /* v4b (F5): depthTest FALSE — the occlusion is the FIXED
+           bucket-640 gate in the FRAG (roomD < 20.03125 discard), NOT
+           the floor's own true depth: the engine paints the floor UNDER
+           all opaque geometry nearer than the bucket far edge and OVER
+           everything farther, regardless of the water plane's true
+           depth.    */
+        transparent: true, depthWrite: false, depthTest: false,
         side: THREE.DoubleSide,
         blending: THREE.CustomBlending,
         blendEquation: THREE.ReverseSubtractEquation,
@@ -12301,6 +12339,27 @@ function sh1xDrWaterFxUpdate() {
   let drew = 0;
   if (drWaterOn) {
     const rec = three.loaded.get(state.activeFile);
+    /* v4b (F5): the floor's fixed-bucket gate needs the room depth
+     * reference EVERY frame the floor is swapped in — the v48 port wired
+     * it only inside the waterfall/zone-matched branches, leaving the
+     * floor sampling a stale/null ref (null = the black default texture
+     * = roomD 0 = the whole floor discarded). Render the reference
+     * fresh (the camera moves every frame) + sync every liveMat slot.
+     * sh1xWaterEnsureMesh() makes wfMat exist for the pass (idempotent;
+     * the mesh stays drawRange 0 = invisible when no waterfall data). */
+    if (rec && rec.shMats) {
+      let hasLive = false;
+      for (const m of rec.shMats)
+        if (m && m.uniforms && m.uniforms.uRoomDepth) { hasLive = true; break; }
+      if (hasLive) {
+        sh1xWaterEnsureMesh();
+        sh1xWaterDepthPass(SV);
+        const dref = wfMat.uniforms.uRoomDepth.value;
+        for (const m of rec.shMats)
+          if (m && m.uniforms && m.uniforms.uRoomDepth && m.uniforms.uRoomDepth.value !== dref)
+            m.uniforms.uRoomDepth.value = dref;
+      }
+    }
     if (rec && rec.sh1xDrWave && rec.sh1xWaterZones && rec.sh1xWaterZones.length) {
       const V = SV.V;
       const env = V.env;
