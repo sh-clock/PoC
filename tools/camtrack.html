@@ -2862,6 +2862,7 @@ window.SHView = (function () {
     varying vec3 vColS; varying float vClut;
     varying float vProf; varying float vLenS; varying float vDepth;
     uniform float uRT_W; uniform float uRT_H;
+    uniform vec2 uPixScale;   /* (RT_W/320, RT_H/224) — the GTE lattice */
     void main() {
       vColS = iPrim;
       vClut = iClut;
@@ -2874,6 +2875,16 @@ window.SHView = (function () {
                      (1.0 - (cT.y / cT.w + 1.0) * 0.5) * uRT_H);
       vec2 sH = vec2((cH.x / cH.w + 1.0) * 0.5 * uRT_W,
                      (1.0 - (cH.y / cH.w + 1.0) * 0.5) * uRT_H);
+      /* v4b: gte_snap_screen VERBATIM (fog_poc.c:8892-8903) on BOTH
+         endpoints — the C snaps the tail and the head (fog_poc.c:14350-
+         14351) then (int)-truncates them for the DDA walk (:14475-14482):
+         floor to the ENGINE lattice + the PushSXY [-1024,1023] saturation.
+         The raw projections left the ribbon endpoints off-lattice (the
+         CT-2#7d comment's "truncated indices' pixel CENTERS" was never
+         implemented) — a sub-pixel shift of every DDA step + len off by
+         the fractional endpoints. */
+      sT = clamp(floor(sT / uPixScale), vec2(-1024.0), vec2(1023.0)) * uPixScale;
+      sH = clamp(floor(sH / uPixScale), vec2(-1024.0), vec2(1023.0)) * uPixScale;
       vec2 d = sH - sT;
       float len = max(abs(d.x), abs(d.y));   /* the C's major-axis length */
       if (len < 1.0) len = 1.0;              /* the C: if (len <= 0) len = 1 */
@@ -3050,7 +3061,8 @@ window.SHView = (function () {
       const mat = new three.ShaderMaterial({
         vertexShader: STREAK_VERT, fragmentShader: STREAK_FRAG,
         uniforms: { map: { value: buildStreakAtlas(three) },
-                    uRT_W: { value: V.RT_W }, uRT_H: { value: V.RT_H } },
+                    uRT_W: { value: V.RT_W }, uRT_H: { value: V.RT_H },
+                    uPixScale: { value: new three.Vector2(V.RT_W / 320, V.RT_H / 224) } },
         transparent: true, depthWrite: false,
         side: three.DoubleSide,
         blending: three.AdditiveBlending
