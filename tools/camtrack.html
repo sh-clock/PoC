@@ -13093,6 +13093,20 @@ function applySh1xPropAnims(t) {
   const M = new THREE.Matrix4(), localM = new THREE.Matrix4(), invP = new THREE.Matrix4();
   const pv = new THREE.Vector3(), pq = new THREE.Quaternion(), ps = new THREE.Vector3();
   const seen = new Set();
+  /* v4b (B6-3): TWO passes. The single-pass compose read the parent's
+   * matrixWorld as of the PREVIOUS frame — three.js refreshes matrixWorld
+   * only during render, and the only updateMatrixWorld was the one-time
+   * record build — so a posed child under a posed/moving parent composed
+   * against a stale chain (world = P_new * P_old^-1 * M: a one-frame lag
+   * plus a spurious relative transform). The C replaces the item's whole
+   * WORLD matrix flat each tick (sh1x_anim_apply, fog_poc.c:10086-10134
+   * — `it->model = M`, reset to the authored base then re-applied per
+   * tick, :10181-10186 — no parent compose, no lag possible). Pass A
+   * writes every reset local and stashes the posed drivers' results
+   * (all locals final for the frame); pass B refreshes each parent's
+   * chain (updateWorldMatrix(true, false) walks the ancestors' FINAL
+   * locals) and composes against the fresh parent world.             */
+  const posed = [];
   for (const it of rec.sh1xItems) {
     if (it.animIdx < 0) continue;
     if (seen.has(it.node)) continue;
@@ -13112,21 +13126,30 @@ function applySh1xPropAnims(t) {
       continue;
     }
     const ap = sh1xDriverApplyNum(S, it.animIdx, it.animInst, [it.tx, it.ty, it.tz]);
-    /* S-conjugated Euler: x preserved, y/z negated (order 'YXZ' = Ry·Rx·Rz) */
+    posed.push({ node: it.node, ap });
+  }
+  for (let pi = 0; pi < posed.length; pi++) {
+    const node = posed[pi].node, ap = posed[pi].ap;
+    /* S-conjugated Euler: x preserved, y/z negated (order 'YXZ' = Ry*Rx*Rz) */
     eul.set(ap.rotQ12[0] * (360 / 4096) * D2R,
             -ap.rotQ12[1] * (360 / 4096) * D2R,
             -ap.rotQ12[2] * (360 / 4096) * D2R, 'YXZ');
     M.makeRotationFromEuler(eul);
     M.setPosition(ap.t[0], ap.t[1], ap.t[2]);
     /* the engine replaces the item's whole WORLD matrix — compose the
-     * node's local as parentWorld⁻¹ · M (posed parents are translation-only) */
-    if (it.node.parent) invP.copy(it.node.parent.matrixWorld).invert();
-    else invP.identity();
+     * node's local as parentWorld^-1 * M against THIS frame's chain
+     * (posed parents are translation-only so the compose is exact) */
+    if (node.parent) {
+      node.parent.updateWorldMatrix(true, false);   /* the FINAL locals above */
+      invP.copy(node.parent.matrixWorld).invert();
+    } else {
+      invP.identity();
+    }
     localM.multiplyMatrices(invP, M);
     localM.decompose(pv, pq, ps);
-    it.node.position.copy(pv);
-    it.node.quaternion.copy(pq);
-    it.node.scale.copy(ps);
+    node.position.copy(pv);
+    node.quaternion.copy(pq);
+    node.scale.copy(ps);
   }
   /* lightFlicker: the live multiplier on the preview sun (ungated drivers) */
   let flick = 1;
