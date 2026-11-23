@@ -12210,6 +12210,10 @@ const WATERLIVE_FRAG = `
 function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
   const SV = window.SHView;
   if (!SV || !SV.V.ready) return;
+  /* v4b (F8): ?drwater=0 gates the FLOOR half too — the v48 port only
+   * gated the FX update (sh1xDrWaterFxUpdate), leaving the floor swapped
+   * to the live material (sampling the never-regenerated zero tile). */
+  if (!drWaterOn) return;
   const rec = SV.V.models.get(name);
   if (!rec || !rec.meshes.length) return;
   const payload = (wr && wr.pixels) ? wr : null;
