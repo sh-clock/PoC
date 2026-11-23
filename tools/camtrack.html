@@ -2773,7 +2773,7 @@ window.SHView = (function () {
         /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
            (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
            PushSXY [-1024,1023] ENGINE-px saturation (swanstation
-           gte.cpp:353-380 — the C's gte_snap_screen, fog_poc.c:8892-8903,
+           gte.cpp:353-380 — the C's gte_snap_screen, fog_poc.c:9104-9115,
            v43 E-11-2): a vertex in front of the camera projecting past
            ±1024 engine px is PINNED there on hardware (the near-edge
            warp), so a straddling quad's visible edge slopes follow the
@@ -2958,8 +2958,8 @@ window.SHView = (function () {
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        /* gte_snap_screen VERBATIM (fog_poc.c:8892-8903, the flake base
-           :14259): PushSXY floor to the ENGINE lattice, THEN the
+        /* gte_snap_screen VERBATIM (fog_poc.c:9104-9115, the flake base
+           :14539): PushSXY floor to the ENGINE lattice, THEN the
            [-1024,1023] saturation (swanstation gte.cpp:353-380) — same
            family as the #195 SH_VERT fix (the #204 re-cut). */
         vec2 eng = floor(screen / uPixScale);
@@ -3016,9 +3016,9 @@ window.SHView = (function () {
                      (1.0 - (cT.y / cT.w + 1.0) * 0.5) * uRT_H);
       vec2 sH = vec2((cH.x / cH.w + 1.0) * 0.5 * uRT_W,
                      (1.0 - (cH.y / cH.w + 1.0) * 0.5) * uRT_H);
-      /* v4b: gte_snap_screen VERBATIM (fog_poc.c:8892-8903) on BOTH
-         endpoints — the C snaps the tail and the head (fog_poc.c:14350-
-         14351) then (int)-truncates them for the DDA walk (:14475-14482):
+      /* v4b: gte_snap_screen VERBATIM (fog_poc.c:9104-9115) on BOTH
+         endpoints — the C snaps the tail and the head (fog_poc.c:14630-
+         14631) then (int)-truncates them for the DDA walk (:14667-14668):
          floor to the ENGINE lattice + the PushSXY [-1024,1023] saturation.
          The raw projections left the ribbon endpoints off-lattice (the
          CT-2#7d comment's "truncated indices' pixel CENTERS" was never
@@ -3078,9 +3078,9 @@ window.SHView = (function () {
       vec3 p = iPos + position * iScale;
       vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       /* V44 (E-3): the C snaps ALL 4 splash ground corners
-         (gte_snap_screen under opts.ps1, fog_poc.c:14432) —
+         (gte_snap_screen under opts.ps1, fog_poc.c:14712) —
          the FLAKE_VERT snap branch verbatim (floor + the PushSXY
-         [-1024,1023] saturation, fog_poc.c:8892-8903).              */
+         [-1024,1023] saturation, fog_poc.c:9104-9115).              */
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
@@ -3545,10 +3545,10 @@ window.SHView = (function () {
         const o3 = i * 3;
 
         /* v44 (E-1) — the per-vertex GTE screen coords for the cull walk
-         * below: the C's RVert sx/sy (transform_item2, fog_poc.c:9070) — the
+         * below: the C's RVert sx/sy (transform_item2, fog_poc.c:9282) — the
          * SAME clip projection SH_VERT uses and the SAME floor snap +
          * PushSXY saturation gte_snap_screen applies when ps1 is on
-         * (fog_poc.c:8892-8903); the engine's nclip reads these
+         * (fog_poc.c:9104-9115); the engine's nclip reads these
          * POST-SNAP, POST-SATURATION coords. A w <= 0 corner (behind the
          * camera) has no shader snap value — the walk skips such quads
          * (qok = 0) rather than guess a wrapped projection.             */
@@ -3561,7 +3561,7 @@ window.SHView = (function () {
           let sx = (cx / cw + 1.0) * 0.5 * 320 * gteScaleX;
           let sy = (1.0 - (cy / cw + 1.0) * 0.5) * 224 * gteScaleY;
           if (gteSnap) {
-            /* gte_snap_screen VERBATIM (fog_poc.c:8892-8903, v43 E-11-2):
+            /* gte_snap_screen VERBATIM (fog_poc.c:9104-9115, v43 E-11-2):
              * floor to the ENGINE-pixel lattice (PushSXY s32(Sx>>16)
              * truncation == floor), THEN saturate to the screen FIFO's
              * [-1024, 1023] engine-px range (PushSXY, swanstation
@@ -5769,7 +5769,7 @@ window.SHUI = (function () {
         note.textContent = 'camera anchor (legacy) — offset ' + U.lightOffset.join(', ') +
           ' m (oy = UP/DOWN)' + (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '') +
           (U.lightRotAuthored ? ' \u00b7 aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' : '') +
-          ' \u2014 v49: the numbers move the ENGINE light (the reflection needs ahead > 0.44 m: Gate 2); drag the gold sphere with Shift for height, or the cyan Y-rail';
+          ' \u2014 v49: the numbers move the ENGINE light (the reflection needs the light >= 113 Q8 = 0.441 m in front of the camera: Gate 2 — the default offset's oz already adds 0.12 m); drag the gold sphere with Shift for height, or the cyan Y-rail';
       } else if (U.lightMode === 'line') {
         note.textContent = 'line light — start ' + U.lightStart.map(v => v.toFixed(1)).join(', ') +
           ' \u2192 end ' + U.lightEnd.map(v => v.toFixed(1)).join(', ') + ' m \u00b7 ' +
@@ -11797,7 +11797,7 @@ const WATER_VERT = `
   varying float vW;          /* the noperspective (affine) unwrap weight */
   varying float vBkt;         /* the prim's far-edge gate depth — the C's painter-gate input */
   uniform float uPsx;
-  uniform vec2 uPixScale;    /* (RT_W/320, RT_H/240) — the GTE grid */
+  uniform vec2 uPixScale;    /* (RT_W/320, RT_H/224) — the GTE grid */
   void main() {
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     float depth = -mvPosition.z;
@@ -11806,9 +11806,12 @@ const WATER_VERT = `
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
          (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
-         PushSXY [-1024,1023] saturation — the C's gte_snap_screen
-         (fog_poc.c:8892-8903) applies to EVERY DrawItem quad corner
-         (transform_item2 :9070), the water strip included. */
+         PushSXY [-1024,1023] saturation — the ENGINE projects
+         every strip row corner through gte_rtps/gte_stsxy
+         (water.c:626-629): the strip is NOT a DrawItem; the same
+         hardware floor+saturation as the C's gte_snap_screen
+         (fog_poc.c:9104-9115; the C twin's strip path —
+         sh1x_school_water_draw — gained the snap in the w5 audit). */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
       vec2 eng = floor(screen / uPixScale);
@@ -12326,7 +12329,7 @@ function drTileEnsure() {
   return drTile.tex;
 }
 /* the ctr composite VERBATIM (lens_flare.c:578-599 + the PoC's
- * fx_water_tile_update fog_poc.c:12498-12522):
+ * fx_water_tile_update fog_poc.c:12768-12792):
  *   poly[0] OPAQUE    u 0..32,  v = (ctr>>1)&0x1F .. +32  (clut row 0)
  *   poly[1] ABR-1 ADD u = ((ctr+1)>>2)&0x1F .. +32, v 8..40 (clut row 0)
  * both primColor (128,128,128) = x1.0 — the composite is the 5-bit
@@ -12398,7 +12401,7 @@ const WATERLIVE_VERT = `
   attribute float shQcull;   /* v4b (F4): the per-QUAD nclip+far-cull verdict (the
                                 CT-2#4/E-1 walk — the C applies BOTH to the
                                 waterLive quads in the same collect loop,
-                                fog_poc.c:14514-14526 + :14889) */
+                                fog_poc.c:15159-15184 + :15171) */
   varying vec2 vUv;
   varying float vQcull;
   uniform float uPsx;
@@ -12412,7 +12415,7 @@ const WATERLIVE_VERT = `
       /* the GTE screen snap (the SH_VERT discipline — the engine's floor
          quads draw through the same GTE projection as the room): floor
          to the ENGINE lattice + the PushSXY [-1024,1023] saturation
-         (gte_snap_screen, fog_poc.c:8892-8903 / transform_item2 :9070) */
+         (gte_snap_screen, fog_poc.c:9104-9115 / transform_item2 :9282) */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
       vec2 eng = floor(screen / uPixScale);
@@ -12436,8 +12439,8 @@ const WATERLIVE_FRAG = `
      * MIN(Q8(7.61)<<(otShift+2), fog.farDistance), var_t2 = the quad's Q8
      * depth — the field_1C FAR CULL; bodyprog_80056D8C.c:1475-1476), and
      * the C twin applies the gte_NormalClip backface cull in the SAME
-     * collect loop (fog_poc.c:14514-14526) before the waterLive bucket
-     * branch (:14891-14904). The shQcull attribute carries both verdicts
+     * collect loop (fog_poc.c:15159-15184) before the waterLive bucket
+     * branch (:15171-15184). The shQcull attribute carries both verdicts
      * (the perVertexPass walk — the established SH_FRAG gate form). The
      * v48 comment claimed "the far-cull never applies" — false. */
     if (vQcull > 0.0) discard;
@@ -12592,7 +12595,10 @@ const CONE_FRAG = `
     gl_FragColor = vec4((f5 * 8.0 + floor(f5 / 4.0)) / 255.0, 1.0);
   }`;
 /* preallocated buffers: the glint quad (4 verts) + the cone fan
- * (8 segments x (2 g4 quads + 2 g3 tris) x 2 pairs — 96 tris).      */
+ * (8 segments x 3 tris/pair/seg x 2 pairs = 48 tris drawn; each buffer
+ * holds DR_TRIS_PER_SEG=6 — both pairs' per-segment count — so each
+ * single-pair buffer draws 3/seg: 2x headroom. w5-audit F18: the old
+ * '96 tris' counted the allocation, not the draw).                    */
 const DR_SEG = 8;
 const DR_TRIS_PER_SEG = 6;      /* opaque: g4 (2) + g3 (1); semi: g4 (2) + g3 (1) */
 let drMeshes = null, drGlintMesh = null, drConeOpMesh = null, drConeSemiMesh = null;
@@ -12995,7 +13001,7 @@ const TV_VERT = `
   varying vec2 vUvw;
   varying float vW;
   uniform float uPsx;
-  uniform vec2 uPixScale;    /* (RT_W/320, RT_H/240) — the GTE grid */
+  uniform vec2 uPixScale;    /* (RT_W/320, RT_H/224) — the GTE grid */
   void main() {
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vec4 clip = projectionMatrix * mvPosition;
@@ -13003,7 +13009,7 @@ const TV_VERT = `
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
          (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
          PushSXY [-1024,1023] saturation — the C's sh_tvpaint_project
-         (fog_poc.c:13792) saturates every TV quad corner. */
+         (fog_poc.c:14031-14051) saturates every TV quad corner. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
       vec2 eng = floor(screen / uPixScale);
