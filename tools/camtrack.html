@@ -1851,6 +1851,13 @@ const SHCore = (function () {
     shParticleDrawCaseMerge(S, S.drawCase);
     S.weatherClass = var_s1;
     S.windFlag = var_s0;
+    /* v43 (E-09-3): sp64 follows the rain intensity this call just set
+       (fog_poc.c:7179 — rain recipes 5/6 reset E32D0 to 135000 -> tier 5;
+       everything else zeroes it -> tier 3), so a render between this
+       reset and the first snowTick draws the engine's tier (the next
+       WeatherParticle_Update head would snapshot the same value).      */
+    S.sp64 = (S.rainIntensity < 27000) ? 3 :
+             (S.rainIntensity < 135000) ? 4 : 5;
   }
 
   /* sharedFunc_800D0B18_0_s00 (fog_poc.c:4469) — the weather TARGET
@@ -1867,7 +1874,15 @@ const SHCore = (function () {
 
     switch (S.weatherClass) {
       case 1: S.snowEnable = 1; break;
-      case 2: S.rainEnable = 1; S.rainIntensity = 0; break;
+      case 2:
+        S.rainEnable = 1; S.rainIntensity = 0;
+        /* v43 (E-09-3): the tier of the reset intensity — fog_poc.c:7231-7233
+           (the engine's first post-D0B18 draw uses sp64 = tier(0) = 3; the
+           next WeatherParticle_Update head snapshots the same value).
+           Case 2 ONLY — the snow/class-0 paths never re-snapshot.       */
+        S.sp64 = (S.rainIntensity < 27000) ? 3 :
+                 (S.rainIntensity < 135000) ? 4 : 5;
+        break;
       default: break;
     }
     /* the verbatim E0CB4 re-pack (particle.c 3911..3924) */
@@ -2088,6 +2103,16 @@ const SHCore = (function () {
   /* Particle_Update — the full two-bank steady-state tick (fog_poc.c:4757) */
   function snowTick(S, camPos, camFwd) {
     shParticleWeatherTick(S);
+    /* v43 (E-09-3), ported v48 CAM2-3: the sp64 snapshot at the HEAD of
+       WeatherParticle_Update (particle.c:839-854, fog_poc.c:7541-7543) —
+       BEFORE the movement passes and BEFORE the pass-1 intensity ramp
+       below (particle.c:1393-1394) — so tick-N splash draws use
+       tier(E32D0 after tick N-1's ramp): the renderer reads S.sp64 and
+       must NOT re-derive the tier from the post-ramp intensity (the old
+       render-time re-derivation was one ramp step late at the
+       27000/135000 thresholds).                                     */
+    S.sp64 = (S.rainIntensity < 27000) ? 3 :
+             (S.rainIntensity < 135000) ? 4 : 5;
     snowBoxOrigin(S, camPos, camFwd);
 
     /* this tick's viewRotation.vy (vwGetViewAngle at the head of
@@ -2243,6 +2268,11 @@ const SHCore = (function () {
       weatherBits: 0, weatherTarget: 0, weatherCurrent: 0,
       weatherSettings: 0, drawCase: 0,
       rainIntensity: 0, rainGravity: 30, weatherTick: 0,
+      /* v43 (E-09-3): the splash growth-rate tier — snapshotted at the
+         snowTick head (particle.c:839-854) and re-set by every
+         rainIntensity reset (particleEnvironmentSet / the D0B18 case-2
+         reset); init = tier(0) = 3 until the boot recipe sets it       */
+      sp64: 3,
       snowTypeEnable: 0, snowEnable: 0, rainEnable: 0,
       windX: 0, windZ: 0, prevViewX: 0, prevViewZ: 0,
       nextWeather: 2,
@@ -3772,8 +3802,13 @@ window.SHView = (function () {
         streaks.push({ tail: [tx, ty, tz], head: [hx, hy, hz], r, g, b, clutRow });
       } else if (p.type === 2 || p.type === 242) {
         if (p.state >= 17) continue;
-        const sp64 = (snow.rainIntensity < 27000) ? 3 :
-                     (snow.rainIntensity < 135000) ? 4 : 5;
+        /* sp64: the splash growth rate — the tier snapshotted at the HEAD
+           of snowTick (v43 E-09-3, fog_poc.c:14396-14400: engine
+           particle.c:839-854, PRE-ramp — tier of E32D0 after the previous
+           tick's ramp, 1393-1394 — NOT the current post-ramp intensity;
+           the old render-time re-derivation read snow.rainIntensity one
+           ramp step late at the 27000/135000 thresholds)                 */
+        const sp64 = snow.sp64;
         const c = p.state << sp64;
         /* v43 (E-11-3/E-16-3), ported v48 CAM2-2: engine :2932/:2993/
            :2999-3005/:3042 (fog_poc.c:14405-14448) — the splash's OT
