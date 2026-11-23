@@ -1261,7 +1261,10 @@ const SHCore = (function () {
       if (var_a1 > 64) var_a1 = 64;          /* dead engine clamp */
       for (let c = 0; c < 3; c++) {
         const sum = env.field_24[c] + shR(env.worldTintColor[c] * var_a1, 7);
-        bk[c] = shR(sum * fogAlpha, 12);
+        /* SetBackColor stores BK = arg<<4 (V44 B-1, C commit 7421567):
+           fog_poc.c:5949 — bk[c] = ((sum*fogAlpha)>>12)<<4. Without the
+           shift the NCS (bk<<12)>>12>>4 ambient lands at 1/16 of the C. */
+        bk[c] = shR(sum * fogAlpha, 12) << 4;
       }
     } else {
       /* func_8005A838 (enum-2 directional): field_28*fogAlpha/2; BK */
@@ -1270,7 +1273,7 @@ const SHCore = (function () {
         llmRow0[c] = v >> 1;
       }
       for (let c = 0; c < 3; c++)
-        bk[c] = shR(env.field_24[c] * fogAlpha, 12);
+        bk[c] = shR(env.field_24[c] * fogAlpha, 12) << 4;  /* SetBackColor BK = arg<<4 (fog_poc.c:5959) */
     }
 
     /* Gfx_BillboardDraw:191-239 — fog scale, magnitude rescale, BK scale,
