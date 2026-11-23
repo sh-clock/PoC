@@ -17182,8 +17182,13 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
     case K_LDOWN:  user_light_nudge(A, 1, -1.0f); break;
     case K_LPITUP: user_light_aim(0, +5.0f); break;
     case K_LPITDN: user_light_aim(0, -5.0f); break;
-    case K_LYAWL:  user_light_aim(1, +5.0f); break;
-    case K_LYAWR:  user_light_aim(1, -5.0f); break;
+    /* v49-audit (A3-1): the engine rot math (func_8003F4DC, the
+     * verbatim sh_light_dir_from_rot) maps +yaw to engine +x = the
+     * camera's RIGHT — 'yaw left' must SUBTRACT (the pitch pair and the
+     * J/O movement pair are label=visual; the shipped signs contradicted
+     * the labels and the three key-map comments). */
+    case K_LYAWL:  user_light_aim(1, -5.0f); break;
+    case K_LYAWR:  user_light_aim(1, +5.0f); break;
     case K_QUIT: return 1;
     case K_ESC:
         /* v9: when the mode browser is open, ESC closes it (the classic
