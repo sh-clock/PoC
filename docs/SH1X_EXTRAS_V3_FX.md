@@ -201,8 +201,10 @@ gated by `chunkGate`/`eventGate(+Polarity)` where the engine gates.
 Positions in ENGINE meters (Q12-decoded, then the engine's own
 WorldObjects_Add Q8/Q10 grid), consumers convert with the standard axis
 map (x, -y, -z). Unplaced animated objects are ALSO emitted as posed
-geometry nodes (`propAnimPosed` extras, one node per instance, t=0
-engine pose) when the model exists in a scanned PLM.
+geometry nodes (one node per instance, t=0
+engine pose; v48 RIP-9: the write-only `propAnimPosed` extras key is
+dropped — `animInst` carries the instance identity) when the model
+exists in a scanned PLM.
 
 ## 4. mapLink (`ANIMS_MAPLINK.md` B-part evidence)
 

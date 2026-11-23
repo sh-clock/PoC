@@ -7236,7 +7236,10 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
             if not _mi:
                 continue
             _meta = {"ot_base": _iobj.ot_base, "field_B_1": _iobj.flag_b1,
-                     "propAnimPosed": True, "animInst": _i + _base_i}
+                     "animInst": _i + _base_i}
+                     # v48 RIP-9 (D4-4): "propAnimPosed": True dropped —
+                     # write-only (no reader in ipd2gltf.py, fog_poc.c reads
+                     # only animInst :2912 + cutsceneOnly :2913)
             if _e.get("cutsceneOnly"):
                 _meta["cutsceneOnly"] = True   # engine-fresh: NOT drawn
             _mn = [builder.add_node(f"{_nname}_m{j}", m, root=False,
