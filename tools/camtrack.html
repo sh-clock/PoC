@@ -12571,7 +12571,19 @@ const GLINT_FRAG = `
 const CONE_VERT = `
   attribute vec3 aCol;
   varying vec3 vCol;
-  void main() { vCol = aCol; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  void main() {
+    vCol = aCol;
+    /* w5-audit (F16): the C truncates EVERY projected coord — (int)
+       TRUNC toward zero, center-relative engine px (fog_poc.c:12185-12190
+       the apex, :12237-12246 the corners); NOT gte_snap_screen's
+       floor+clamp — a different family the cone sites don't use */
+    vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    if (clip.w > 0.0) {
+      vec2 cr = trunc(vec2(clip.x / clip.w * 160.0, -clip.y / clip.w * 112.0));
+      clip.xy = vec2(cr.x / 160.0, -cr.y / 112.0) * clip.w;
+    }
+    gl_Position = clip;
+  }`;
 const CONE_FRAG = `
   uniform sampler2D uRoomDepth;
   uniform vec2 uRtSize;
@@ -12813,7 +12825,11 @@ function sh1xDrWaterFxUpdate() {
                  engine screen y is y-DOWN: px = ndc.x*160, py = -ndc.y*112 */
               const ndc = new THREE.Vector3(lx, gy, lz).project(rtCam);
               if (ndc.z < 1) {
-                const px = ndc.x * 160, py = -ndc.y * 112;
+                /* w5-audit (F16): the C truncates EVERY projected coord
+                   ((int) TRUNC toward zero — fog_poc.c:12107-12116
+                   glintPx/glintPy) before the +-24/+-48 quad; the engine
+                   writes integer screen coords (lens_flare.c:669-676) */
+                const px = Math.trunc(ndc.x * 160), py = Math.trunc(-ndc.y * 112);
                 /* the 48x96 px quad (x±24, y±48) in NDC */
                 const x0 = (px - 24) / 160, x1 = (px + 24) / 160;
                 const y0 = -(py - 48) / 112, y1 = -(py + 48) / 112;
