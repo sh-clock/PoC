@@ -12128,15 +12128,19 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
           uPsx: { value: SV.V.psxWobble ? 1 : 0 },
           uPixScale: { value: new THREE.Vector2(SV.V.RT_W / 320, SV.V.RT_H / 224) }
         },
-        /* tpage 0x14D ABR-2: dst = dst - F. depthTest true: the room's
-           nearer opaque geometry occludes the floor exactly like the
-           engine's OT walk (the floor at the FIXED bucket 640 paints
-           under everything nearer). depthWrite false (the PS1 has no
-           depth buffer; the C's water floor never writes fb->z).    */
+        /* tpage 0x14D ABR-2: dst = B - F (fog_poc.c:8348-8392 — the
+           per-channel (bg5 - f5) SATURATING AT 0). WebGL FUNC_SUBTRACT
+           computes s*S - d*D = F - B (the INVERSE); FUNC_REVERSE_SUBTRACT
+           is d*D - s*S = B - F — the engine's form. The v48 port used
+           SubtractEquation (F - B): wherever the room was brighter than
+           the dapple it clamped to BLACK, wherever darker it showed the
+           raw dapple — both inverted. GL clamps to [0,1] = the C's
+           saturate-at-0. depthWrite false (the PS1 has no depth buffer;
+           the C's water floor never writes fb->z).    */
         transparent: true, depthWrite: false, depthTest: true,
         side: THREE.DoubleSide,
         blending: THREE.CustomBlending,
-        blendEquation: THREE.SubtractEquation,
+        blendEquation: THREE.ReverseSubtractEquation,
         blendSrc: THREE.OneFactor,
         blendDst: THREE.OneFactor
       });
