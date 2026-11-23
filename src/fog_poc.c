@@ -811,7 +811,11 @@ static uint8_t *png_decode_rgba(const uint8_t *d, size_t n, int *wOut, int *hOut
                        ((uint32_t)d[p+2] << 8) | d[p+3];
         const char *typ = (const char *)d + p + 4;
         const uint8_t *data = d + p + 8;
-        if (p + 8 + (size_t)len + 4 > n) return NULL;
+        /* v48 (PNG-1): a chunk whose declared length runs past the buffer
+         * early-returns — but idat (the heap buffer accumulated from any
+         * prior IDAT chunks) was NOT freed on this path (every other
+         * failure path frees it); free it here like the rest. */
+        if (p + 8 + (size_t)len + 4 > n) { free(idat); return NULL; }
         if (!memcmp(typ, "IHDR", 4) && len >= 13) {
             w = (int)(((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) |
                       ((uint32_t)data[2] << 8) | data[3]);
