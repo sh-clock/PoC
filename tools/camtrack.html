@@ -12327,7 +12327,15 @@ const CONE_FRAG = `
     vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
     float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
     if (roomD < uGate) discard;
-    gl_FragColor = vec4(vCol / 255.0, 1.0);
+    /* v4b (F13): the C's fx_blit_gouraud_tri quantizes PER PIXEL
+       (fog_poc.c:8806-8811): interpolate the RAW u8 corner tuples,
+       round (+-0.5), clamp 0..255, then f5 = ci >> 3, repl5 out. The
+       v48 port pre-quantized the CORNERS to repl5(c>>3) — a 12->4
+       ramp midpoint gave f5 1 in the C but 0 in the JS (repl5(12)=8,
+       repl5(4)=0, interp 4). */
+    vec3 c8 = clamp(floor(vCol + 0.5), 0.0, 255.0);
+    vec3 f5 = floor(c8 / 8.0);
+    gl_FragColor = vec4((f5 * 8.0 + floor(f5 / 4.0)) / 255.0, 1.0);
   }`;
 /* preallocated buffers: the glint quad (4 verts) + the cone fan
  * (8 segments x (2 g4 quads + 2 g3 tris) x 2 pairs — 96 tris).      */
@@ -12605,15 +12613,17 @@ function sh1xDrWaterFxUpdate() {
             const cwx = lx + ((syw * 179) >> 12) / 256;
             const cwz = lz - ((cyw * 179) >> 12) / 256;
             const apex = [cwx, posY, cwz];
-            /* the 5-bit-quantized corner colors (the engine's 8-bit packet
-             * colors land in the 5-bit fb: repl5(c>>3))                  */
-            const repl5c = c => (c >> 3) << 3 | ((c >> 3) >> 2);
-            const cA = [repl5c(24), repl5c(22), repl5c(12)];  /* g3[0] apex   */
-            const cB = [repl5c(20), repl5c(18), repl5c(12)];  /* g4/g3 (20,18,12) */
-            const cC = [repl5c(4), repl5c(4), repl5c(4)];     /* g4 P2/P3 (4,4,4) */
-            const cD = [repl5c(4), repl5c(8), repl5c(4)];     /* semi (4,8,4)  */
-            const cE = [repl5c(0), repl5c(0), repl5c(0)];     /* semi P2/P3    */
-            const cF = [repl5c(8), repl5c(8), repl5c(4)];     /* semi g3[1] apex */
+            /* the RAW 8-bit corner colors (the engine's packet tuples —
+             * lens_flare.c:768-784): the C interpolates these PER PIXEL
+             * and quantizes to 5-bit at the store (fx_blit_gouraud_tri,
+             * fog_poc.c:8806-8811 — see CONE_FRAG). v4b (F13): the v48
+             * port pre-quantized to repl5(c>>3) at the corners.        */
+            const cA = [24, 22, 12];  /* g3[0] apex                      */
+            const cB = [20, 18, 12];  /* g4/g3 (20,18,12)                */
+            const cC = [4, 4, 4];     /* g4 P2/P3 (4,4,4)                */
+            const cD = [4, 8, 4];     /* semi (4,8,4)                    */
+            const cE = [0, 0, 0];     /* semi P2/P3                      */
+            const cF = [8, 8, 4];     /* semi g3[1] apex                 */
             let opT = 0, semiT = 0;
             for (let i = 0; i < 8; i++) {
               const curA = i * 45 * 4096 / 360 | 0;
