@@ -7484,6 +7484,20 @@ static void snow_reset_seed(Snow *S, unsigned seed) {
     S->lastTickT = 0.0;
     S->prevX = 0; S->prevZ = 0;        /* g_Particle_PrevPosition at load   */
     S->prevYawQ12 = 0;                 /* PrevRotationY (BSS 0 at load)     */
+    /* v48 audit (A3-1): g_WeatherParticle_Vectors1 is BSS 0 at a fresh
+     * process boot (particle.c:45-46 ".bss data in maps we've matched .bss
+     * for") and its ONLY writer is the SystemUpdate tail
+     * (particle.c:638 `g_WeatherParticle_Vectors1 = g_WeatherParticle_Vectors0;`)
+     * — so a fresh session's FIRST rain tick computes the case-1 delta as
+     * (0 - viewPosition) (particle.c:3274-3275), teleporting the bank by the
+     * full view position. The seek/backward-jump re-sim (snow_sync_live ->
+     * snow_reset -> here) models "a fresh session from the fixed seed" but
+     * kept the PRE-JUMP prevViewX/Z, so its first re-sim tick applied the
+     * small inter-tick camera delta instead — the re-sim diverged from the
+     * fresh-boot replay it must reproduce. Zero it here so EVERY
+     * fresh-session re-seed (seek, K_R, K_B, K_W, boot) gets the BSS-zero
+     * first tick. */
+    S->prevViewX = 0; S->prevViewZ = 0; /* g_WeatherParticle_Vectors1 (BSS 0) */
     S->boxX  = 0; S->boxZ = 0;
     S->camMoved = 0;
 }
@@ -16902,9 +16916,11 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
          * view position, so the first post-restart rain tick applied a
          * small inter-tick camera delta where a fresh boot teleports
          * the bank by the full view position (312 px at --duration 3;
-         * --nosnow is md5-identical). */
-        A->snow.prevViewX = 0;
-        A->snow.prevViewZ = 0;
+         * --nosnow is md5-identical).
+         * v48 audit (A3-1): the zeroing moved INTO snow_reset_seed (the
+         * seek/backward-jump re-sim needed the same fresh-session first
+         * tick and had no site of its own) — the re-seed below restores
+         * it, so the explicit pair this block used to carry is gone. */
         /* V45 audit W7: re-seed with the BOOT seed, not the default — the
          * fresh boot's final warm-up runs snow_reset_seed(&A.snow,
          * snowSeed) (the v41-ENGFX bug 2 site), so --snow-seed N must
