@@ -13801,7 +13801,19 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
             int u1 = a->tvU[si] + sty->u0 + a->tvR2[si] + sty->du - 1;
             int v0 = a->tvV[si] + sty->v0 + a->tvR3[si];
             int v1 = v0 + sty->dv - 1;
-            u0 &= 0xFF; u1 &= 0xFF; v0 &= 0xFF; v1 &= 0xFF;
+            /* v48 (A-2): NO early &0xFF wrap here. The engine keeps the RAW
+             * sums in the u16 fields (map4_s03.c:1258-1259 sp30[][].field_8/
+             * field_A; the corner stores at :1330-1344 are the UNWRAPPED
+             * s32 sums temp_s6/spB0/temp_s4/var_t0), interpolates the
+             * midpoints on those raw u16s ((a+b)>>1, :1349/:1355/...), and
+             * only TRUNCATES to u8 at setUV4 (:1396-1400). Wrapping before
+             * the >>1 midpoints (the old form) gives ((A&0xFF)+(B&0xFF))>>1
+             * where the engine gives ((A+B)>>1)&0xFF — different whenever a
+             * window crosses 255 (e.g. v corners 202/256: engine mid 229,
+             * old form 101 — the big screen's mid row/col UVs, live in the
+             * func_800D8620 case-4/case-5 sub-states whose v ramps cross
+             * 0/256). The &0xFF now happens at each consumption point
+             * below (the setUV4-equivalent sites). */
             /* the corners (func_800D761C's cross-wiring): c0 = A,
              * c1 = (B.x, A.y, B.z), c2 = (A.x, B.y, A.z), c3 = B.
              * World = anchor(engine Q12 m) + corner(Q8)/256, glTF map
@@ -13915,8 +13927,8 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                             o->sx = (float)(*gxq) * R->enginePixScale;
                             o->sy = (float)(*gyq) * R->enginePixScaleY;
                             o->z  = *gzq;
-                            o->u  = (float)(*guq) / 256.0f;
-                            o->v  = (float)(*gvq) / 256.0f;
+                            o->u  = (float)(*guq & 0xFF) / 256.0f;
+                            o->v  = (float)(*gvq & 0xFF) / 256.0f;
                             o->vcol[0] = o->vcol[1] = o->vcol[2] = var_s2;
                             o->ocol[0] = o->ocol[1] = o->ocol[2] = 0;
                         }
@@ -13943,8 +13955,9 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                 TvQuad *q = &tvq[(*nTvq)++];
                 for (int c = 0; c < 4; c++) {
                     q->v[c] = rv[c];
-                    q->v[c].u = (float)(c == 1 || c == 3 ? u1 : u0) / 256.0f;
-                    q->v[c].v = (float)(c >= 2 ? v1 : v0) / 256.0f;
+                    /* setUV4's u8 truncation (func_800D88C8:1396-1400) */
+                    q->v[c].u = (float)((c == 1 || c == 3 ? u1 : u0) & 0xFF) / 256.0f;
+                    q->v[c].v = (float)((c >= 2 ? v1 : v0) & 0xFF) / 256.0f;
                 }
                 q->tex = tex;
                 q->bright = var_s2;
