@@ -1477,7 +1477,8 @@ const SHCore = (function () {
                      isFinite(+ULp.offset[0]) && isFinite(+ULp.offset[1]) &&
                      isFinite(+ULp.offset[2]))
           ? [+ULp.offset[0], +ULp.offset[1], +ULp.offset[2]]
-          : [-0.08, 0.28, -0.12];   /* Game_FlashlightAttribsSet, glTF axes */
+          : [-21 / 256, 72 / 256, -30 / 256];   /* Game_FlashlightAttribsSet Q8
+         grid: engine Q12(-0.08,-0.28,+0.12)>>4 = (-21,-72,+30), glTF (x,-y,-z) */
         const ahead = (ULp && ULp.ahead != null && isFinite(+ULp.ahead))
           ? Math.max(0, +ULp.ahead)
           : (ULp ? 0 : 2.5);   /* authored explicit; no light = the engine TRAIL */
@@ -11519,10 +11520,11 @@ function updateLightGizmo() {
      * (the PiP camera IS the track camera, updated this frame)          */
     if (!pipCam || pipCam.matrixAutoUpdate) pipCam.updateMatrix();
     const camQ = pipCam.quaternion.clone();
+    /* w5-audit (A1-2): the Q8-grid engine quantization (-21,+72,-30)/256 */
     const off = new THREE.Vector3(
-      Array.isArray(l.offset) && isFinite(+l.offset[0]) ? +l.offset[0] : -0.08,
-      Array.isArray(l.offset) && isFinite(+l.offset[1]) ? +l.offset[1] : 0.28,
-      Array.isArray(l.offset) && isFinite(+l.offset[2]) ? +l.offset[2] : -0.12);
+      Array.isArray(l.offset) && isFinite(+l.offset[0]) ? +l.offset[0] : -21 / 256,
+      Array.isArray(l.offset) && isFinite(+l.offset[1]) ? +l.offset[1] : 72 / 256,
+      Array.isArray(l.offset) && isFinite(+l.offset[2]) ? +l.offset[2] : -30 / 256);
     const ahead = l.ahead != null && isFinite(+l.ahead) ? Math.max(0, +l.ahead) : 0;
     const world = off.applyQuaternion(camQ).add(pipCam.position);
     /* v49: ahead extends along the CAMERA FORWARD (the C twin's anchor,
