@@ -13202,6 +13202,23 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
 
     /* ---------------- the stream surface (water.c:446-711) ---------- */
     if (a->wfSurfaceOn) {
+        /* v48 audit (A4/A5-1): sp14 is FUNCTION-scope in the engine —
+         * water.c:466 declares `s32 sp14;` among sharedFunc_800CCE60_1_s02's
+         * locals and water.c:485 zeroes it ONCE, BEFORE the segment loop
+         * (the `for (i = 0; i < field_78; i++)` walk). It is written only
+         * by the row-advance clamp branch (water.c:638
+         * `sp14 = field_28[i] - var_s4;`) and read by the last-quad vSpan
+         * (water.c:671 `var_t3_2 = (sp14 << 6) / field_44[i];`) — so a
+         * segment whose walk ends EXACTLY on len (the `var_s4 == len`
+         * break at water.c:649, never entering the clamp) consumes the
+         * PREVIOUS segment's sp14 in the engine. The PoC declared it
+         * per-segment (reset to 0 every sgi), so those segments read 0
+         * instead — live on map1_s03-class data (segment 0 clamps every
+         * frame; segment 1 len 20152/tile 2048 hits scroll≡1720
+         * periodically → engine last-quad vSpan=(819<<6)/2048=25 vs 0).
+         * Hoisted to the walk's outer scope so it persists across
+         * segments exactly like water.c. */
+        int sp14 = 0;
         for (int sgi = 0; sgi < a->wfSegCount; sgi++) {
             const Sh1xWaterSeg *sg = &a->wfSeg[sgi];
             int temp_s0 = sg->width >> 1;               /* water.c:494  */
@@ -13236,7 +13253,9 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
             if (sgi == a->wfSegCount - 1)
                 f26E = sg->len - a->wfSeg[a->wfSegCount].len;
             if (f26E < 0) f26E = -1;
-            int sp14 = 0;
+            /* (sp14 declared at the WALK scope — see the v48 A4/A5-1 note
+             * above; the engine's is function-scope, zeroed once before the
+             * segment loop, and the clamp below is its ONLY writer.)      */
             float rowsX[16][2], rowsYm[16][2], rowsZ[16][2];
             int rowsB[16][2];
             int j = 0, var_s4 = 0;
