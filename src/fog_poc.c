@@ -6346,12 +6346,16 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
 }
 
 static void sh_env_tick(ShEnv *env, int dtQ12, v3 camPos, Quat camQ) {
-    /* v49: the LINE light's travel clock — the engine advances every
-     * effect on the SAME game-frame dt (D_800AFDAC++ only when
-     * g_DeltaTime != 0); the camtrack twin rides state.t (frozen when
-     * paused, exactly like the 30Hz tick grid here).                     */
+    /* v49: the LINE light's travel clock — the camtrack twin rides
+     * state.t, which advances EXACTLY 1/30 s per fired tick (tickPlayback
+     * :8532; the PoC's own playback advances play.t by exactly 1.0/30.0
+     * per tick, live_advance). SHENV_DT30 (136) is the Q12-TRUNCATED
+     * engine dt = 255/256 of the real tick — accumulating it left the
+     * travel 1 tick behind every 256 (v49-audit A2-2). Advance the exact
+     * tick dt; frozen when paused (no ticks fire) exactly like the
+     * twin's state.t.                                                    */
     if (g_userLightLine && dtQ12 > 0)
-        g_userLightLineT += (double)dtQ12 / 4096.0;
+        g_userLightLineT += 1.0 / 30.0;
     /* Gfx_EffectsUpdate — flashlight ramp + blend + fog params + light */
     if (env->isFlashlightOn)
         env->flashlightIntensity += (int)(((int64_t)dtQ12 * 16384) >> 12); /* dt*4.0 */
@@ -6584,6 +6588,12 @@ static void sh_env_sync_live(ShEnv *env, double t, v3 camPos, Quat camQ,
          * and moves the tick grid to the new time — the engine's clock is
          * monotonic and its env state is persistent game state.          */
         env->ticksDone = target;
+        /* v49-audit (A2-3): the twin's light is a PURE function of the
+         * phase (lightWorldPos(l, state.t)) — a scrub/wrap moves it back.
+         * With the exact 1/30 advance the clock IS the phase, so re-base
+         * it with the grid on backward jumps. */
+        if (g_userLightLine)
+            g_userLightLineT = (double)target / 30.0;
     }
     while (env->ticksDone < target) {
         if (getenv("FOGPOC_TICKDBG"))
@@ -20169,6 +20179,8 @@ int main(int argc, char **argv) {
         g_waterTileEverUpdated = 0;
         g_sh1xBeltScroll = 0;
         g_tvpaint_pad = 0;
+        g_userLightLineT = 0.0;   /* v49-audit (A2-4): the LINE travel clock
+                                     — shot i must match a fresh --shot run */
         /* v41 (audit A-3): re-run the map-load ripple spawn AFTER the
          * seed reset — a fresh process consumed the 49 draws at scene
          * load (the Map_WorldObjectsInit stand-in above), so shot i's
