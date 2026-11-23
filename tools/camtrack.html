@@ -742,24 +742,33 @@ const SHCore = (function () {
   const shR = (x, n) => Math.floor(x / (1 << n));
   const shU32 = x => ((x % 4294967296) + 4294967296) % 4294967296;
 
-  /* GTE DPCS(color, IR0=k, FC=0) — sf=1, lm=0. DuckStation TruncateRGB
-     unsigned semantics (v12 D8 fix): a negative MAC saturates to 255. */
+  /* GTE DPCS(color, IR0=k, FC=0) — sf=1, lm=0 (fog_poc.c:5148).
+     V42 C-1 (correcting the stale "v12 D8" note): swanstation's
+     TruncateRGB takes the value SIGNED (gte.cpp:145-160:
+     if (value < 0 || value > 0xFF) return (value < 0) ? 0 : 0xFF;
+     psx-spx: saturated to +00h..+FFh) — a negative MAC>>4 saturates
+     to 0 on the hardware, NOT 255. Unreachable for k <= 4096 but
+     kept engine-exact (negative IR0 extrapolation is a live path). */
   function gteDpcsFc0(c, k) {
     const inMac = c * 65536;                       /* c<<16 (fp64 exact) */
     let IR = clamp16(shR(-inMac, 12));             /* (0 - inMac) >> 12 */
     const mac = shR(IR * k + inMac, 12);
-    const u = shU32(shR(mac, 4));                  /* (unsigned)(mac>>4) */
-    return u > 0xFF ? 0xFF : u;
+    const v = shR(mac, 4);                         /* (int)(mac>>4) — signed */
+    return v < 0 ? 0 : (v > 0xFF ? 0xFF : v);
   }
 
   /* GTE DPCL(RGB=tint, IR1=light<<5, IR0=fog<<4, FC=0) — the flashlight
-     vertex color (fog_poc.c:3021) */
+     vertex color (fog_poc.c:5170). V42 C-1: the SIGNED saturation
+     (negative MAC>>4 -> 0) — swanstation TruncateRGB(int32_t) /
+     psx-spx +00h..+FFh; the old unsigned reinterpretation returned
+     255 on the negative-MAC path (reachable during the night fade,
+     low wLI with fog still on — fog_poc.c:5174-5182). */
   function gteDpclFc0(tint, lightIR, fogIR0) {
     const inMac = (tint * lightIR) * 16;           /* (tint*lightIR)<<4 */
     let IR = clamp16(shR(-inMac, 12));
     const mac = shR(IR * fogIR0 + inMac, 12);
-    const u = shU32(shR(mac, 4));
-    return u > 0xFF ? 0xFF : u;
+    const v = shR(mac, 4);                         /* (int)(mac>>4) — signed */
+    return v < 0 ? 0 : (v > 0xFF ? 0xFF : v);
   }
 
   /* LoadAverageCol(c0, c1, aFrom, aTo) — libgte (fog_poc.c:3033) */
