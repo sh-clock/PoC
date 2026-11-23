@@ -11342,9 +11342,16 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
                 a->fallArmed = 1;      /* D_800F482C = Q12_ANGLE(-167.6) */
                 a->binAng = -1906;    /* = -1906 raw                    */
             }
+            /* v48 (A16-2): the engine order is POSE-THEN-DECREMENT
+             * (map7_s03_3.c:8200-8202): Math_SetSVectorFast(rot,
+             * D_800F482C,...) poses with the CURRENT accumulator,
+             * WorldObjects_Add, and only THEN D_800F482C -=
+             * Q12_DIV(dt, Q12(3.6)). The old decrement-first form drew
+             * the engine's NEXT frame every tick (a constant one-frame
+             * ~3.33 deg lead) and never drew the initial -1906 pose. */
+            a->cur[0] = (float)a->binAng * (360.0f / 4096.0f);
             a->binAng -= (int)(((int64_t)dtRaw << 12) / 14745);
             if (a->binAng < -32768) a->binAng += 65536; /* SVECTOR vy s16 */
-            a->cur[0] = (float)a->binAng * (360.0f / 4096.0f);
             break;
         }
         case 20: { /* scrollBelt — map7_s03_3.c:8296-8355 VERBATIM (the
