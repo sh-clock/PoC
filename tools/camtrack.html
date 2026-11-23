@@ -12116,6 +12116,13 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
     if (!isLive) continue;
     if (!liveMat) {
       const tex = drTileEnsure();
+      /* v4b (F7): the C seeds the tile at the first floor draw —
+       * fx_water_live_rgba (fog_poc.c:12452-12453):
+       * `if (!g_waterTileEverUpdated) fx_water_tile_update(0);` — the
+       * floor ALWAYS shows at least the ctr=0 composite, in or out of
+       * zone / FX-gated. The v48 port left the tile all-zero until the
+       * first in-zone gated frame (a black floor under the B-F blend). */
+      if (!drTile.regens) drTileRegen(payload);
       liveMat = new THREE.ShaderMaterial({
         vertexShader: WATERLIVE_VERT, fragmentShader: WATERLIVE_FRAG,
         uniforms: {
