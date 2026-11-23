@@ -8566,7 +8566,13 @@ function sh1xRngNext(S) {
 
 /* ---- tiny JSON accessors mirroring the engine's jint/jnum/jbool/jstr ---- */
 function sh1xJn(e, k, d) { const v = e ? e[k] : undefined; const n = +v; return (v !== undefined && isFinite(n)) ? n : d; }
-function sh1xJi(e, k, d) { const v = e ? e[k] : undefined; const n = +v; return (v !== undefined && isFinite(n)) ? Math.trunc(n) | 0 : d; }
+/* v4b (B5-4): the C's jint is STRICT (fog_poc.c:555-558 — `v->type ==
+ * JV_NUM ? (int)v->num : def`): strings/booleans/null take the DEFAULT
+ * (the parser stores num=1 for `true` but its TYPE is JV_BOOL — jint
+ * never reads it; fog_poc.c:496). The old `+v` coercion accepted "5"->5,
+ * true->1, null->0 across all 41 call sites. Math.trunc(v)|0 == the C's
+ * (int) trunc-toward-zero incl. the int32 wrap. */
+function sh1xJi(e, k, d) { const v = e ? e[k] : undefined; return (typeof v === 'number' && isFinite(v)) ? Math.trunc(v) | 0 : d; }
 function sh1xJb(e, k, d) { const v = e ? e[k] : undefined; return (typeof v === 'boolean') ? v : d; }
 /* v41 (CT-IMPL fix 3): the C's jintb (fog_poc.c:573-578) — SH1X fields
  * accept JSON booleans TOO (and the tvPaint "big" flags are emitted as
