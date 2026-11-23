@@ -10584,6 +10584,19 @@ function sh1xLightQueryPos(tbl, env, posX, posY, posZ) {
   return var_a3;
 }
 
+/* V44 (A-2) / v48 CAM2-1: the engine water OT bucket's far edge — the C's
+ * sh_water_ot_gate (fog_poc.c:12589-12592), VERBATIM. The engine OT-inserts
+ * every water prim at the BIASED bucket ((zQ8+0x100)>>3) (water.c:439/698)
+ * while the room meshes insert at their plain (SZ>>3) bucket
+ * (bodyprog_80056D8C.c:855, otShift=1) — a mesh paints over the water iff
+ * meshBucket <= waterBucket, i.e. opaque geometry up to B+8 Q8 (1.03125 m
+ * at the 0x100 bias) FARTHER than the water prim still covers it. The
+ * gate returns that far edge in metres: (((zQ8+bias)>>3)+1)*8 Q8. */
+function shWaterOtGate(depthM, biasQ8) {
+  const zq8 = Math.trunc(depthM * 256);   /* the C's (int) truncation */
+  return ((((zq8 + biasQ8) >> 3) + 1) * 8) / 256;
+}
+
 /* fog_poc.c:11319 sh_wspr_project — one school-water world point through
  * the viewer's OWN camera eval (ctx.mvpE/ctx.viewE — 16-element column-major
  * mat4 `elements`, the SAME projection the room geometry renders through,
@@ -10638,8 +10651,9 @@ const _wfDirEng = [0, 0, 0];
  *                     ft4 — the GPU additive path). The sinks receive the
  *                     WORLD glTF corner positions, the CLUT row, the UV
  *                     window, the corner brightness (cr=cg=cb — grayscale)
- *                     and the prim's own projected depth (the OT bucket
- *                     input, water.c:439/698). */
+ *                     and the prim's depth gate — the V44 (A-2) biased
+ *                     OT-bucket far edge sh_water_ot_gate (fog_poc.c:
+ *                     12589-12592, water.c:439/698). */
 function sh1xSchoolWaterDraw(S, a, ctx) {
   if (!a.seeded || !a.wfHasStream) return;
   const cullX = 200 * ctx.fbW / 320;   /* the PSX +/-200px window, RT-scaled */
@@ -10811,11 +10825,14 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
         _wfCr[0] = _wfRowsB[k][0]; _wfCr[1] = _wfRowsB[k][1];
         _wfCr[2] = _wfRowsB[k + 1][0]; _wfCr[3] = _wfRowsB[k + 1][1];
         /* clut ROW 1 (the 0x4E word); strip tile u 64..95; the sliding
-         * leading window v [127-t, 127] (k=0) / body v 64..127; the
-         * sink's own depth gate = the prim's plain avg depth (the v37
-         * water-family gate) */
+         * leading window v [127-t, 127] (k=0) / body v 64..127; the sink's
+         * depth gate = the V44 (A-2) far-edge form sh_water_ot_gate(avgZ,
+         * 0x100) (fog_poc.c:13155) — the engine OT-inserts the strip quad
+         * at ((avg4zQ8 + 0x100)>>3) (water.c:698), so meshes up to B+8 Q8
+         * (1.03125 m) farther still cover it (the old v37 plain-depth gate
+         * UNDER-occluded: near-side only) */
         ctx.emitGT4(_wfWX, _wfWY, _wfWZ, 1, 64, vNear, 95, vNear + vSpan,
-                   _wfCr, avgZ);
+                   _wfCr, shWaterOtGate(avgZ, 0x100));
       }
     }
   }
@@ -11010,13 +11027,15 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
             sh1xLightQueryPos(_wfLt, env, a.wfX[q], a.wfY[q], a.wfZ[q]), 7);
     if (br < 0) br = 0;
     if (br > 255) br = 255;
-    /* depthM = the prim's OWN average depth — the engine's established
-     * water-family gate (v37 W1-5: the ripple mesh/sprites pass dsum*0.25
-     * with the (zQ8+128)>>3 OT note; the game's own +0x100 bucket bias
-     * (water.c:439) documents the OT-slot granularity, the painter gate
-     * uses the plain depth) */
+    /* V44 (A-2): the engine OT-inserts the droplet at
+     * ((zQ8 + 0x100) >> 3) (water.c:439) — the +0x100 Q8 bias is a
+     * 1.0 m = 32-bucket FAR-SHIFT (one OT slot = 8 Q8 = 3.125 cm,
+     * NOT "slot granularity"), so opaque geometry up to B+8 Q8 =
+     * 1.03125 m FARTHER than the droplet still paints over it. The
+     * sink gate is the far-edge form sh_water_ot_gate(f160/256, 0x100)
+     * (fog_poc.c:13392) — the old v37 plain-depth gate under-occluded. */
     ctx.emitFT4(_wfWX, _wfWY, _wfWZ, 0, u0, vv0, u1, vv0 + v17D, br,
-                f160 / 256);
+                shWaterOtGate(f160 / 256, 0x100));
   }
 }
 /* ==== SH1X-DRIVERS-END ==== */
@@ -11473,11 +11492,14 @@ function lightResolveForView() {
 /*    composite deviation vs the C's per-prim 5-bit FB writes;           */
 /*  - the PSX AFFINE varying interpolation (no perspective correction -
  *    the C rasterizers' screen-space linear UV/Gouraud) follows SH_VERT's
- *    established w-multiply discipline, with the prim's PLAIN average
- *    depth as the flat per-quad w/depth (the C's painter gate,
- *    fog_poc.c:11218-11219 - occluded only by opaque geometry strictly
- *    NEARER; the coplanar ditch-bed tie DRAWS, while a bucket-grid tie
- *    vs the depthFunc-LESS room floor would reject - the 1-px A/B class);
+ *    established w-multiply discipline, with the prim's V44 (A-2) biased
+ *    OT-bucket FAR-EDGE depth (sh_water_ot_gate, fog_poc.c:12589-12592 —
+ *    the C's painter-gate input, fed at :13155/:13392) as the flat per-quad
+ *    w/depth: the engine OT-inserts the water at ((zQ8+0x100)>>3)
+ *    (water.c:439/698) vs the meshes' plain (SZ>>3), so a mesh bucket
+ *    z>>3 <= water bucket (z+0x100)>>3 draws AFTER and COVERS — at exact
+ *    coplanarity the mesh wins, and opaque geometry up to B+8 Q8
+ *    (1.03125 m) FARTHER than the prim still covers it;
 /*    vertex;                                                            */
 /*  - the 0x0000 texel hole ((tc & 0x7FFF) == 0) = the atlas alpha 0.    */
 /* ==================================================================== */
@@ -11491,11 +11513,11 @@ try {
 
 const WATER_VERT = `
   attribute vec3 shWcol;     /* the per-corner prim/Gouraud brightness 0..255 */
-  attribute float shWb;      /* the prim's own plain avg depth, m (water.c:439) */
+  attribute float shWb;      /* the prim's biased OT-bucket far edge, m (water.c:439/698) */
   varying vec3 vWcol;
   varying vec2 vUvw;
   varying float vW;          /* the noperspective (affine) unwrap weight */
-  varying float vBkt;         /* the prim's depthM — the C's painter-gate input */
+  varying float vBkt;         /* the prim's far-edge gate depth — the C's painter-gate input */
   uniform float uPsx;
   uniform vec2 uPixScale;    /* (RT_W/320, RT_H/240) — the GTE grid */
   void main() {
@@ -11511,11 +11533,15 @@ const WATER_VERT = `
       screen = floor(screen / uPixScale) * uPixScale;
       vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
-      /* the water prim's own PLAIN avg depth (shWb) — the C's painter gate
-         input (fog_poc.c:11218-11219: skip only when opaque geometry is
-         strictly NEARER; ties draw). The GL depth TEST is OFF (the room's
-         bucketed/mixed-w PSX depth is NOT the C's fb->z reference — see the
-         WATER_FRAG gate); the z below only keeps the clip volume valid. */
+      /* the water prim's V44 (A-2) far-edge gate (shWb = sh_water_ot_gate of
+         the prim depth, fog_poc.c:12589-12592) — the C's painter gate input
+         (fog_poc.c:12824 with depthM = the far edge at :13155/:13392:
+         skip when opaque geometry is nearer than prim+1.03125 m; at exact
+         coplanarity the mesh bucket z>>3 <= water bucket (z+0x100)>>3 so
+         the mesh draws AFTER and COVERS the water). The GL depth TEST is
+         OFF (the room's bucketed/mixed-w PSX depth is NOT the C's fb->z
+         reference — see the WATER_FRAG gate); the z below only keeps the
+         clip volume valid. */
       float zclip = projectionMatrix[2].z * (-shWb) + projectionMatrix[3].z;
       gl_Position = vec4(ndc * shWb, zclip, shWb);
       /* the PSX AFFINE varyings (the w cancels — screen-space linear) */
@@ -11529,11 +11555,16 @@ const WATER_VERT = `
   }`;
 const WATER_FRAG = `
   uniform sampler2D map;
-  /* v39.1 THE C's PAINTER GATE (fog_poc.c:11218-11219 / water.c:439):
-   *   skip the fragment iff the room's covering depth is STRICTLY nearer
-   *   than the prim's own plain average depth (ties draw — the coplanar
-   *   ditch-bed strip rides ON its bed exactly like the engine's OT
-   *   (z+0x100)>>3 bucket under-draw). The reference = the room's TRUE
+  /* v39.1+v48 CAM2-1 THE C's PAINTER GATE (fog_poc.c:12824 fed the
+   *   V44 A-2 far edge at :13155/:13392 — sh_water_ot_gate, water.c:439/698):
+   *   skip the fragment iff the room's covering depth is nearer than the
+   *   prim's biased OT-bucket FAR EDGE (((zQ8+0x100)>>3)+1)*8 Q8 — i.e.
+   *   opaque geometry up to B+8 Q8 (1.03125 m) FARTHER than the prim still
+   *   covers the water. At exact coplanarity the mesh bucket z>>3 <= the
+   *   water bucket (z+0x100)>>3, so the mesh draws AFTER and COVERS — the
+   *   coplanar ditch-bed strip does NOT ride on its bed (the old plain-
+   *   depth "ties draw" claim inverted the engine's OT order). The
+   *   reference = the room's TRUE
    *   perspective-correct per-pixel view depth (the wfDepthRT pass —
    *   16-bit RG, meters, clear 64m = the C's fb->z 1e30 "no data").
    * The GL depth TEST is OFF: the app's own room depth carries the v5
@@ -11627,11 +11658,13 @@ function sh1xWaterAtlas(sheet) {
 function wfEmitQuad(wx, wy, wz, clutRow, u0, v0, u1, v1, cols, depthM) {
   if (wfQuads >= WF_MAX_QUADS) return;
   const b = wfQuads * 4;
-  /* the prim's own PLAIN average depth — the C's painter gate input
-   * (fog_poc.c:11218-11219: `fb->z[pi] < depthM -> skip` — occluded only
-   * by opaque geometry strictly NEARER than the prim; ties draw — the
-   * coplanar ditch-bed strip rides ON its bed like the engine's OT
-   * (z+0x100)>>3 bucket under-draw). The GL depth test is OFF (see
+  /* the prim's V44 (A-2) biased OT-bucket far-edge depth — the C's painter
+   * gate input (fog_poc.c:12824 with depthM = sh_water_ot_gate at
+   * :13155/:13392: `fb->z[pi] < depthM -> skip` — occluded by opaque
+   * geometry nearer than prim+1.03125 m; at exact coplanarity the mesh
+   * bucket z>>3 <= water bucket (z+0x100)>>3 so the mesh draws AFTER and
+   * COVERS the water — the old plain-depth "ties draw" comment inverted
+   * the engine's OT order). The GL depth test is OFF (see
    * WATER_FRAG): the comparison reference is the wfDepthRT true-depth
    * pass, NOT the room's v5 bucketed GL depth. */
   const bkt = Math.max(depthM, 0);
@@ -11688,9 +11721,10 @@ function sh1xWaterEnsureMesh() {
         (window.SHView ? window.SHView.V.RT_W : 640) / 320,
         (window.SHView ? window.SHView.V.RT_H : 360) / 224) }   /* v40: NTSC 224-row GTE grid */
     },
-    /* TPAGE-45 ABR-1: additive, occluded only by opaque geometry
-     * strictly NEARER (the C's fb->z depthM gate — implemented as the
-     * WATER_FRAG's sampled true-depth discard); the GL depth TEST is
+    /* TPAGE-45 ABR-1: additive, occluded by opaque geometry nearer than
+     * the prim's biased OT-bucket far edge (the C's fb->z depthM gate fed
+     * sh_water_ot_gate — implemented as the WATER_FRAG's sampled
+     * true-depth discard); the GL depth TEST is
      * OFF (the app's room depth is the v5 bucketed/mixed-w PSX
      * construction — NOT the C's fb->z reference), depthWrite off (the
      * PSX has no depth buffer; the C's water blits never write fb->z) */
@@ -11715,8 +11749,9 @@ function sh1xWaterCamPose(t) {
 }
 
 /* v39.1 THE ROOM TRUE-DEPTH REFERENCE PASS — the C's water gate
- * (fog_poc.c:11218-11219 `fb->z[pi] < depthM -> skip`) compares the prim's
- * plain avg depth against the room's covering depth. The C's fb->z holds
+ * (fog_poc.c:12824 `fb->z[pi] < depthM -> skip`) compares the prim's
+ * V44 (A-2) far-edge gate depth (sh_water_ot_gate, fog_poc.c:12589-12592)
+ * against the room's covering depth. The C's fb->z holds
  * the room raster's own depth (the GTE vertex depths, behind-camera
  * triangles SKIPPED — fog_poc.c:8096-8098). The app's faithful room render
  * writes GL depth through the v5 OT-bucket snap + the mixed-w PSX
