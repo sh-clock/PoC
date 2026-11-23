@@ -772,18 +772,27 @@ def _tv_paint_extras(room, resolver=None, report=None):
         flags = u32(raw, 4)
         if not (flags & 8) or (flags & 3) != 0:   # need 4bpp CLUT TIM
             return None
-        clen = u32(raw, 8)
-        cw, ch = u16(raw, 16), u16(raw, 18)
-        clut = raw[20:20 + (clen - 12)]   # data = clen-12 after the 12-byte block hdr
-        io = 8 + clen
-        iw, ih = u16(raw, io + 8), u16(raw, io + 10)
-        pix = raw[io + 12:io + 12 + iw * 2 * ih]
-        if len(clut) < cw * 2 * ch or len(pix) < iw * 2 * ih:
+        # v48 (RIP-2): a corrupt CLUT-block length (e.g. clen 0xFFFFFFFF)
+        # or a truncated CLUT/image makes u16()/struct.unpack_from raise
+        # struct.error BEFORE the length checks can reject the blob — the
+        # crash killed the ENTIRE room export (same class as RIP-1). Per
+        # the docstring ("or None on any structural mismatch") every
+        # malformed blob returns None instead.
+        try:
+            clen = u32(raw, 8)
+            cw, ch = u16(raw, 16), u16(raw, 18)
+            clut = raw[20:20 + (clen - 12)]   # data = clen-12 after the 12-byte block hdr
+            io = 8 + clen
+            iw, ih = u16(raw, io + 8), u16(raw, io + 10)
+            pix = raw[io + 12:io + 12 + iw * 2 * ih]
+            if len(clut) < cw * 2 * ch or len(pix) < iw * 2 * ih:
+                return None
+            rows = [list(struct.unpack_from(f"<{cw}H", clut, r * cw * 2))
+                    for r in range(ch)]
+            prows = [list(struct.unpack_from(f"<{iw}H", pix, y * iw * 2))
+                     for y in range(ih)]
+        except (struct.error, IndexError, ValueError):
             return None
-        rows = [list(struct.unpack_from(f"<{cw}H", clut, r * cw * 2))
-                for r in range(ch)]
-        prows = [list(struct.unpack_from(f"<{iw}H", pix, y * iw * 2))
-                 for y in range(ih)]
         return rows, prows, iw, ih
 
     def _resolve_bytes(name):
@@ -813,8 +822,19 @@ def _tv_paint_extras(room, resolver=None, report=None):
                     f"resolved/4bpp (its CLUT row emitted as 0)")
             continue
         clut_rows, _prows, _w, _h = parts
-        for c in range(16):
-            strip[r][c] = clut_rows[row][c] & 0xFFFF
+        # v48 (RIP-2): a TV TIM with fewer CLUT rows (or a narrower row)
+        # than tv_rows samples raised IndexError here — the same
+        # whole-room-export kill class; degrade to the documented 0 row.
+        try:
+            rowvals = [clut_rows[row][c] & 0xFFFF for c in range(16)]
+        except IndexError:
+            if report is not None:
+                report.setdefault("problems", []).append(
+                    f"{room.name}: tvPaint palette strip: {name} CLUT "
+                    f"smaller than the paint samples (its CLUT row "
+                    f"emitted as 0)")
+            continue
+        strip[r][:16] = rowvals
     # the room's first three TIMs (the PLM texture-table order = the
     # engine's material binding order): pixel rows 0..11 (the sheets'
     # rows are img_w halfwords each)
