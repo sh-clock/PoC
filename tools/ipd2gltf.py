@@ -6520,7 +6520,6 @@ def build_sh1x(room, resolver, report, known_rooms=None):
     `known_rooms` (optional set of room names in this conversion) enables
     mapLink neighbor emission; None skips mapLink.
     """
-    inst_key = {id(i): n for n, i in enumerate(room.instances)}
     sh1x = {
         "schema": "SH1X", "version": 3,
         "room": room.name,
