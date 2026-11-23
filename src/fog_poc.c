@@ -8352,12 +8352,29 @@ static void raster_tri(Frame *fb, const RVert *vA, const RVert *vB, const RVert 
                  * the opaque path runs through fb_put.                             */
                 const uint8_t *bg = fb->rgb + pi * 3;
                 if (quantize) {
-                    int f5r = quantize8((((tr >> 3) * vr) >> 4) + orr, dither, x, y) >> 3;
-                    int f5g = quantize8((((tg >> 3) * vg) >> 4) + og, dither, x, y) >> 3;
-                    int f5b = quantize8((((tb >> 3) * vb) >> 4) + ob, dither, x, y) >> 3;
-                    int or5 = (bg[0] >> 3) + f5r; if (or5 > 31) or5 = 31;
-                    int og5 = (bg[1] >> 3) + f5g; if (og5 > 31) og5 = 31;
-                    int ob5 = (bg[2] >> 3) + f5b; if (ob5 > 31) ob5 = 31;
+                    /* v48 (A-3): the V45 C2-1 per-prim dither form — the
+                     * engine draws the veil quad and the textured GT4 as
+                     * TWO prims, each through its own dither LUT pass
+                     * (gpu_sw_backend.cpp:136-139 textured, :148-150 flat
+                     * G4), THEN the ABR-1 saturating 5-bit add
+                     * (:170-178). The old form fused F8+V8 through ONE
+                     * quantize8 — the dither counted once instead of
+                     * twice and the 8-bit pre->>3 sum leaked low bits
+                     * (+1/31 on 43.75% of residue pairs) — the exact
+                     * class V45 fixed in the STP-clear sub-branch and
+                     * the opaque fall-through (the two-step pattern at
+                     * 8449-8460). Saturation is monotone, so
+                     * min(31, B5+V5+F5) == the engine's two-prim
+                     * min(31, min(31, B5+V5) + F5).                        */
+                    int f5r = quantize8(((tr >> 3) * vr) >> 4, dither, x, y) >> 3;
+                    int f5g = quantize8(((tg >> 3) * vg) >> 4, dither, x, y) >> 3;
+                    int f5b = quantize8(((tb >> 3) * vb) >> 4, dither, x, y) >> 3;
+                    int v5r = quantize8(orr, dither, x, y) >> 3;
+                    int v5g = quantize8(og, dither, x, y) >> 3;
+                    int v5b = quantize8(ob, dither, x, y) >> 3;
+                    int or5 = (bg[0] >> 3) + f5r + v5r; if (or5 > 31) or5 = 31;
+                    int og5 = (bg[1] >> 3) + f5g + v5g; if (og5 > 31) og5 = 31;
+                    int ob5 = (bg[2] >> 3) + f5b + v5b; if (ob5 > 31) ob5 = 31;
                     uint8_t *dp = fb->rgb + pi * 3;
                     dp[0] = (uint8_t)((or5 << 3) | (or5 >> 2));
                     dp[1] = (uint8_t)((og5 << 3) | (og5 >> 2));
