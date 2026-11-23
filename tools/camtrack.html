@@ -2024,6 +2024,14 @@ const SHCore = (function () {
                 if (p.pos[1] === 0) p.state++;
               } else {
                 rainSpawnMovementApply(S, p, dt);
+                /* S20 audit F1: the engine's Active case in
+                 * WeatherParticle_SnowInit is SHARED by both banks
+                 * (particle.c:771-781): SpawnMovementApply runs, then
+                 * `if (part->position0.vy == 0) part->stateStep++;` —
+                 * the check lives in the CALLER's loop, not inside
+                 * SpawnMovementApply's case 1, so it advances warm-up
+                 * rain to rest exactly like warm-up snow. */
+                if (p.pos[1] === 0) p.state++;   /* land -> rest */
               }
               break;
             default:
