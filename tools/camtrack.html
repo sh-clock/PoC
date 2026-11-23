@@ -12463,7 +12463,10 @@ function sh1xDrWaterFxUpdate() {
            return skips the water branch and the ctr too)              */
         const v = new THREE.Vector3(lx, ly, lz).applyMatrix4(rtCam.matrixWorldInverse);
         const d = -v.z;
-        if (d * 256 > 112) {
+        /* v4b: the engine/C compare the TRUNCATED Q8 depth (fog_poc.c:12513
+           `!((int)(d * 256.0f) > 112)`, lens_flare.c:73-75) — the raw float
+           passed a 3.9 mm band (d*256 in (112,113)) the engine returns on. */
+        if (Math.trunc(d * 256) > 112) {
           /* the zone test (LensFlare_WaterZoneGet lens_flare.c:504-523):
              the LIGHT's ENGINE x/z (glTF x, -glTF z), first match     */
           const ex = lx, ez = -lz;
