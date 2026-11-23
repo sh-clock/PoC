@@ -1461,9 +1461,34 @@ const SHCore = (function () {
         L.pos[1] = Math.trunc(w[1] * 4096);
         L.pos[2] = Math.trunc(w[2] * 4096);
       } else {
-        L.pos[0] = Math.trunc(camPos[0] * 4096);
-        L.pos[1] = Math.trunc(camPos[1] * 4096);
-        L.pos[2] = Math.trunc(camPos[2] * 4096);
+        /* v49 (the flashlight-circle fix): ONE light — the engine's single
+         * g_WorldEnvRenderWork.light feeds the mesh lighting AND the water
+         * FX; the pre-v49 camera-coincident else-branch (the v6 directive)
+         * failed Gate 2 (vz > 112 Q8, lens_flare.c:73-75) and killed the
+         * whole reflection family. The DEFAULT = the ENGINE TRAILING
+         * ANCHOR: the camera stands in for the eye, the light = the player
+         * ~2.5 m ahead of the camera (vc_main.c:2137-2151 — the trailing
+         * camera; the v48-verified ahead:2.5 A/B), the verbatim Harry
+         * offset rotated by the camera frame (the PoC twin
+         * sh_user_light_world_pos). An AUTHORED follow:'camera' light now
+         * honors its offset/ahead — the numbers are REAL (the gizmo twin),
+         * including the vertical oy (the up/down control).              */
+        const off = (ULp && Array.isArray(ULp.offset) && ULp.offset.length >= 3 &&
+                     isFinite(+ULp.offset[0]) && isFinite(+ULp.offset[1]) &&
+                     isFinite(+ULp.offset[2]))
+          ? [+ULp.offset[0], +ULp.offset[1], +ULp.offset[2]]
+          : [-0.08, 0.28, -0.12];   /* Game_FlashlightAttribsSet, glTF axes */
+        const ahead = (ULp && ULp.ahead != null && isFinite(+ULp.ahead))
+          ? Math.max(0, +ULp.ahead)
+          : (ULp ? 0 : 2.5);   /* authored explicit; no light = the engine TRAIL */
+        const X = camAxes[0], Y = camAxes[1], Z = camAxes[2];
+        let wx = X[0] * off[0] + Y[0] * off[1] + Z[0] * off[2] + camPos[0];
+        let wy = X[1] * off[0] + Y[1] * off[1] + Z[1] * off[2] + camPos[1];
+        let wz = X[2] * off[0] + Y[2] * off[1] + Z[2] * off[2] + camPos[2];
+        if (ahead > 0) { wx -= Z[0] * ahead; wy -= Z[1] * ahead; wz -= Z[2] * ahead; }
+        L.pos[0] = Math.trunc(wx * 4096);
+        L.pos[1] = Math.trunc(wy * 4096);
+        L.pos[2] = Math.trunc(wz * 4096);
       }
 
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),
@@ -2933,9 +2958,14 @@ window.SHView = (function () {
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        screen = floor(screen / uPixScale) * uPixScale;
-        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+        /* gte_snap_screen VERBATIM (fog_poc.c:8892-8903, the flake base
+           :14259): PushSXY floor to the ENGINE lattice, THEN the
+           [-1024,1023] saturation (swanstation gte.cpp:353-380) — same
+           family as the #195 SH_VERT fix (the #204 re-cut). */
+        vec2 eng = floor(screen / uPixScale);
+        eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+        clip.xy = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                       1.0 - eng.y / 224.0 * 2.0) * clip.w;
       }
       /* atlas uv: the engine samples texels [u0t .. u0t+size) x [0..size) */
       vUvA = vec2((sU0 + sFrac.x * sSize) / 8.0, (sClutY + sFrac.y * sSize) / 40.0);
@@ -3048,14 +3078,16 @@ window.SHView = (function () {
       vec3 p = iPos + position * iScale;
       vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       /* V44 (E-3): the C snaps ALL 4 splash ground corners
-         (gte_snap_screen under opts.ps1, fog_poc.c:13244-13245) —
-         the FLAKE_VERT snap branch verbatim.                        */
+         (gte_snap_screen under opts.ps1, fog_poc.c:14432) —
+         the FLAKE_VERT snap branch verbatim (floor + the PushSXY
+         [-1024,1023] saturation, fog_poc.c:8892-8903).              */
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        screen = floor(screen / uPixScale) * uPixScale;
-        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+        vec2 eng = floor(screen / uPixScale);
+        eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+        clip.xy = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                       1.0 - eng.y / 224.0 * 2.0) * clip.w;
       }
       gl_Position = clip;
     }`;
@@ -5735,8 +5767,9 @@ window.SHUI = (function () {
     if (note) {
       if (isLegacy) {
         note.textContent = 'camera anchor (legacy) — offset ' + U.lightOffset.join(', ') +
-          ' m' + (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '') +
-          (U.lightRotAuthored ? ' \u00b7 aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' : '');
+          ' m (oy = UP/DOWN)' + (U.lightAhead > 0 ? ' \u00b7 ' + U.lightAhead.toFixed(2) + ' m ahead' : '') +
+          (U.lightRotAuthored ? ' \u00b7 aim ' + U.lightRot.slice(0, 2).map(v => v.toFixed(0)).join(', ') + '\u00b0 (camera-relative)' : '') +
+          ' \u2014 v49: the numbers move the ENGINE light (the reflection needs ahead > 0.44 m: Gate 2); drag the gold sphere with Shift for height, or the cyan Y-rail';
       } else if (U.lightMode === 'line') {
         note.textContent = 'line light — start ' + U.lightStart.map(v => v.toFixed(1)).join(', ') +
           ' \u2192 end ' + U.lightEnd.map(v => v.toFixed(1)).join(', ') + ' m \u00b7 ' +
@@ -11492,7 +11525,13 @@ function updateLightGizmo() {
       Array.isArray(l.offset) && isFinite(+l.offset[2]) ? +l.offset[2] : -0.12);
     const ahead = l.ahead != null && isFinite(+l.ahead) ? Math.max(0, +l.ahead) : 0;
     const world = off.applyQuaternion(camQ).add(pipCam.position);
-    if (ahead > 0) world.add(dir.clone().multiplyScalar(ahead));
+    /* v49: ahead extends along the CAMERA FORWARD (the C twin's anchor,
+     * fog_poc.c fx_light_anchor's extraAhead), not the beam dir — the
+     * pre-v49 gizmo drifted the light off the authored ahead line. */
+    if (ahead > 0) {
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camQ);
+      world.addScaledVector(fwd, ahead);
+    }
     g.visible = true;
     g.position.copy(world);
     g.userData.arrow.setDirection(dir.clone().applyQuaternion(camQ));
@@ -11701,7 +11740,15 @@ function lightResolveForView() {
       ul = { mode: 1, hasRot, rot: vec3(l.rot, [-15, 0, 0]),
              world: lightWorldPos(l, state.t) };
     } else if (l.follow === 'camera') {
-      ul = { mode: 0, hasRot, rot: vec3(l.rot, [-15, 0, 0]), world: null };
+      /* v49 (D6): carry the authored offset/ahead so the ENGINE light
+       * honors them (the gizmo twin) — the pre-v49 carrier dropped them
+       * and the light stayed AT the camera while the gizmo showed the
+       * authored pose. */
+      const hasOff = Array.isArray(l.offset) && l.offset.length >= 3 &&
+        isFinite(+l.offset[0]) && isFinite(+l.offset[1]) && isFinite(+l.offset[2]);
+      ul = { mode: 0, hasRot, rot: vec3(l.rot, [-15, 0, 0]), world: null,
+             offset: hasOff ? [+l.offset[0], +l.offset[1], +l.offset[2]] : null,
+             ahead: (l.ahead != null && isFinite(+l.ahead)) ? Math.max(0, +l.ahead) : null };
     }
   }
   SV.setUserLight(ul);
@@ -11758,12 +11805,16 @@ const WATER_VERT = `
     vBkt = shWb;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
-         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
+         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
+         PushSXY [-1024,1023] saturation — the C's gte_snap_screen
+         (fog_poc.c:8892-8903) applies to EVERY DrawItem quad corner
+         (transform_item2 :9070), the water strip included. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       /* the water prim's V44 (A-2) far-edge gate (shWb = sh_water_ot_gate of
          the prim depth, fog_poc.c:12589-12592) — the C's painter gate input
          (fog_poc.c:12824 with depthM = the far edge at :13155/:13392:
@@ -12359,12 +12410,15 @@ const WATERLIVE_VERT = `
     vec4 clip = projectionMatrix * mvPosition;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* the GTE screen snap (the SH_VERT discipline — the engine's floor
-         quads draw through the same GTE projection as the room) */
+         quads draw through the same GTE projection as the room): floor
+         to the ENGINE lattice + the PushSXY [-1024,1023] saturation
+         (gte_snap_screen, fog_poc.c:8892-8903 / transform_item2 :9070) */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       gl_Position = vec4(ndc * clip.w, clip.z, clip.w);
     } else {
       gl_Position = clip;
@@ -12378,7 +12432,7 @@ const WATERLIVE_FRAG = `
   varying float vQcull;
   void main() {
     /* v4b (F4): the engine's per-quad culls — func_80059E34 drops the quad
-     * at :1500-1503 `if (var_t9 < var_t2) continue;` (var_t9 =
+     * at :1500-1503 'if (var_t9 < var_t2) continue;' (var_t9 =
      * MIN(Q8(7.61)<<(otShift+2), fog.farDistance), var_t2 = the quad's Q8
      * depth — the field_1C FAR CULL; bodyprog_80056D8C.c:1475-1476), and
      * the C twin applies the gte_NormalClip backface cull in the SAME
@@ -12421,7 +12475,13 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
   if (!drWaterOn) return;
   const rec = SV.V.models.get(name);
   if (!rec || !rec.meshes.length) return;
-  const payload = (wr && wr.pixels) ? wr : null;
+  /* v49 fix: the regen consumes the PARSED payload ({idx, clut} — the
+   * sh1xDrWaveFromExtras twin at :7656), never the RAW extras object
+   * (the raw .idx is undefined — drTileRegen crashed reading [0], the
+   * boot-time "SHView register failed" TypeError). The effectTexFlag
+   * gate rides the rec's own parse (the WF-4 #209 form).              */
+  const payload = (rec.sh1xDrWave) ? rec.sh1xDrWave
+                : ((wr && wr.pixels) ? sh1xDrWaveFromExtras(wr) : null);
   if (!payload) return;
   let liveMat = null;
   for (let i = 0; i < rec.meshes.length; i++) {
@@ -12941,12 +13001,15 @@ const TV_VERT = `
     vec4 clip = projectionMatrix * mvPosition;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
-         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
+         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
+         PushSXY [-1024,1023] saturation — the C's sh_tvpaint_project
+         (fog_poc.c:13792) saturates every TV quad corner. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       /* the flat-w construction: gl_Position = (ndc*w, zclip, w) — the
          affine varyings follow (the PSX raster has no perspective
          correction; the engine's UV DDA is screen-space linear) */
