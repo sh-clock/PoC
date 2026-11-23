@@ -10972,8 +10972,17 @@ static void sh1x_anims_tick(Sh1x *sx, double dt, const v3 *camGltf) {
                     if (t == 1 || t == -1) a->rawVel = 0;
                 }
                 if (a->rawVel == 0 && a->kickPhase == 1) {
-                    a->rawVy = a->rawSettle;    /* rest: Q12_ANGLE(-157.4) */
+                    /* v48 (A16-3): the engine sets flag 106 on the frame
+                     * the halving ends (map1_s03.c:1977-1988) but applies
+                     * the settle pose vy = Q12_ANGLE(-157.4f) only on the
+                     * NEXT frame via the else-if flag branch (:1992-1996).
+                     * The old form snapped in the SAME step — one frame
+                     * early. Phase 2 now applies the settle one step
+                     * later, matching the engine's frame N / N+1 split. */
                     a->kickPhase = 2;
+                } else if (a->rawVel == 0 && a->kickPhase == 2) {
+                    a->rawVy = a->rawSettle;    /* rest: Q12_ANGLE(-157.4) */
+                    a->kickPhase = 3;
                 }
             }
             break;
