@@ -7201,6 +7201,19 @@ static int g_bootWeatherTarget = -1;
  * with the same seed the fresh boot's final snow_reset_seed uses, else
  * --snow-seed N restart != fresh. */
 static unsigned g_bootSnowSeed = SNOW_SEED_DEFAULT;
+/* V48 audit A23-F1: the resolved BOOT weather recipe — weatherBits (E0CB0)
+ * exactly as the boot left it (CLI --weather > the camdat env boot > the
+ * GLB room field_17 > the map0 default). The K_R restart must re-sync the
+ * transition state from THIS, not the live weatherBits: the W key's
+ * runtime event re-packs weatherBits (particle_environment_set(2, 127),
+ * the map6_s00.c:184 recipe; E0CB0 re-packed at particle.c:3811 and
+ * 3815-3820), so after a W press the live bits are the recipe-2 snow
+ * packing, not the boot recipe. The engine's room reload never sees a
+ * mutated recipe — every map load re-derives E0CB0 from the map header
+ * (GameBoot_WorldEnvInit, load_screen.c:36:
+ * particleEnviromentSet(field_17, field_16)); the stash is the PoC's
+ * restart==fresh-session equivalent. */
+static uint32_t g_bootWeatherBits = 0;
 static int sh_particle_weather_target_set(Snow *S, int arg0) {
     if (!S->transitionLock) {
         /* engine line 3946: `return false` — the whole body is skipped */
@@ -16842,11 +16855,23 @@ static int live_action(LiveApp *A, LiveKey k, int down) {
          * cross-fade (the W key / --weather-target) was carried deeper
          * into the restarted session than any fresh boot — the engine
          * reload DROPS the transition and re-syncs to the room recipe
-         * (the map event re-arms D0B18 as scripted). weatherBits is the
-         * boot recipe and nothing mutates it during a session, so this
-         * re-sync also restores the fresh boot's current==target.       */
+         * (the map event re-arms D0B18 as scripted).
+         * v48 (A23-F1): the re-sync reads the STASHED BOOT recipe
+         * (g_bootWeatherBits), not the live weatherBits — the old comment
+         * claimed "weatherBits is the boot recipe and nothing mutates it
+         * during a session", which is FALSE: the W key's runtime event
+         * re-packs it (particle_environment_set(2, 127) — the map6_s00.c:184
+         * recipe; E0CB0 re-packed at particle.c:3811/3815-3820), so a
+         * W-then-R restart re-synced current/target/settings to the
+         * recipe-2 SNOW packing where a fresh session boots the original
+         * recipe (boot --weather 5 rain + W + R booted SNOW). The engine's
+         * reload never inherits a mutated recipe — every map load
+         * re-derives E0CB0 from the header (load_screen.c:36). The
+         * register itself is restored too, so the post-restart state
+         * equals the fresh boot's for any later reader.                 */
         A->snow.weatherTick = 0;
         A->snow.transitionLock = 1;
+        A->snow.weatherBits = g_bootWeatherBits;
         A->snow.weatherCurrent = A->snow.weatherBits;
         A->snow.weatherTarget = A->snow.weatherBits;
         A->snow.weatherSettings = (uint16_t)(A->snow.weatherBits >> 12);
@@ -19401,6 +19426,7 @@ int main(int argc, char **argv) {
      * calls D0B18(6) — its snow->rain street event). */
     g_bootWeatherTarget = bootWeatherTarget;   /* V42 D-1: for the K_R re-arm */
     g_bootSnowSeed = snowSeed;                 /* V45 audit W7: same for the seed */
+    g_bootWeatherBits = A.snow.weatherBits;    /* V48 A23-F1: the boot recipe for K_R */
     if (bootWeatherTarget >= 0) {
         if (sh_particle_weather_target_set(&A.snow, bootWeatherTarget)) {
             printf("[weather] boot sharedFunc_800D0B18(%d) — sine cross-fade "
