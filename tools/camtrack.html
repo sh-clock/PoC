@@ -2815,9 +2815,14 @@ window.SHView = (function () {
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        screen = floor(screen / uPixScale) * uPixScale;
-        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+        /* gte_snap_screen VERBATIM (fog_poc.c:8892-8903, the flake base
+           :14259): PushSXY floor to the ENGINE lattice, THEN the
+           [-1024,1023] saturation (swanstation gte.cpp:353-380) — same
+           family as the #195 SH_VERT fix. */
+        vec2 eng = floor(screen / uPixScale);
+        eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+        clip.xy = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                       1.0 - eng.y / 224.0 * 2.0) * clip.w;
       }
       /* atlas uv: the engine samples texels [u0t .. u0t+size) x [0..size) */
       vUvA = vec2((sU0 + sFrac.x * sSize) / 8.0, (sClutY + sFrac.y * sSize) / 40.0);
@@ -2919,14 +2924,16 @@ window.SHView = (function () {
       vec3 p = iPos + position * iScale;
       vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       /* V44 (E-3): the C snaps ALL 4 splash ground corners
-         (gte_snap_screen under opts.ps1, fog_poc.c:13244-13245) —
-         the FLAKE_VERT snap branch verbatim.                        */
+         (gte_snap_screen under opts.ps1, fog_poc.c:14432) —
+         the FLAKE_VERT snap branch verbatim (floor + the PushSXY
+         [-1024,1023] saturation, fog_poc.c:8892-8903).              */
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        screen = floor(screen / uPixScale) * uPixScale;
-        clip.xy = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                       1.0 - screen.y / (224.0 * uPixScale.y) * 2.0) * clip.w;
+        vec2 eng = floor(screen / uPixScale);
+        eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+        clip.xy = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                       1.0 - eng.y / 224.0 * 2.0) * clip.w;
       }
       gl_Position = clip;
     }`;
@@ -11505,12 +11512,16 @@ const WATER_VERT = `
     vBkt = shWb;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
-         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
+         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
+         PushSXY [-1024,1023] saturation — the C's gte_snap_screen
+         (fog_poc.c:8892-8903) applies to EVERY DrawItem quad corner
+         (transform_item2 :9070), the water strip included. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       /* the water prim's own PLAIN avg depth (shWb) — the C's painter gate
          input (fog_poc.c:11218-11219: skip only when opaque geometry is
          strictly NEARER; ties draw). The GL depth TEST is OFF (the room's
@@ -12070,12 +12081,15 @@ const WATERLIVE_VERT = `
     vec4 clip = projectionMatrix * mvPosition;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* the GTE screen snap (the SH_VERT discipline — the engine's floor
-         quads draw through the same GTE projection as the room) */
+         quads draw through the same GTE projection as the room): floor
+         to the ENGINE lattice + the PushSXY [-1024,1023] saturation
+         (gte_snap_screen, fog_poc.c:8892-8903 / transform_item2 :9070) */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       gl_Position = vec4(ndc * clip.w, clip.z, clip.w);
     } else {
       gl_Position = clip;
@@ -12556,12 +12570,15 @@ const TV_VERT = `
     vec4 clip = projectionMatrix * mvPosition;
     if (uPsx > 0.5 && clip.w > 0.0) {
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
-         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor) */
+         (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
+         PushSXY [-1024,1023] saturation — the C's sh_tvpaint_project
+         (fog_poc.c:13792) saturates every TV quad corner. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
-      screen = floor(screen / uPixScale) * uPixScale;
-      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
-                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      vec2 eng = floor(screen / uPixScale);
+      eng = clamp(eng, vec2(-1024.0), vec2(1023.0));
+      vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
+                      1.0 - eng.y / 224.0 * 2.0);
       /* the flat-w construction: gl_Position = (ndc*w, zclip, w) — the
          affine varyings follow (the PSX raster has no perspective
          correction; the engine's UV DDA is screen-space linear) */
