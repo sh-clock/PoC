@@ -1645,6 +1645,13 @@ const SHCore = (function () {
     const x = t - r;
     p.pos[0] = x | 0;
     const rr = r - (x < 0 ? -x : x);
+    /* v4b (B1-6): the C returns BEFORE the second RNG draw (fog_poc.c:6875
+       `if (rr <= 0) { p->pos[2] = 0; return; }` — rr==0 makes the MIPS DIV
+       unpredictable, p ~ 3.7e-9 per call). The JS always drew snowRand16 —
+       when rr hit 0 the PRNG stream diverged from the engine from that
+       event on (every subsequent snow/rain spawn desynced). NaN|0 had
+       coincidentally produced pos[2]=0, so only the STREAM diverged. */
+    if (rr <= 0) { p.pos[2] = 0; return; }
     p.pos[2] = ((randvRef.v % rr) + (snowRand16(S) % rr) - rr) | 0;
   }
   const snowPositionRandomize = (S, p, randvRef) =>
