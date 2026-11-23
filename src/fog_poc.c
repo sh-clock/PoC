@@ -13384,6 +13384,16 @@ static void sh1x_school_water_draw(Frame *fb, const Renderer *R,
                             -rowsYm[rj][rk] / 4096.0f,
                             -rowsZ[rj][rk] / 4096.0f,
                             fb, &px, &py, &zm)) { vis = 0; break; }
+                    /* v49-audit (A6-1): the ENGINE projects every strip
+                     * row corner through gte_rtps/gte_stsxy (water.c:626-
+                     * 629) — the PushSXY lattice floor + [-1024,1023]
+                     * saturation the JS WATER_VERT twin already carries;
+                     * the C twin's sh_wspr_project path had NEITHER (raw
+                     * floats, then RT-scale (int) truncs). Snap like
+                     * every other projected call site. */
+                    if (R->opts.ps1)
+                        gte_snap_screen(&px, &py, R->enginePixScale,
+                                        R->enginePixScaleY);
                     sxq[c] = (int)px;
                     syq[c] = (int)py;
                     zq[c] = zm;
