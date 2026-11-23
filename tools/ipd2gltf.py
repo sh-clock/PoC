@@ -7061,8 +7061,12 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
                                        if inst.obj_name in room.plm.obj_order
                                        else -1),
                         "objIdx": inst.obj_idx,
-                        "add_seq": sum(len(room.buffer_billboards.get(b, ()))
-                                       for b in range(inst.group)) + inst.group,
+                        # v48 RIP-8 (D4-5): add_seq DROPPED — the consumer
+                        # parses it (fog_poc.c:2906 jint -> item.addSeq :2938)
+                        # but NEVER reads item.addSeq (3 occurrences in all
+                        # of fog_poc.c: the struct decl + two assignments); the
+                        # draw order is reproduced structurally by the emission
+                        # order (sh1x["render"]["addOrder"]). Write-only field.
                     },
                 }
             mesh_nodes = [builder.add_node(f"{node_name}_m{j}", mi, root=False,

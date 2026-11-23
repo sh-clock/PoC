@@ -33,9 +33,10 @@ We use:
 - `nodes[i].extras.SH1X` — per-instance references for renderer convenience:
   `{ room: <room name>, buffer: <idx>, instance: <idx>, object: <name>,
      plm_object: <idx into SH1X.plm.objects>, ot_base: <int>,
-     field_B_1: <int>, add_seq: <int — global engine add order> }`.
+     field_B_1: <int> }`.
   (Derived data, *redundant* by design: every value is derivable from the
-  scene-level container; the C engine's loader is simpler this way.)
+  scene-level container; the C engine's loader is simpler this way.
+  v48 RIP-8: `add_seq` dropped — the consumer parsed but never read it.)
 - `meshes[i].extras.SH1X` — per-mesh engine view: `{ plm_object, plm_mesh,
      vertexOffset, normalOffset, flagsByte }` + `packs` array (see below).
 
