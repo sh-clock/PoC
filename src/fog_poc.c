@@ -15955,12 +15955,42 @@ static void r2view_tick(R2View *V, const CamPose *body) {
         V->selfViewTimer += R2_DT_Q12;
 
         /* --- ideal camera position (vcMakeIdealCamPosByHeadPos,
-         * extraViewMode ON branch; engine y-down +0.07 -> y-up -0.07)   */
+         * extraViewMode ON branch; engine y-down +0.07 -> y-up -0.07).
+         * v48 (A22-F3): the ENTRY tick takes the WARP_WATCH branch —
+         * vcSetFlagsByCamMvType sets VC_WARP_WATCH_F on the press edge
+         * (vc_main.c:769-786, extraViewMode-gated) alongside the every-
+         * tick VC_WARP_CAM_F|VC_WARP_CAM_TGT_F (:761), and the ideal
+         * builder's FIRST branch is
+         *   if (w_p->flags & VC_WARP_WATCH_F) {
+         *       ideal_pos->vx = w_p->chara_pos.vx;   root xz
+         *       ideal_pos->vy = w_p->chara_top_y;    top height
+         *       ideal_pos->vz = w_p->chara_pos.vz;
+         *       return;  }                 (vc_main.c:1929-1935)
+         * the character ROOT xz at the TOP height (top = root + 1.7m:
+         * hero_top_y = position.vy + Q12(-1.7f), vc_util.c:132) — NO
+         * 0.18m head offset, NO 140deg, NO 0.07 y. WARP_CAM/CAM_TGT then
+         * glue camPos/camTgt to it for this tick (vcRenewalCamData,
+         * vc_main.c:2565-2572), so the entry-tick watch pipeline
+         * (vcMixSelfViewEffectToWatchTgtPos reads cam_pos, vc_main.c:
+         * 1509-1511) and the WARP_WATCH angle snap below all run from
+         * this first-person-at-the-top position; the flag clears at the
+         * end of the tick (vc_main.c:360) and the camera moves to
+         * head+0.18m@140deg from tick 2. In this PoC's camera-stands-in-
+         * for-player model the anchor IS the head/top and the root xz
+         * equals the anchor xz (the farWatch mapping below models
+         * chara_pos.xz == head.xz), so the warp position is the anchor
+         * itself.                                                        */
         int32_t camAng = eyeYaw + R2_HEAD_ANG;
         int32_t ideal[3];
-        ideal[0] = head[0] + R2_MUL(sh_math_sin(camAng), R2_HEAD_DIST);
-        ideal[2] = head[2] + R2_MUL(sh_math_cos(camAng), R2_HEAD_DIST);
-        ideal[1] = head[1] - R2_HEAD_Y;
+        if (edge) {
+            ideal[0] = head[0];
+            ideal[1] = head[1];
+            ideal[2] = head[2];
+        } else {
+            ideal[0] = head[0] + R2_MUL(sh_math_sin(camAng), R2_HEAD_DIST);
+            ideal[2] = head[2] + R2_MUL(sh_math_cos(camAng), R2_HEAD_DIST);
+            ideal[1] = head[1] - R2_HEAD_Y;
+        }
 
         /* SELF_VIEW sets WARP_CAM/CAM_TGT every tick: hard glue         */
         V->camPos[0] = V->camTgt[0] = ideal[0];
