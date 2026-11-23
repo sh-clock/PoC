@@ -7321,6 +7321,18 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
             "images": len(assigned_images),
             "nodes": len(builder.json["nodes"]) - s_nodes,
             "png_conversions": len(builder.json["images"]) - s_imgs,
+            # v48 RIP-6 (D3-3): the per-room vertices/triangles were
+            # ALWAYS 0 (no writer anywhere — serialized straight into the
+            # --report JSON). Same accessor math as the whole-map summary
+            # (L8700-8703), over THIS room's mesh range [s_meshes:].
+            "vertices": sum(
+                builder.json["accessors"][p["attributes"]["POSITION"]]["count"]
+                for m in builder.json["meshes"][s_meshes:]
+                for p in m["primitives"]),
+            "triangles": sum(
+                builder.json["accessors"][p["indices"]]["count"] // 3
+                for m in builder.json["meshes"][s_meshes:]
+                for p in m["primitives"]),
         })
     else:
         out_path = os.path.join(out_dir, f"{room.name}.glb")
@@ -7345,7 +7357,18 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
                        "materials": len(builder.json["materials"]),
                        "images": len(builder.json["images"]),
                        "nodes": len(builder.json["nodes"]),
-                       "png_conversions": len(builder.json["images"])})
+                       "png_conversions": len(builder.json["images"]),
+                       # v48 RIP-6 (D3-3): same as the whole-map block above
+                       # — the single-room builder's meshes are exactly this
+                       # room's ([s_meshes:] == all of them here).
+                       "vertices": sum(
+                           builder.json["accessors"][p["attributes"]["POSITION"]]["count"]
+                           for m in builder.json["meshes"][s_meshes:]
+                           for p in m["primitives"]),
+                       "triangles": sum(
+                           builder.json["accessors"][p["indices"]]["count"] // 3
+                           for m in builder.json["meshes"][s_meshes:]
+                           for p in m["primitives"])})
     # imported objects (verbatim cross-library geometry) into the report
     report["imported_objects"] = list(imported_seen.values())
     # tex_variants_struct is needed by the reconciliation below - build first
