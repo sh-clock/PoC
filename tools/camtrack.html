@@ -3808,6 +3808,13 @@ window.SHView = (function () {
      * order (map update before WorldGfx_Draw, game_sys_states.c:172 vs :189). */
     if (V.tvPaintHook) V.tvPaintHook();
 
+    /* v48: THE DR WATER (WaterRefract) FX — the sewer water floor's live
+     * tile regen + the lens glint + the cone-of-light (lens_flare.c:525-825
+     * via the module glue). Runs with the other FX hooks, before the RT
+     * render (the engine's WorldGfx_2dEffectsDraw runs INSIDE WorldGfx_Draw
+     * before the OT walk, draw.c:442-445 — the same slot).                    */
+    if (V.drWaterHook) V.drWaterHook();
+
     /* particle collection + sprite buffers (exact math) */
     const parts = collectParticles(env, snow, viewE);
     updateFlakeBuffers(parts.flakes);
@@ -3865,6 +3872,10 @@ window.SHView = (function () {
      * discipline — restore regardless of drawRT so the orbit render never
      * leaks the screens). */
     if (V.tvMeshes) for (const m of V.tvMeshes) m.visible = false;
+
+    /* v48: the DR water FX meshes are RT-ONLY too (the glint quad + the
+     * cone fan — the sprites/waterfall/TV discipline). */
+    if (V.drWaterMeshes) for (const m of V.drWaterMeshes) m.visible = false;
 
     /* the post pass uniforms (the exact overlay + quantize math) */
     V.postMat.uniforms.uBright.value = V.enabled ? env.screenBrightness : 0;
@@ -4034,6 +4045,12 @@ window.SHView = (function () {
     V.tvMeshes = meshes || [];
     V.tvPaintHook = hook || null;
   }
+  /* v48: register the DR water (WaterRefract) FX meshes + the per-frame
+   * collect hook (the setWaterFx discipline; the DR water family). */
+  function setDrWaterFx(meshes, hook) {
+    V.drWaterMeshes = meshes || [];
+    V.drWaterHook = hook || null;
+  }
   /* v41 (CT-IMPL fix 4): the AUTHORED USER LIGHT carrier — the editor
    * glue resolves the ACTIVE model's models[].light into this slot every
    * frame (lightResolveForView); null restores the engine anchor. The
@@ -4054,7 +4071,7 @@ window.SHView = (function () {
     V, init, registerModel, syncAndDraw, blitFaithful,
     setPair, setFlashlight, toggleFlashlight, lightning, setLensFlare,
     setWeatherTarget, setBootWeather, setPsx, setDither, setParticles,
-    setEnabled, setWaterFx, setTvPaintFx, setUserLight
+    setEnabled, setWaterFx, setTvPaintFx, setUserLight, setDrWaterFx
   };
 })();
 
@@ -7269,6 +7286,7 @@ async function loadModelFiles(files) {
       const ab = await glb.arrayBuffer();
       gltf = await loader.parseAsync(ab, '');
       gltf._sh1x = glbSceneSh1xExtras(ab);
+      gltf._sh1xMats = glbMaterialSh1xExtras(ab);
     }
     else gltf = await loader.parseAsync(await main.text(), '');
     registerModel(name, gltf);
@@ -7290,6 +7308,7 @@ async function loadModelBase64(name, b64) {
   const loader = new GLTFLoaderC();
   const gltf = await loader.parseAsync(buf.buffer, '');
   gltf._sh1x = glbSceneSh1xExtras(buf.buffer);
+  gltf._sh1xMats = glbMaterialSh1xExtras(buf.buffer);
   registerModel(name, gltf);
 }
 
@@ -7399,6 +7418,11 @@ function registerModel(name, gltf) {
   const diag = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) || 1;
   three.loaded.set(name, { scene: root, box, diag, sh1xAnims: propAnims, sh1xHeader: (sh1x && sh1x.header) || null,
     sh1xEnv: (sh1x && sh1x.env) || null,
+    /* v48: THE DR WATER — the SH1X.envEffects.waterRefract payload (the
+     * DR_WAVE sheet + the live-tile contract) + the SH1X.waterZones (the
+     * engine's s_WaterZone list, map_info.c:389-402, decoded at load)      */
+    sh1xDrWave: sh1xDrWaveFromExtras(sh1x && sh1x.envEffects && sh1x.envEffects.waterRefract),
+    sh1xWaterZones: sh1xWaterZonesFromExtras(sh1x && sh1x.waterZones),
     /* v39: the school-water sheet — the SH1X.waterTex EXTRAs decoded at
      * load (fog_poc.c:1801-1833; absent/malformed = null -> the
      * compiled-in WATER.TIM default, sh1xWaterTexDefault) */
@@ -7470,6 +7494,16 @@ function registerModel(name, gltf) {
     };
     try {
       window.SHView.registerModel(name, root, hooks);
+      /* v48: THE WATER FLOOR MATERIAL SWAP — the waterLive meshes (the
+       * DWAVE material family: DR's MIZ*_DWA floors) leave the static
+       * DWAVE_TILE0 shMat and take the SUBTRACTIVE live-tile material
+       * (func_80059E34 arg0==1: tpage 0x14D, 15-bit DIRECT, ABR-2 B-F,
+       * flat (56,56,56), the FIXED bucket 640 = renderOrder 10). The
+       * mesh is IDENTIFIED by its material's SH1X.waterLive extras (the
+       * raw-GLB material map above) — the material NAME is only the
+       * fallback. The orbit view keeps the original static material
+       * (the sprites/water/TV RT-only discipline).                        */
+      sh1xDrWaterFloorSwap(name, gltf._sh1xMats || null, sh1x && sh1x.envEffects && sh1x.envEffects.waterRefract);
       if (window.SHUI && window.SHUI.ready) {
         /* priority: URL params (the session's explicit intent, like the C++
            CLI overriding camdat) > the saved model env > the current state.
@@ -8388,6 +8422,25 @@ function glbSceneSh1xExtras(buf) {
     const sc = json.scenes && json.scenes[0] && json.scenes[0].extras &&
                json.scenes[0].extras.SH1X;
     return sc || null;
+  } catch (e) { return null; }
+}
+/* v48: the MATERIAL-level SH1X extras (the waterLive/waterAdd contracts —
+ * GLTFLoader r170 never copies material extras to userData; the water
+ * port keys on the material NAME the loader preserves). A map:
+ * name -> extras.SH1X. */
+function glbMaterialSh1xExtras(buf) {
+  try {
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== 0x46546C67) return null;
+    const jlen = dv.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jlen)));
+    const out = {};
+    if (Array.isArray(json.materials))
+      for (const m of json.materials) {
+        const ex = m && m.extras && m.extras.SH1X;
+        if (ex && typeof m.name === 'string') out[m.name] = ex;
+      }
+    return out;
   } catch (e) { return null; }
 }
 /* ==== SH1X-DRIVERS-BEGIN ==== */
@@ -11857,6 +11910,595 @@ function sh1xWaterFxUpdate() {
 }
 
 /* ==================================================================== */
+/* v48: THE DR WATER (WaterRefract) PORT — the sewer water family.       */
+/* The camtrack consumed NONE of the water EXTRAs before (the floor     */
+/* rendered as an OPAQUE STATIC bright-gray plane — the user's visible   */
+/* "the water textures don't look correct"). This block ports the        */
+/* engine's COMPLETE water path (lens_flare.c:525-825 + func_80059E34   */
+/* arg0==1, all vs the PoC twins fog_poc.c:11429-12077 / 12447-12522):   */
+/*   1. the LIVE TILE regeneration (func_8008E5B4: the two 32x32       */
+/*      scrolling layers into the 32x32 tile at VRAM (832,224) — the    */
+/*      (ctr>>1)&0x1F vertical window + the ((ctr+1)>>2)&0x1F           */
+/*      horizontal window, the ctr advancing on the 30Hz grid while     */
+/*      the light stands inside a water zone);                          */
+/*   2. the SUBTRACTIVE floor (func_80059E34 arg0==1: tpage 0x14D,      */
+/*      15-bit DIRECT, ABR-2 B-F, flat (56,56,56), FIXED bucket 640 ->   */
+/*      renderOrder 10, depthWrite false, CustomBlending Subtract);      */
+/*   3. the LENS GLINT (func_8008E794: the mirrored light position       */
+/*      2*waterY - lightY, the 48x96 px additive quad u 64..127 v 0..31  */
+/*      clut row 1, the sin(angZ-40) prim color, bucket 641 -> the      */
+/*      fixed-depth gate roomD < 20.0625 discard);                       */
+/*   4. the CONE-OF-LIGHT fan (func_8008EA68: 8 segments AT the water   */
+/*      height around the LIGHT's ground position, the inner r=0.8      */
+/*      @1.2m + outer r=2.2 @1.5m rings + the (0,0,0.7) apex, the      */
+/*      opaque pair at 641 + the additive pair at 639 over the floor).  */
+/* ==================================================================== */
+let drWaterOn = true;
+try {
+  drWaterOn = new URLSearchParams(location.search).get('drwater') !== '0';
+} catch (e) { /* file:// or such — keep on */ }
+
+/* the SH1X.envEffects.waterRefract payload decode (ipd2gltf.py:577-659):
+ * pixels = 4096 b64 bytes (4bpp nibbles, LOW nibble = even u — the
+ * TimFile layout, fs_queue.c:643-678); clut = 2 rows x 16 u15.       */
+function sh1xDrWaveFromExtras(wr) {
+  if (!wr || typeof wr !== 'object') return null;
+  try {
+    const bytes = sh1xB64Bytes(wr.pixels);
+    if (!bytes || bytes.length !== 4096) return null;
+    const clut = wr.clut;
+    if (!Array.isArray(clut) || clut.length < 2 || !Array.isArray(clut[0])) return null;
+    const idx = new Uint8Array(128 * 64);      /* one palette index per texel */
+    for (let v = 0; v < 64; v++)
+      for (let u = 0; u < 128; u++) {
+        /* 4bpp: one byte = two texels — the 128-texel row is 64 BYTES
+         * (the TimFile image block: 32 halfwords x 64 rows = 4096 bytes;
+         * the v37 camtrack twin had a 128-byte stride that read past the
+         * buffer end -> every index 0 -> the all-black tile)           */
+        const b = bytes[v * 64 + (u >> 1)];
+        idx[v * 128 + u] = (u & 1) ? (b >> 4) : (b & 0xF);
+      }
+    return { idx, clut };
+  } catch (e) { return null; }
+}
+/* the SH1X.waterZones decode (map_info.c:389-402 verbatim — the engine
+ * bounds are ENGINE meters; illumination raw q11_4 -> meters /16).   */
+function sh1xWaterZonesFromExtras(zs) {
+  if (!Array.isArray(zs) || !zs.length) return null;
+  const out = [];
+  for (const z of zs) {
+    if (!z || z.enabled !== true) continue;
+    const illumM = typeof z.illuminationMeters === 'number' ? z.illuminationMeters
+                 : ((z.illumination || 0) / 16);
+    out.push({ enabled: true, illumM, minX: z.minX, maxX: z.maxX, minZ: z.minZ, maxZ: z.maxZ });
+  }
+  return out.length ? out : null;
+}
+
+/* ---- 1. THE LIVE TILE (func_8008E5B4 twin) ------------------------ */
+/* The engine's ONE VRAM tile at (832,224,32,32) — a single global.     */
+const drTile = { tex: null, data: null, ctr: 0, ticks: -1 };
+function drTileEnsure() {
+  if (drTile.tex) return drTile.tex;
+  drTile.data = new Uint8Array(32 * 32 * 4);
+  drTile.tex = new THREE.DataTexture(drTile.data, 32, 32, THREE.RGBAFormat);
+  drTile.tex.magFilter = THREE.NearestFilter;
+  drTile.tex.minFilter = THREE.NearestFilter;
+  drTile.tex.generateMipmaps = false;
+  drTile.tex.colorSpace = THREE.NoColorSpace;
+  drTile.tex.wrapS = drTile.tex.wrapT = THREE.RepeatWrapping;
+  drTile.tex.flipY = false;
+  drTile.regens = 0;
+  return drTile.tex;
+}
+/* the ctr composite VERBATIM (lens_flare.c:578-599 + the PoC's
+ * fx_water_tile_update fog_poc.c:12498-12522):
+ *   poly[0] OPAQUE    u 0..32,  v = (ctr>>1)&0x1F .. +32  (clut row 0)
+ *   poly[1] ABR-1 ADD u = ((ctr+1)>>2)&0x1F .. +32, v 8..40 (clut row 0)
+ * both primColor (128,128,128) = x1.0 — the composite is the 5-bit
+ * per-channel saturating add of the two row-0 decodes.               */
+function drTileRegen(wr) {
+  const ctr = drTile.ctr | 0;
+  const vA = (ctr >> 1) & 0x1F;
+  const uB = ((ctr + 1) >> 2) & 0x1F;
+  const idx = wr.idx, clut0 = wr.clut[0];
+  const data = drTile.data;
+  const repl5 = v => (v << 3) | (v >> 2);
+  for (let y = 0; y < 32; y++) {
+    const row0 = (vA + y) * 128;
+    const row1 = (8 + y) * 128;
+    for (let x = 0; x < 32; x++) {
+      const c0 = clut0[idx[row0 + x]] || 0;
+      const c1 = clut0[idx[row1 + (uB + x)]] || 0;
+      const o = (y * 32 + x) * 4;
+      data[o]     = repl5(Math.min(31, (c0 & 31)        + (c1 & 31)));
+      data[o + 1] = repl5(Math.min(31, ((c0 >> 5) & 31) + ((c1 >> 5) & 31)));
+      data[o + 2] = repl5(Math.min(31, ((c0 >> 10) & 31) + ((c1 >> 10) & 31)));
+      data[o + 3] = 255;
+    }
+  }
+  drTile.tex.needsUpdate = true;
+  drTile.regens = (drTile.regens || 0) + 1;
+}
+
+/* ---- the DR_WAVE atlas: the 128x64 sheet decoded with BOTH clut rows */
+/* (rows 0..63 = clut row 0, rows 64..127 = clut row 1 — the glint's     */
+/* u 64..127 / v 0..31 window samples row 1 at atlas v 64..95).          */
+function sh1xDrWaveAtlas(wr) {
+  if (wr._atlasTex) return wr._atlasTex;
+  const repl5 = v => (v << 3) | (v >> 2);
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 128;
+  const ctx2 = cv.getContext('2d');
+  const img = ctx2.createImageData(128, 128);
+  for (let row = 0; row < 2; row++) {
+    for (let v = 0; v < 64; v++) {
+      for (let u = 0; u < 128; u++) {
+        const entry = wr.clut[row][wr.idx[v * 128 + u]] || 0;
+        const o = ((row * 64 + v) * 128 + u) * 4;
+        if ((entry & 0x7FFF) === 0) { img.data[o + 3] = 0; continue; }   /* the hole */
+        img.data[o]     = repl5(entry & 31);
+        img.data[o + 1] = repl5((entry >> 5) & 31);
+        img.data[o + 2] = repl5((entry >> 10) & 31);
+        img.data[o + 3] = 255;
+      }
+    }
+  }
+  ctx2.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.flipY = false;    /* v = canvas y directly */
+  wr._atlasTex = tex;
+  return tex;
+}
+
+/* ---- 2. THE SUBTRACTIVE FLOOR MATERIAL ---------------------------- */
+/* func_80059E34 arg0==1: flat (56,56,56) modulate, ABR-2 B-F; the mesh
+ * TEXCOORDs are already tile-relative (u/32, (v-224)/32) — the material
+ * samples the live tile directly. renderOrder 10 = the FIXED bucket 640
+ * slot (between the opaque room pass and the additive FX at 20).       */
+const WATERLIVE_VERT = `
+  varying vec2 vUv;
+  uniform float uPsx;
+  uniform vec2 uPixScale;
+  void main() {
+    vUv = uv;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vec4 clip = projectionMatrix * mvPosition;
+    if (uPsx > 0.5 && clip.w > 0.0) {
+      /* the GTE screen snap (the SH_VERT discipline — the engine's floor
+         quads draw through the same GTE projection as the room) */
+      vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
+                         (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
+      screen = floor(screen / uPixScale) * uPixScale;
+      vec2 ndc = vec2(screen.x / (320.0 * uPixScale.x) * 2.0 - 1.0,
+                      1.0 - screen.y / (224.0 * uPixScale.y) * 2.0);
+      gl_Position = vec4(ndc * clip.w, clip.z, clip.w);
+    } else {
+      gl_Position = clip;
+    }
+  }`;
+const WATERLIVE_FRAG = `
+  uniform sampler2D map;     /* the 32x32 live tile (repl5 RGB) */
+  varying vec2 vUv;
+  void main() {
+    vec4 texel = texture2D(map, vUv);
+    /* the 0x2E383838 flat modulate: F5 = (T5 * 56) >> 7 (the direct
+       15-bit tile view — func_80059E34 case 1; the PoC twin
+       fog_poc.c:15063-15065) */
+    vec3 t5 = floor(texel.rgb * (255.0 / 8.0));
+    vec3 f5 = min(vec3(31.0), floor(t5 * 56.0 / 128.0));
+    /* the ABR-2 SUBTRACTIVE output: dst = B - F (5-bit, clamped 0) — the
+       CustomBlending SubtractEquation ONE/ONE below performs the subtract;
+       the RT post pass re-quantizes to 5-bit exactly like the PS1 fb      */
+    gl_FragColor = vec4(floor(f5 * 255.0 / 31.0 + 0.5) / 255.0, 1.0);
+  }`;
+/* the floor swap: replaces the waterLive meshes' shMat slot (the
+ * syncAndDraw RT swap picks it up automatically) + renderOrder 10.   */
+function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
+  const SV = window.SHView;
+  if (!SV || !SV.V.ready) return;
+  const rec = SV.V.models.get(name);
+  if (!rec || !rec.meshes.length) return;
+  const payload = (wr && wr.pixels) ? wr : null;
+  if (!payload) return;
+  let liveMat = null;
+  for (let i = 0; i < rec.meshes.length; i++) {
+    const o = rec.meshes[i];
+    const srcMat = Array.isArray(o.material) ? o.material[0] : o.material;
+    const nm = srcMat && typeof srcMat.name === 'string' ? srcMat.name : '';
+    const ex = sh1xMats && nm ? sh1xMats[nm] : null;
+    const isLive = (ex && ex.waterLive === true) ||
+                   (nm.indexOf('DWAVE') === 0 && nm.indexOf('_WADD') < 0);
+    if (!isLive) continue;
+    if (!liveMat) {
+      const tex = drTileEnsure();
+      liveMat = new THREE.ShaderMaterial({
+        vertexShader: WATERLIVE_VERT, fragmentShader: WATERLIVE_FRAG,
+        uniforms: {
+          map: { value: tex },
+          /* uFarCullM: synced by perVertexPass on EVERY shMat slot
+             (:3605) — the water floor ignores it (the engine's
+             func_80059E34 case-1 quads draw at the FIXED bucket 640,
+             the far-cull never applies) but the slot must exist. */
+          uFarCullM: { value: 60.875 },
+          uPsx: { value: SV.V.psxWobble ? 1 : 0 },
+          uPixScale: { value: new THREE.Vector2(SV.V.RT_W / 320, SV.V.RT_H / 224) }
+        },
+        /* tpage 0x14D ABR-2: dst = dst - F. depthTest true: the room's
+           nearer opaque geometry occludes the floor exactly like the
+           engine's OT walk (the floor at the FIXED bucket 640 paints
+           under everything nearer). depthWrite false (the PS1 has no
+           depth buffer; the C's water floor never writes fb->z).    */
+        transparent: true, depthWrite: false, depthTest: true,
+        side: THREE.DoubleSide,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.SubtractEquation,
+        blendSrc: THREE.OneFactor,
+        blendDst: THREE.OneFactor
+      });
+    }
+    rec.shMats[i] = liveMat;
+    o.renderOrder = 10;    /* the FIXED bucket 640 slot */
+  }
+}
+
+/* ---- 3. THE LENS GLINT + 4. THE CONE FAN -------------------------- */
+/* one screen-space glint quad (NDC positions, updated per frame) + two
+ * world-space cone meshes (the opaque pair + the additive pair).       */
+const GLINT_VERT = `
+  varying vec2 vGuv;
+  void main() { vGuv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+const GLINT_FRAG = `
+  uniform sampler2D map;         /* the DR_WAVE atlas (row 1 = v 64..127) */
+  uniform sampler2D uRoomDepth;  /* the room true-depth reference (wfDepthRT) */
+  uniform vec2 uRtSize;
+  uniform vec3 uPrim;            /* the sin-driven prim color 0..255 */
+  varying vec2 vGuv;
+  void main() {
+    /* the FIXED bucket 641 gate (the PoC twin fog_poc.c:11443-11452:
+       fb->z[pi] < 20.0625f -> skip — the engine's fixed-depth occlusion) */
+    vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
+    float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
+    if (roomD < 20.0625) discard;
+    vec4 texel = texture2D(map, vGuv);
+    if (texel.a < 0.5) discard;
+    /* the tpage-45 ABR-1 ADDITIVE output: F5 = (T5 * P8) >> 7 (the
+       (128,128,128)-less prim colors are the sin terms themselves)   */
+    vec3 t5 = floor(texel.rgb * (255.0 / 8.0));
+    vec3 f5 = min(vec3(31.0), floor(t5 * uPrim / 128.0));
+    gl_FragColor = vec4(floor(f5 * 255.0 / 31.0 + 0.5) / 255.0, 1.0);
+  }`;
+const CONE_VERT = `
+  attribute vec3 aCol;
+  varying vec3 vCol;
+  void main() { vCol = aCol; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const CONE_FRAG = `
+  uniform sampler2D uRoomDepth;
+  uniform vec2 uRtSize;
+  uniform float uGate;     /* the bucket far-edge depth: 641 -> 20.0625 / 639 -> 20.0 */
+  varying vec3 vCol;
+  void main() {
+    vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
+    float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
+    if (roomD < uGate) discard;
+    gl_FragColor = vec4(vCol / 255.0, 1.0);
+  }`;
+/* preallocated buffers: the glint quad (4 verts) + the cone fan
+ * (8 segments x (2 g4 quads + 2 g3 tris) x 2 pairs — 96 tris).      */
+const DR_SEG = 8;
+const DR_TRIS_PER_SEG = 6;      /* opaque: g4 (2) + g3 (1); semi: g4 (2) + g3 (1) */
+let drMeshes = null, drGlintMesh = null, drConeOpMesh = null, drConeSemiMesh = null;
+let drGlintGeo = null, drGlintMat = null, drConeOpGeo = null, drConeOpMat = null, drConeSemiGeo = null, drConeSemiMat = null;
+const drGlintPos = new Float32Array(4 * 3);
+const drGlintUv = new Float32Array([ 64 / 128, (64 + 31) / 128,   /* c0 (top-left)     u=64 v=31 */
+                                     64 / 128, (64 + 0) / 128,    /* c1 (top-right)    u=64 v=0  */
+                                     127 / 128, (64 + 31) / 128,  /* c2 (bottom-left)  u=127 v=31 */
+                                     127 / 128, (64 + 0) / 128 ]);/* c3 (bottom-right) u=127 v=0 */
+const drConeOpPos = new Float32Array(DR_SEG * DR_TRIS_PER_SEG * 3 * 3);
+const drConeOpCol = new Float32Array(DR_SEG * DR_TRIS_PER_SEG * 3 * 3);
+const drConeSemiPos = new Float32Array(DR_SEG * DR_TRIS_PER_SEG * 3 * 3);
+const drConeSemiCol = new Float32Array(DR_SEG * DR_TRIS_PER_SEG * 3 * 3);
+let drConeOpTris = 0, drConeSemiTris = 0;
+function drEmitConeTri(dst, col, t, a, b, c, ca, cb, cc) {
+  const p = t * 9;
+  dst[p] = a[0]; dst[p + 1] = a[1]; dst[p + 2] = a[2];
+  dst[p + 3] = b[0]; dst[p + 4] = b[1]; dst[p + 5] = b[2];
+  dst[p + 6] = c[0]; dst[p + 7] = c[1]; dst[p + 8] = c[2];
+  const q = t * 9;
+  col[q] = ca[0]; col[q + 1] = ca[1]; col[q + 2] = ca[2];
+  col[q + 3] = cb[0]; col[q + 4] = cb[1]; col[q + 5] = cb[2];
+  col[q + 6] = cc[0]; col[q + 7] = cc[1]; col[q + 8] = cc[2];
+  return t + 1;
+}
+function sh1xDrWaterEnsureMeshes() {
+  if (drMeshes) return drMeshes;
+  drGlintGeo = new THREE.BufferGeometry();
+  drGlintGeo.setAttribute('position', new THREE.BufferAttribute(drGlintPos, 3));
+  drGlintGeo.setAttribute('uv', new THREE.BufferAttribute(drGlintUv, 2));
+  drGlintGeo.setDrawRange(0, 6);
+  drGlintGeo.setIndex([0, 1, 2, 1, 3, 2]);
+  drGlintMat = new THREE.ShaderMaterial({
+    vertexShader: GLINT_VERT, fragmentShader: GLINT_FRAG,
+    uniforms: { map: { value: null }, uRoomDepth: { value: null },
+                uRtSize: { value: new THREE.Vector2(640, 360) },
+                uPrim: { value: new THREE.Vector3(0, 0, 0) } },
+    /* tpage 45 ABR-1 ADDITIVE; the occlusion is the fixed-bucket roomD
+       gate (depthTest off — the quad's own depth is the fixed bucket) */
+    transparent: true, depthWrite: false, depthTest: false,
+    blending: THREE.AdditiveBlending
+  });
+  drGlintMesh = new THREE.Mesh(drGlintGeo, drGlintMat);
+  drGlintMesh.frustumCulled = false;
+  drGlintMesh.visible = false;
+  /* engine OT bucket 641: the glint draws UNDER the floor's 640
+     subtract (the floor's mostly-black tile passes it through) and
+     OVER the cone's opaque pair (the engine's within-641 LIFO)      */
+  drGlintMesh.renderOrder = 9.5;
+  scene.add(drGlintMesh);
+  drConeOpGeo = new THREE.BufferGeometry();
+  drConeOpGeo.setAttribute('position', new THREE.BufferAttribute(drConeOpPos, 3));
+  drConeOpGeo.setAttribute('aCol', new THREE.BufferAttribute(drConeOpCol, 3));
+  drConeOpGeo.setDrawRange(0, 0);
+  drConeOpMat = new THREE.ShaderMaterial({
+    vertexShader: CONE_VERT, fragmentShader: CONE_FRAG,
+    uniforms: { uRoomDepth: { value: null },
+                uRtSize: { value: new THREE.Vector2(640, 360) },
+                uGate: { value: 20.0625 } },
+    /* the engine's OPAQUE pair (setRGBC0 g4[0]/g3[0], no setSemiTrans)
+       at bucket 641 — dst = C (normal blending, alpha 1)              */
+    transparent: true, depthWrite: false, depthTest: false,
+    blending: THREE.NormalBlending
+  });
+  drConeOpMesh = new THREE.Mesh(drConeOpGeo, drConeOpMat);
+  drConeOpMesh.frustumCulled = false;
+  drConeOpMesh.visible = false;
+  drConeOpMesh.renderOrder = 9;      /* bucket 641, under the glint */
+  scene.add(drConeOpMesh);
+  drConeSemiGeo = new THREE.BufferGeometry();
+  drConeSemiGeo.setAttribute('position', new THREE.BufferAttribute(drConeSemiPos, 3));
+  drConeSemiGeo.setAttribute('aCol', new THREE.BufferAttribute(drConeSemiCol, 3));
+  drConeSemiGeo.setDrawRange(0, 0);
+  drConeSemiMat = new THREE.ShaderMaterial({
+    vertexShader: CONE_VERT, fragmentShader: CONE_FRAG,
+    uniforms: { uRoomDepth: { value: null },
+                uRtSize: { value: new THREE.Vector2(640, 360) },
+                uGate: { value: 20.0 } },
+    /* the semi pair: the engine's SetDrawTPage(...,1,32) leaves the GPU
+       in ABR-1 ADDITIVE for the untextured semi prims at bucket 639   */
+    transparent: true, depthWrite: false, depthTest: false,
+    blending: THREE.AdditiveBlending
+  });
+  drConeSemiMesh = new THREE.Mesh(drConeSemiGeo, drConeSemiMat);
+  drConeSemiMesh.frustumCulled = false;
+  drConeSemiMesh.visible = false;
+  drConeSemiMesh.renderOrder = 10.5;   /* bucket 639, OVER the floor's 640 */
+  scene.add(drConeSemiMesh);
+  drMeshes = [drGlintMesh, drConeOpMesh, drConeSemiMesh];
+  return drMeshes;
+}
+
+/* the Q12 angle + the raw-LUT sine/cosine (the SHCore globals) */
+function drQ12Ang(deg) { return Math.trunc(deg / 360 * 4096) & 4095; }
+
+/* THE per-frame DR water update (the syncAndDraw hook). The engine flow
+ * (shLensFlareExec lens_flare.c:52-94): GATE 1 (Spot + lensFlare != 0)
+ * -> the light screen projection -> GATE 2 (vz > 112 Q8 — the early
+ * return skips the water too) -> the zone test on the LIGHT's engine x/z
+ * -> func_8008E5B4 (the ctr++ + the live-tile rewrite) -> the glint +
+ * the cone at the water height.                                        */
+function sh1xDrWaterFxUpdate() {
+  const SV = window.SHView;
+  if (!SV || !SV.V.ready) return;
+  if (!drMeshes) { sh1xDrWaterEnsureMeshes(); SV.setDrWaterFx(drMeshes, sh1xDrWaterFxUpdate); }
+  let drew = 0;
+  if (drWaterOn) {
+    const rec = three.loaded.get(state.activeFile);
+    if (rec && rec.sh1xDrWave && rec.sh1xWaterZones && rec.sh1xWaterZones.length) {
+      const V = SV.V;
+      const env = V.env;
+      /* GATE 1 (bodyprog_80055028.c:102-106): Spot mode + the blended
+         EnableLensFlare flag — gates the WHOLE water branch           */
+      const execOn = env.field_0 === 1 && env.cur.flashlightLensFlareIntensity !== 0;
+      if (execOn) {
+        const rtCam = V.rtCam;
+        const L = env.light;
+        const lx = L.pos[0] / 4096, ly = L.pos[1] / 4096, lz = L.pos[2] / 4096;
+        /* the light's view depth for GATE 2 (lens_flare.c:63-75:
+           vz > ReadGeomScreen()/2 = 112 Q8 = 0.4375 m — the early
+           return skips the water branch and the ctr too)              */
+        const v = new THREE.Vector3(lx, ly, lz).applyMatrix4(rtCam.matrixWorldInverse);
+        const d = -v.z;
+        if (d * 256 > 112) {
+          /* the zone test (LensFlare_WaterZoneGet lens_flare.c:504-523):
+             the LIGHT's ENGINE x/z (glTF x, -glTF z), first match     */
+          const ex = lx, ez = -lz;
+          let zone = null;
+          for (const z of rec.sh1xWaterZones) {
+            if (!z.enabled) break;
+            if (ex >= z.minX && ex < z.maxX && ez >= z.minZ && ez < z.maxZ) { zone = z; break; }
+          }
+          if (zone) {
+            /* the 30Hz ctr grid (D_800AFDAC++ per in-zone frame —
+             * the PoC twin fx_water_scroll_sync fog_poc.c:12482-12527:
+             * the counter advances on the 30Hz tick grid, the zone test
+             * evaluated per FIRED tick at that tick's own light/camera
+             * pose). The light at the tick: the AUTHORED world light
+             * (mode 1) or the camera-follow (the v6 light==camera
+             * directive — the ShEnv updatePose carrier).               */
+            const target = Math.floor(state.sessionT * 30 + 1e-9);
+            if (drTile.ticks < 0) drTile.ticks = target;
+            if (target >= drTile.ticks) {
+              const tr = playTarget() || selTrack();
+              const ULw = (env.userLight && env.userLight.mode === 1 && env.userLight.world)
+                        ? env.userLight.world : null;
+              let burst = 0;
+              while (drTile.ticks < target && burst < 3600) {
+                const tickT = (drTile.ticks + 1) / 30;
+                let px = lx, pz = lz;
+                if (!ULw && tr) {
+                  const ev = evalTrack(tr, tickT);
+                  if (ev && ev.pos) { px = ev.pos[0]; pz = ev.pos[2]; }
+                } else if (ULw) { px = ULw[0]; pz = ULw[2]; }
+                const tex = px, tez = -pz;
+                let inz = false;
+                for (const z of rec.sh1xWaterZones) {
+                  if (!z.enabled) break;
+                  if (tex >= z.minX && tex < z.maxX && tez >= z.minZ && tez < z.maxZ) { inz = true; break; }
+                }
+                if (inz) drTile.ctr++;
+                drTile.ticks++;
+                burst++;
+              }
+              if (target < drTile.ticks) drTile.ticks = target;   /* seek-back */
+            }
+            /* the live-tile rewrite (func_8008E5B4 — every in-zone frame;
+               out of zone the tile keeps the last state, frozen ✓)     */
+            drTileRegen(rec.sh1xDrWave);
+            /* ---- the LENS GLINT (func_8008E794) ---- the mirrored light
+             * 2*waterY - lightY (the reflection ACROSS the water plane) */
+            const posY = -zone.illumM;
+            const gy = posY * 2 - ly;
+            const mv = new THREE.Vector3(lx, gy, lz).applyMatrix4(rtCam.matrixWorldInverse);
+            const md = -mv.z;
+            if (md > 0.5) {
+              /* the engine's screen projection (LightScreenPositionGet:
+                 H=224, center-relative) — three.js projects y-UP NDC, the
+                 engine screen y is y-DOWN: px = ndc.x*160, py = -ndc.y*112 */
+              const ndc = new THREE.Vector3(lx, gy, lz).project(rtCam);
+              if (ndc.z < 1) {
+                const px = ndc.x * 160, py = -ndc.y * 112;
+                /* the 48x96 px quad (x±24, y±48) in NDC */
+                const x0 = (px - 24) / 160, x1 = (px + 24) / 160;
+                const y0 = -(py - 48) / 112, y1 = -(py + 48) / 112;
+                drGlintPos[0] = x0; drGlintPos[1] = y0; drGlintPos[2] = 0;
+                drGlintPos[3] = x1; drGlintPos[4] = y0; drGlintPos[5] = 0;
+                drGlintPos[6] = x0; drGlintPos[7] = y1; drGlintPos[8] = 0;
+                drGlintPos[9] = x1; drGlintPos[10] = y1; drGlintPos[11] = 0;
+                /* the prim color: sin(clamp(angZ-40°, ≤90°)) (lens_flare.c:
+                   641-658). angZ = the angle between the eye->light ray and
+                   the light direction — FRAME-INVARIANT (the V48 note: cos
+                   is a plain dot, sin a double-T-canceled triple product),
+                   computed here in the glTF view frame exactly like the
+                   PoC's fx_lens_exec twin (fog_poc.c:11620-11656).         */
+                const lpv = new THREE.Vector3(lx, ly, lz).applyMatrix4(rtCam.matrixWorldInverse);
+                const dirView = new THREE.Vector3(L.dir[0] / 4096, L.dir[1] / 4096, L.dir[2] / 4096)
+                                  .transformDirection(rtCam.matrixWorldInverse);
+                const nl = lpv.length() + 1e-9, nd = dirView.length() + 1e-9;
+                const ox = lpv.x / nl, oy = lpv.y / nl, oz = lpv.z / nl;
+                const lxv = dirView.x / nd, lyv = dirView.y / nd, lzv = dirView.z / nd;
+                let pxn = oy * lzv - oz * lyv, pyn = oz * lxv - ox * lzv, pzn = ox * lyv - oy * lxv;
+                const pn = Math.hypot(pxn, pyn, pzn) + 1e-9;
+                pxn /= pn; pyn /= pn; pzn /= pn;
+                const cosz = ox * lxv + oy * lyv + oz * lzv;
+                const rx = pyn * oz - pzn * oy, ry = pzn * ox - pxn * oz, rz = pxn * oy - pyn * ox;
+                const sinz = lxv * rx + lyv * ry + lzv * rz;
+                const angZq = drQ12Ang(Math.atan2(sinz, cosz) * 180 / Math.PI);
+                let ang0 = angZq - drQ12Ang(40);   /* 455 */
+                const a90 = drQ12Ang(90);          /* 1024 */
+                if (ang0 > a90) ang0 = a90;
+                let sinA = sh1xSinQ12(ang0);
+                if (sinA < 0) sinA = 0;
+                drGlintMat.uniforms.uPrim.value.set(sinA >> 6, (sinA * 7) >> 9, (sinA * 5) >> 9);
+                const atlas = sh1xDrWaveAtlas(rec.sh1xDrWave);
+                if (drGlintMat.uniforms.map.value !== atlas) drGlintMat.uniforms.map.value = atlas;
+                drGlintGeo.attributes.position.needsUpdate = true;
+                drGlintMesh.visible = true;
+                drew++;
+              }
+            }
+            /* ---- the CONE-OF-LIGHT fan (func_8008EA68) ---- the 8-segment
+             * ring AT THE WATER HEIGHT posY, anchored at the LIGHT's x/z,
+             * yawed by ratan2(dir.vx, dir.vz) (the ENGINE frame = glTF
+             * atan2(dir.x, -dir.z)). The PoC twin: fog_poc.c:11875-12077
+             * (the V48 screen-Y-fixed projection — three.js handles the
+             * y convention natively here).                              */
+            const yawDeg = Math.atan2(L.dir[0], -L.dir[2]) * 180 / Math.PI;
+            const yawQ = drQ12Ang(yawDeg);
+            const cyw = sh1xCosQ12(yawQ), syw = sh1xSinQ12(yawQ);
+            /* the apex (0,0,Q8(0.7)) projected once (packedXy) — the G3
+             * triangles' shared corner                                  */
+            const cwx = lx + ((syw * 179) >> 12) / 256;
+            const cwz = lz - ((cyw * 179) >> 12) / 256;
+            const apex = [cwx, posY, cwz];
+            /* the 5-bit-quantized corner colors (the engine's 8-bit packet
+             * colors land in the 5-bit fb: repl5(c>>3))                  */
+            const repl5c = c => (c >> 3) << 3 | ((c >> 3) >> 2);
+            const cA = [repl5c(24), repl5c(22), repl5c(12)];  /* g3[0] apex   */
+            const cB = [repl5c(20), repl5c(18), repl5c(12)];  /* g4/g3 (20,18,12) */
+            const cC = [repl5c(4), repl5c(4), repl5c(4)];     /* g4 P2/P3 (4,4,4) */
+            const cD = [repl5c(4), repl5c(8), repl5c(4)];     /* semi (4,8,4)  */
+            const cE = [repl5c(0), repl5c(0), repl5c(0)];     /* semi P2/P3    */
+            const cF = [repl5c(8), repl5c(8), repl5c(4)];     /* semi g3[1] apex */
+            let opT = 0, semiT = 0;
+            for (let i = 0; i < 8; i++) {
+              const curA = i * 45 * 4096 / 360 | 0;
+              const nxtA = (i + 1) * 45 * 4096 / 360 | 0;
+              const sn1 = sh1xSinQ12(curA), cs1 = sh1xCosQ12(curA);
+              const sn2 = sh1xSinQ12(nxtA), cs2 = sh1xCosQ12(nxtA);
+              /* inner ring r=0.8 (the shift-10 quirk: FP_MULTIPLY(sin,
+                 Q8(0.2), 10)) @ local z 1.2; outer r=2.2 @ 1.5 (Q8)      */
+              const in0x = (sn1 * 51) >> 10, in0z = ((cs1 * 51) >> 10) + 307;
+              const in1x = (sn2 * 51) >> 10, in1z = ((cs2 * 51) >> 10) + 307;
+              const ou0x = (sn1 * 563) >> 12, ou0z = ((cs1 * 563) >> 12) + 384;
+              const ou1x = (sn2 * 563) >> 12, ou1z = ((cs2 * 563) >> 12) + 384;
+              const corner = (ix, iz, vy) => [
+                lx + ((cyw * ix + syw * iz) >> 12) / 256,
+                posY - vy / 256,
+                lz + ((syw * ix - cyw * iz) >> 12) / 256
+              ];
+              const v0 = corner(in0x, in0z, 0);
+              const v1 = corner(in1x, in1z, 0);
+              const v2 = corner(ou0x, ou0z, 51);
+              const v3 = corner(ou1x, ou1z, 51);
+              /* the opaque pair at bucket 641: g4[0] (2 tris) + g3[0]
+               * (the apex + the inner ring edge)                        */
+              opT = drEmitConeTri(drConeOpPos, drConeOpCol, opT, v0, v1, v2, cB, cB, cC);
+              opT = drEmitConeTri(drConeOpPos, drConeOpCol, opT, v1, v3, v2, cB, cC, cC);
+              opT = drEmitConeTri(drConeOpPos, drConeOpCol, opT, apex, v0, v1, cA, cB, cB);
+              /* the semi pair at bucket 639 (OVER the floor): g4[1] + g3[1] */
+              semiT = drEmitConeTri(drConeSemiPos, drConeSemiCol, semiT, v0, v1, v2, cD, cD, cE);
+              semiT = drEmitConeTri(drConeSemiPos, drConeSemiCol, semiT, v1, v3, v2, cD, cE, cE);
+              semiT = drEmitConeTri(drConeSemiPos, drConeSemiCol, semiT, apex, v0, v1, cF, cD, cD);
+            }
+            drConeOpGeo.attributes.position.needsUpdate = true;
+            drConeOpGeo.attributes.aCol.needsUpdate = true;
+            drConeOpGeo.setDrawRange(0, opT * 3);
+            drConeOpMesh.visible = opT > 0;
+            drConeSemiGeo.attributes.position.needsUpdate = true;
+            drConeSemiGeo.attributes.aCol.needsUpdate = true;
+            drConeSemiGeo.setDrawRange(0, semiT * 3);
+            drConeSemiMesh.visible = semiT > 0;
+            if (opT) drew++;
+            /* the room true-depth reference for the fixed-bucket gates —
+               the wfDepthRT pass (the school waterfall's discipline)     */
+            sh1xWaterDepthPass(SV);
+            if (wfMat && wfMat.uniforms.uRoomDepth.value) {
+              const dref = wfMat.uniforms.uRoomDepth.value;
+              drGlintMat.uniforms.uRoomDepth.value = dref;
+              drConeOpMat.uniforms.uRoomDepth.value = dref;
+              drConeSemiMat.uniforms.uRoomDepth.value = dref;
+            }
+            const rs = drGlintMat.uniforms.uRtSize.value;
+            rs.set(V.RT_W, V.RT_H);
+            drConeOpMat.uniforms.uRtSize.value.set(V.RT_W, V.RT_H);
+            drConeSemiMat.uniforms.uRtSize.value.set(V.RT_W, V.RT_H);
+          }
+        }
+      }
+    }
+  }
+  if (!drew) {
+    if (drGlintMesh) drGlintMesh.visible = false;
+    if (drConeOpMesh) drConeOpMesh.visible = false;
+    if (drConeSemiMesh) drConeSemiMesh.visible = false;
+  }
+}
+
+/* ==================================================================== */
 /* v41 (CT-IMPL fix 3): THE TV-NOISE SCREEN PAINT — the engine's         */
 /* sh_tvpaint VERBATIM port drawn into the faithful RT (func_800D88C8,   */
 /* map4_s03.c:1252-1409; fog_poc.c:12381-12631). The COLLECT:            */
@@ -13755,6 +14397,11 @@ const EMBED = {
      * per-vertex pass and restores visible=false after the RT render) */
     sh1xWaterEnsureMesh();
     window.SHView.setWaterFx(wfMesh, sh1xWaterFxUpdate);
+    /* v48: the DR water (WaterRefract) FX — the glint quad + the cone fan
+     * (created once; SHView calls the hook from syncAndDraw after the
+     * waterfall hook and restores visible=false after the RT render). */
+    sh1xDrWaterEnsureMeshes();
+    window.SHView.setDrWaterFx(drMeshes, sh1xDrWaterFxUpdate);
     /* v41 (CT-IMPL fix 3): the TV-noise paint FX — the 13 screen quad
      * slots + the per-frame collect hook (created once; SHView calls it
      * from syncAndDraw after the water hook and restores visible=false

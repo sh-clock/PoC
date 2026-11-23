@@ -2741,3 +2741,137 @@ The commandments stay embedded at the head of this file.
   v33.44 built with all three assets (source + linux + win zips).
 - PoC main is GREEN at the V47 state. The version self-heal confirmed
   (no manual version surgery needed — the S23 lesson applied).
+
+---
+
+## Session V48 (2026-11-23, Main_Agent_s25_V48_WaterLens) — the water SOLE-focus session: THE LENS FLARE + CONE-OF-LIGHT POSITION FIX (the PoC) + THE CAMTRACK WATER PORT
+
+### 0. THE SESSION SCOPE (the owner's directive, verbatim intent)
+"I think the problem is with the lens flare and the position of the cone of light ...
+extensively check. Use parallel agents and see where they intersect ... I expect you
+to spend ALL your effort in this session SOLEY on fixing the water." — executed: three
+parallel mapping agents (A: the decomp water/lens path; B: the PoC state + the defect
+hunt; C: the camtrack integration terrain), the intersection root-caused, fixed,
+verified. The PR backlog: 0 open PRs at session end (the owner's audit agents had not
+submitted yet — CHECK FIRST next session).
+
+### 1. THE ROOT CAUSE (agent B's find, agent A's engine math cross-verified)
+THE ENTIRE LENS-FLARE/WATER FX FAMILY PROJECTED SCREEN-Y WITH THE WRONG SIGN. The
+engine's screen y axis is y-DOWN and light_overlap.c:270-272 projects the ENGINE
+view-space vy straight onto it; the PoC's view matrix is glTF (y-UP) — the engine
+screen y = -(glTF view vy) * H/d. The old code fed +vy into the y-DOWN formula:
+EVERY flare sprite, the water glint, and the cone fan painted MIRRORED about the
+screen's horizontal center — the cone/glint ARE at the water plane in world space
+(the geometry math was correct all along) but painted at the TOP of the frame —
+"the lens effect is above the water and is incredibly broken". The engine view frame
+is the T=diag(1,-1,-1) reflection of the glTF view frame (the standing axis map
+engine=(x,-y,-z)*glTF, fog_poc.c:6169-6173). The mesh/snow/rain/TV paths all flip
+correctly (fog_poc.c:9067) — the FX family was the one holdout.
+
+### 2. THE PoC FIXES (src/fog_poc.c — 7 sites, the engine y negation)
+1. fx_lens_exec scrLPos[1] = (int)(-vy * invd) (:11598-class — the LIGHT's screen pos;
+   also feeds the visibility probe's row and the add_flare_ang phase terms).
+2. scrAngXY: atan2(-pyn, pxn) - 90deg (:11641-class — the plane normal is glTF-frame;
+   the ENGINE normal is (pxn,-pyn,-pzn) — the OLD +pyn mirrored the streak fan;
+   ang_z is frame-INVARIANT (cos = a plain dot, sin = a double-T-canceled triple
+   product — brute-force verified (Ta)x(Tb) = T(a×b) for T=diag(1,-1,-1)).
+3. The glint glintPy = (int)(-vy * invd) (fx_water_zone_collect — the mirrored light
+   2*waterY-lightY is correct in world space; only the projection was flipped).
+4. The cone G3 apex aey = (int)(-cpy * civ).
+5. The cone G4 corners rey = (int)(-py * iv).
+6+7. The school water-ripple mesh mqy + sprite spy (the same FX family, latent —
+   no ripple room in the current corpus, fixed for parity).
+VERIFIED (the A/B proof, DR01FE, --cam 54 2.0 46 54 -0.5 58 --night --userlight
+ahead:2.5): BEFORE the fix the ring band was y in [0..61] (the frame TOP, 6107 px,
+the mirrored annulus); AFTER: y in [171..223] (the near water band — ON the water,
+916 px). A second camera over the channel (--cam 60 3.0 62 57.7 -0.5 60.2): the ring
+annulus lands x 77..211 y 55..169 around the light's ground position ON the water
+(3709 px). The ripple/glint/cone WORLD geometry was already correct (the ring at
+posY, the glint at the mirror point, the colors/UVs verbatim).
+THE MINI ANIMATION BATTERY (the rebuilt binary, all green): fanArray 8.75%,
+tvNoise 12.56% (the historical 13.55 band), rngWalk 0.57%, waterRipple 0.54%,
+waterFloor 0.53%; with --userlight ahead:2.5 the DR01FE t=1/t=11 A/B = 1.18% (the
+tile + ring animating). No regressions.
+A VLM AUDIT FALSE ALARM RESOLVED: camtrack.html line 3853 displayed as
+"for (const esh, mat] of swaps)" in every terminal view — the HEX shows the line is
+ACTUALLY "for (const [mesh, mat] of swaps) mesh.material = mat;" — the display layer
+ate "[m" as an escape sequence. NO corruption existed; node --check was RIGHT. LESSON:
+trust the parser, hex-dump before eyeballing "corruption".
+
+### 3. THE CAMTRACK WATER PORT (tools/camtrack.html — the visible-bug fix)
+The camtrack consumed NONE of the water EXTRAs (W2's V47 finding — the floor rendered
+as an OPAQUE STATIC bright-gray plane). Ported the COMPLETE engine water path:
+- THE LIVE TILE (func_8008E5B4): sh1xDrWaveFromExtras (the 4096-byte nibble sheet,
+  the v37-twin 128-byte stride bug FIXED to the correct 64-byte 4bpp row — the
+  out-of-bounds read made every index 0 = the all-black tile), drTileRegen (the
+  VERBATIM two-layer composite: poly[0] OPAQUE u 0..32 v (ctr>>1)&0x1F..+32 /
+  poly[1] ABR-1 ADD u ((ctr+1)>>2)&0x1F..+32 v 8..40, both clut row 0, the 5-bit
+  saturating add), the ctr advancing on a 30Hz tick grid with the per-tick zone test
+  at the tick's own light/camera pose (the fx_water_scroll_sync discipline).
+- THE SUBTRACTIVE FLOOR (func_80059E34 arg0==1): the waterLive meshes (identified by
+  the MATERIAL-level SH1X.waterLive extras — glbMaterialSh1xExtras parses the raw GLB
+  JSON materials; the material NAME fallback) swap their shMat slot for the
+  WATERLIVE material: tpage 0x14D ABR-2 B-F (CustomBlending SubtractEquation
+  ONE/ONE), F5=(T5*56)>>7, flat 0x2E383838, renderOrder 10 (the FIXED bucket 640),
+  depthWrite false, depthTest true, the GTE screen snap in WATERLIVE_VERT, the
+  uFarCullM uniform present (perVertexPass syncs it on every shMat — :3605).
+- THE LENS GLINT (func_8008E794): the screen-space NDC quad at the mirrored light
+  position 2*waterY-lightY, 48x96 engine px, the DR_WAVE atlas u 64..127 v 0..31
+  clut row 1 (the corner-UV mapping verbatim — u runs top->bottom, v flipped),
+  the sin(clamp(angZ-40,<=90)) prim color (r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9,
+  the ang_z math = the PoC twin, frame-invariant), ABR-1 additive, renderOrder 9.5,
+  the fixed-bucket gate roomD<20.0625 discard (the wfDepthRT reference).
+- THE CONE-OF-LIGHT FAN (func_8008EA68): 8 segments AT THE WATER HEIGHT posY around
+  the LIGHT's x/z, yaw=atan2(dir.x,-dir.z) glTF, the inner r=0.8@1.2m (the shift-10
+  quirk) + outer r=2.2@1.5m rings + the (0,0,0.7) apex, the opaque pair (normal
+  blending, renderOrder 9, gate 20.0625) + the semi pair (additive — the engine's
+  SetDrawTPage(...,1,32) ABR-1, renderOrder 10.5, gate 20.0), colors repl5(c>>3).
+- THE PLUMBING: the SHView drWaterHook (called after the tvPaintHook, before the RT
+  render — the WorldGfx_2dEffectsDraw slot), the RT-only visibility restore, the
+  setDrWaterFx export, the boot registration (sh1xDrWaterEnsureMeshes — the lazy
+  registration was a chicken-egg, fixed the waterfall's boot pattern), the
+  ?drwater=0 kill switch, sh1xWaterDepthPass reuse for the fixed-bucket gates.
+VERIFIED (headless chromium, zero page errors): DR01FE loaded through
+__camtrack.loadModelFiles, the water camera (60,3,62 yaw 51.95 pitch -50.16 — the
+lookAt-derived fixed track), the authored WORLD light {on,follow:'world',mode:'fixed',
+pos:[57.5,2.2,60],rot:[-15,0,0]} (the rawDoc is the LIVE doc — the doc getter returns
+a JSON COPY), the engine pair {6,3} + setFlashlight(true) (the flashlight ramp ticks
+ONLY while PLAYING — the env's 30Hz syncLive grid runs on state.t), 8 waterLive
+mats swapped at renderOrder 10, flareInt 4096, lightPos 57.5/2.2/60.
+- THE RENDER: the water floor = the SUBTRACTIVE animated dapple (the t=2.5s vs
+  t=3.7s A/B: 10243 changed pixels — the tile animating); the drwater=1 vs 0 A/B
+  (both runs paused for a clean diff): 3090 FX pixels — the diff-mask geometry shows
+  THE CONE FAN (the diagonal wedge/fan band, mid-lower frame, dense multicolored
+  speckle around the light's ground point) + THE GLINT (the bright streaky cluster
+  at the right edge — the 48x96 vertical streak) + the animated dapple — matching
+  the engine's subtle reference look (the VLM reads the reference as "faint, dim
+  ripples — no bright glints": the engine colors (20,18,12)-class ARE subtle).
+- THE V48 NOTE ON THE DEFAULT LIGHT: the camtrack/PoC default light == the camera
+  (the v6 directive) -> Gate 2 (vz>112 Q8) ALWAYS fails -> the water FX family +
+  the ctr are dead by default (engine-true for a camera-coincident light). The
+  AUTHORED world light (follow:'world', pos AHEAD over the water) activates
+  everything — exactly the engine's trailing-camera flashlight geometry. The
+  owner's userLight authoring flow is the supported path.
+- NO RIPPER CHANGES: the waterZones/waterRefract/waterLive exports verified
+  verbatim by BOTH audit agents (W1's V47 byte-audit + this session's agents) —
+  the ripper was already correct; the defect was consumer-side.
+
+### 4. THE NEXT SESSION QUEUE (S26/V49, in order)
+1. CHECK + DISPOSITION the audit-agent PRs FIRST (the owner runs them after this
+   session; the sole-merger protocol: verify fully, reimplement-don't-merge bad fixes).
+2. THE PoC + WALLPAPER waterAdd CONSUMER PORT (the B4==2 class — the V47 ripper
+   export is done; the ADDITIVE raster + the z-sorted bucket in fog_poc.c; the
+   camtrack waterAdd material consumer). Affected rooms: APU0002 DRL2_ILI, RSU01FF
+   FLOOR4_I, SC00FF G_HIDE_I + R_HIDE_I, SPU0401 REF_NEAR.
+3. THE WALLPAPER TWIN SYNC of V46+V47+V48 (the engine merges + the ripper classes +
+   THIS session's fog_poc/camtrack water work) + the 45-asset GLB regeneration +
+   the env/EXTRAs rules (no rain indoors; day/night population; unbiased EXTRAs) +
+   related-map EXTRAs.
+4. The reference-camera WATER COMPARISON pass (the owner's "match the camera angles
+   of the reference images BEFORE testing" — the fixed cameras derive from the map's
+   camera-path data (map5_s00/map6_s03 camera_paths.h) + the CDN reference shots;
+   the PoC renders at the matched poses + VLM compare).
+5. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
+6. The flashlight (user-programmable light, full camera-like movement) + APU00FF/
+   APUFFFE animation failures + the all-animations PoC suite.
+The commandments remain embedded at the head of this file.

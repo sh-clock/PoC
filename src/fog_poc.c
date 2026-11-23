@@ -11595,7 +11595,20 @@ static void fx_lens_exec(Frame *fb, const Renderer *R, const CamPose *cam) {
              * bounds use the 320x224 screen halves)                   */
             float invd = 224.0f / d;
             scrLPos[0] = (int)(vx * invd);          /* screen-centered px */
-            scrLPos[1] = (int)(vy * invd);
+            /* V48 (W-audit B root cause): the ENGINE screen Y axis is
+             * y-DOWN and light_overlap.c:270-272 projects the ENGINE
+             * view-space vy straight onto it; the PoC's view matrix is
+             * glTF (y-UP), so the engine screen y = -(glTF view vy) * H/d.
+             * The old +vy fed the y-UP component into the y-DOWN formula
+             * and mirrored the ENTIRE lens/water FX family vertically
+             * about the screen center: the cone-of-light + glint painted
+             * at the TOP of the frame (visually "floating above the
+             * water") while the water floor band sits low — the user's
+             * "the lens effect is above the water and is incredibly
+             * broken". The engine view frame is the T=diag(1,-1,-1)
+             * reflection of the PoC glTF view frame (the standing axis
+             * map engine=(x,-y,-z)*glTF, fog_poc.c:6169-6173).         */
+            scrLPos[1] = (int)(-vy * invd);
             scrLPos[2] = (int)(d * 256.0f);          /* Q8-ish depth       */
             /* scr_l_ang_xy/z: angle between the eye->light ray and the
              * light direction (lighting.c:203-238). V41 C-1: the ENGINE
@@ -11637,8 +11650,15 @@ static void fx_lens_exec(Frame *fb, const Renderer *R, const CamPose *cam) {
             float pn = sqrtf(pxn * pxn + pyn * pyn + pzn * pzn) + 1e-9f;
             pxn /= pn; pyn /= pn; pzn /= pn;
             /* scr_l_ang_xy = atan2(norm.y, norm.x) - 90deg (Q12) —
-             * Q12_ANGLE_NORM_U-wrapped like the engine (lighting.c:241) */
-            scrAngXY = (fx_q12_angle(atan2f(pyn, pxn) * (180.0f / (float)M_PI))
+             * Q12_ANGLE_NORM_U-wrapped like the engine (lighting.c:241).
+             * V48 (W-audit B): the plane normal above is computed in the
+             * glTF view frame; the ENGINE view frame is T=diag(1,-1,-1)
+             * of it, so the ENGINE normal is (pxn, -pyn, -pzn) — the
+             * atan2 must take the NEGATED y or the streak axis mirrors
+             * about the vertical. (ang_z is frame-invariant: its cos is a
+             * plain dot (T-canceled), its sin a double-T-canceled triple
+             * product — see the V48 worklog note.)                        */
+            scrAngXY = (fx_q12_angle(atan2f(-pyn, pxn) * (180.0f / (float)M_PI))
                         - fx_q12_angle(90.0f)) & 4095;
             /* scr_l_ang_z = atan2(sin, cos) with sin = (lvec . (norm x
              * pos)), cos = (pos . lvec) — engine verbatim, then the
@@ -11851,7 +11871,14 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                      * (v40: NTSC GTE H=224)                             */
                     float invd = 224.0f / d;
                     glintPx = (int)(vx * invd);
-                    glintPy = (int)(vy * invd);
+                    /* V48 (W-audit B): engine y-DOWN screen — negate the
+                     * glTF view vy. The mirrored light point is correct in
+                     * world space (gy = posY*2 - ly, the engine mirror
+                     * lens_flare.c:624); only the screen projection was
+                     * flipped, painting the glint mirrored above the
+                     * water band instead of ON it (:635-676 projects the
+                     * ENGINE view y onto the y-DOWN screen).            */
+                    glintPy = (int)(-vy * invd);
                     /* brightness: sin(clamp(angle-40°,<=90°)) — the
                      * angle is scr_l_ang_z; r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9 */
                     int ang0 = g_flaresys.scrLAngZ - fx_q12_angle(40.0f);
@@ -11921,7 +11948,9 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                         if (cdd > 0.05f) {
                             float civ = 224.0f / cdd;  /* v40: NTSC 224 */
                             int aex = (int)(cpx * civ);  /* engine px, ctr */
-                            int aey = (int)(cpy * civ);
+                            /* V48 (W-audit B): engine y-DOWN screen — the
+                             * G3 apex must negate the glTF view cpy      */
+                            int aey = (int)(-cpy * civ);
                             cScx = (int)(aex * fxpX) + (int)(fb->w / 2);
                             cScy = (int)(aey * fxpY) + (int)(fb->h / 2);
                             cVis = 1;
@@ -11971,7 +12000,13 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                             if (dd <= 0.05f) { vis = 0; break; }
                             float iv = 224.0f / dd;    /* v40: NTSC 224 (RotTransPers4) */
                             int rex = (int)(px * iv);  /* engine px, ctr */
-                            int rey = (int)(py * iv);
+                            /* V48 (W-audit B): engine y-DOWN screen — the
+                             * ring corners must negate the glTF view py;
+                             * the ring geometry itself is already AT the
+                             * water plane in world space (posY), so this
+                             * is what puts the visible annulus ON the
+                             * water band instead of at the frame top   */
+                            int rey = (int)(-py * iv);
                             sxp[k] = (int)(rex * fxpX) + (int)(fb->w / 2);
                             syp[k] = (int)(rey * fxpY) + (int)(fb->h / 2);
                         }
@@ -13492,7 +13527,11 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                         dsum += d;
                         float iv = 224.0f / d;      /* v40: NTSC 224 (gte_rtpt) */
                         int mqx = (int)(px * iv);   /* engine px, screen-ctr */
-                        int mqy = (int)(py * iv);
+                        /* V48 (W-audit B): engine y-DOWN screen — negate
+                         * the glTF view py (the ripple mesh + sprites are
+                         * the same FX family; latent: no ripple room in
+                         * the current GLB corpus, fixed for parity)   */
+                        int mqy = (int)(-py * iv);
                         if (k == 0) { m0xe = mqx; m0ye = mqy; }
                         sxq[k] = (int)(mqx * fxpX) + (int)(fb->w / 2);
                         syq[k] = (int)(mqy * fxpY) + (int)(fb->h / 2);
@@ -13576,7 +13615,9 @@ static void sh1x_water_fx_draw(Frame *fb, const Renderer *R,
                     dsum += d;
                     float iv = 224.0f / d;          /* v40: NTSC 224 (gte_rtps) */
                     int spx = (int)(px * iv);       /* engine px, screen-ctr */
-                    int spy = (int)(py * iv);
+                    /* V48 (W-audit B): engine y-DOWN screen — negate the
+                     * glTF view py (same FX-family flip as the mesh site) */
+                    int spy = (int)(-py * iv);
                     sxq[k] = (int)(spx * fxpX) + (int)(fb->w / 2);
                     syq[k] = (int)(spy * fxpY) + (int)(fb->h / 2);
                     if (k == 3) {
