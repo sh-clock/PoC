@@ -10195,7 +10195,13 @@ function sh1xWaterTexDecode(pixels, clut) {
   for (let r = 0; r < 2; r++) {
     const row = Array.isArray(clut[r]) ? clut[r] : [];
     for (let k = 0; k < 16 && k < row.length; k++)
-      c[r * 16 + k] = (row[k] & 0xFFFF) | 0;
+      /* v4b (B5-5): the C's element coercion (fog_poc.c:1912-1920 —
+         `(unsigned short)((int)cv->num & 0xFFFF)`; the parser's num:
+         strings/null -> 0, `true` -> 1, fog_poc.c:487-521). The old
+         `row[k] & 0xFFFF` coerced numeric STRINGS through ToInt32
+         ("33825" -> 33825 where the C keeps 0). Same rule the tvPaint
+         tvEl fix (v44 F-3) established for its element arrays. */
+      c[r * 16 + k] = (typeof row[k] === 'number' ? row[k] : row[k] === true ? 1 : 0) & 0xFFFF;
   }
   return { idx: idx, clut: c };
 }
