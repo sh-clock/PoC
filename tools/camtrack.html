@@ -10991,7 +10991,13 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
       if (!sh1xWsprProject(ctx, _wfWX[c], _wfWY[c], _wfWZ[c], _wfP3)) {
         vis = 0; break;
       }
-      _wfSX[c] = _wfP3[0]; _wfSY[c] = _wfP3[1]; _wfZQ[c] = _wfP3[2];
+      /* v4b (B5-6): the C truncates the corner to INT before the :411/:416
+         cull (fog_poc.c:13355 `sxq[c] = (int)px;` -> :13363 the fabsf on
+         the int); the raw float culled a droplet at x = fbW*0.5+cullX+0.9
+         where the C (trunc -> exactly +cullX) draws it. The strip path
+         (:10804) keeps raw floats — its quads are addPrim'd unconditionally
+         (water.c:657-700, audit v39-A3) and the stored values never read. */
+      _wfSX[c] = Math.trunc(_wfP3[0]); _wfSY[c] = Math.trunc(_wfP3[1]); _wfZQ[c] = _wfP3[2];
     }
     if (!vis) continue;
     /* the GTE avg z (Q8) — the C: (int)((zq0+..+zq3) * (256*0.25)) */
