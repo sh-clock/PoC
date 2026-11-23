@@ -5098,9 +5098,14 @@ class GltfBuilder:
         return self._accessor(u, 5126, "VEC2", u.shape[0])
 
     def add_indices(self, indices):
-        i = np.asarray(indices, dtype="<u2")
-        if i.max(initial=0) >= 65536:
+        # v48 RIP-4 (D3-1): the overflow check must run BEFORE the <u2
+        # cast — after it every element is <= 65535 by TYPE (the guard was
+        # unreachable), and a >= 65536 input either raised OverflowError at
+        # the cast (guard bypassed) or silently wrapped mod 65536 (65537 -> 1).
+        i_raw = np.asarray(indices)
+        if i_raw.size and int(i_raw.max(initial=0)) > 65535:
             raise ValueError("index overflow for UNSIGNED_SHORT")
+        i = np.asarray(indices, dtype="<u2")
         return self._accessor(i, 5123, "SCALAR", i.shape[0])
 
     def add_image(self, png_bytes, name):
