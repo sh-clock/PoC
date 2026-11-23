@@ -2875,3 +2875,50 @@ mats swapped at renderOrder 10, flareInt 4096, lightPos 57.5/2.2/60.
 6. The flashlight (user-programmable light, full camera-like movement) + APU00FF/
    APUFFFE animation failures + the all-animations PoC suite.
 The commandments remain embedded at the head of this file.
+
+---
+
+## Session V49 (2026-11-24, Main_Agent_s26_V49_FlashlightCircle) — the flashlight-circle reflection fix + THE 72-PR AUDIT MERGE
+
+### 0. THE SESSION SCOPE (the owner's directive)
+"OK - I think the water is placed correctly, but the Flashlight circle reflection is not. Continue with the task. There are also new PRs, check through them and merge if correct." — executed: three parallel agents (A: the decomp flashlight+water mapping; B: the PoC/camtrack defect hunt; C: the full PR verification), the intersection root-caused, fixed, verified; 72 PRs merged (the sole-merger protocol), 1 reimplemented, 4 closed.
+
+### 1. THE ROOT CAUSE (agents A+B, cross-verified at the intersection)
+THE WATER FX GEOMETRY WAS ALREADY ENGINE-TRUE (V48's y-sign fixes verified line-by-line — the mirror formula, the ring anchor/radii/yaw/apex, the glint 48x96 quad + transposed UVs + CLUT row 1, buckets 641/639/640, the live tile). THE DEFECT WAS WHICH LIGHT FEEDS THE FX: the engine's light is HARRY'S FLASHLIGHT AT THE PLAYER — the torso-bone offset (-0.08,-0.28,0.12) with the FIXED -15deg beam pitch (Game_FlashlightAttribsSet effects.c:210-218 -> Gfx_FlashlightPositionUpdate) — 1.8-2.5 m AHEAD of the trailing camera (vc_main.c:2137-2151). The PoC/camtrack default light was CAMERA-COINCIDENT (the v6 directive) -> Gate 2 (vz > 112 Q8, lens_flare.c:73-75's early return kills the water branch too) NEVER passed -> MEASURED: ZERO water prims by default. With --userlight ahead:D the ring fired but the CAMERA-LOCKED beam kept ang_z ~ 21deg < 40deg -> the glint color sin(clamp(angZ-40,<=90)) clamped to BLACK (measured r=g=b=0). In camtrack the glint quad was ALSO back-facing under FrontSide (PR #207) — it NEVER rendered at all. THREE independent killers; the fix removes all three.
+
+### 2. THE PoC FIXES (src/fog_poc.c, ff2ca66)
+1. SH_LIGHT_TRAIL_M 2.5: the DEFAULT (mode 0) anchor = camera + camera-forward*2.5 + the verbatim Harry offset — the engine's trailing-camera player geometry (the v48-verified ahead:2.5 A/B). Gate 2 passes by default; ang_z lands near 180deg = MAX glint brightness.
+2. ONE light (the engine's g_WorldEnvRenderWork.light): sh_user_light_world_pos shared by sh_env_update_pose (the MESH light — was camPos, the v6 split) and fx_light_anchor (the FX light) — the lit floor circle and its water reflection now anchor at the SAME point.
+3. THE LINE LIGHT: the camdat light mode "line" (start/end/speedMS/loopMode, or the auto-detect) parsed + the travel runtime (the camtrack lightWorldPos twin: dur = len/speedMS; loop/once/pingPong) — the PoC previously DROPPED the line fields entirely (agent B's D4).
+4. THE RUNTIME USER LIGHT KEYS (the owner's task 3 — "moves in all the ways the camera can"): I/K fwd/back, J/O left/right, U/C up/down (camera frame; the first nudge freezes a free-world light at the anchor), T/G pitch, A/E yaw (the ANGLE DISTINCTION), F the flashlight toggle, day modes inert (the verbatim Spot gates). Wired through the win32/sdl/x11 key tables + live_action; K_R restarts the line clock.
+5. The Sh1x userLightOffset EXTRAs fallback resolved at boot into the shared anchor (the rot twin was already the pattern).
+
+### 3. THE CAMTRACK FIXES (tools/camtrack.html)
+1. THE SAME trailing default: the env light's else-branch (was camPos — the D6/v6 split) = camera + fwd*2.5 + the Harry offset; an AUTHORED follow:'camera' light's offset/ahead now honored by the ENGINE light (the carrier carries them — the numbers are REAL, oy = the up/down control the owner asked for; the gizmo ahead rides camera-forward, the C twin's form).
+2. THE MERGE-ROUND REPAIRS (the audit agents' PRs were diff-verified but never RUN): PR #226's comment backticks sat INSIDE the WATERLIVE_FRAG template literal — a page-killing SyntaxError (module block; node --check on the module block + the pageerror probe caught it; fixed to single quotes); the floor-swap passed the RAW waterRefract extras into drTileRegen (wr.idx undefined — the boot "SHView register failed" TypeError; now the parsed rec.sh1xDrWave payload).
+3. The light-panel legend documents the Y affordances (oy numeric, Shift-drag, the cyan Y-rail) + the Gate-2 ahead threshold.
+
+### 4. THE PR DISPOSITION (agent C's full verification; the sole merger)
+- MERGED 72: PoC #175-#203, #205-#226 (51; the v48 audit round — every claim re-verified against main + the decomp + the C twin, swanstation for the GTE/GPU claims; conflict pairs ordered: #194 then #197, #206 -> #226 stacked, #190 before #192, #186 with #192, #175->#176, #199->#200, #202->#203) + wallpaper #24-#42 (19; WAJ/WAN) + lively #6, #3.
+- REIMPLEMENTED 1: PoC #204 (the 5 GTE PushSXY saturation sites — the hunks correct, the branch polluted with 72 undeclared stray files) — re-cut verbatim in ff2ca66, closed as superseded.
+- CLOSED as superseded: lively #2 (contained in #6), #4/#5 (the resync chain) — with comments.
+
+### 5. THE VERIFICATION (the full audit, not a smoke test)
+- PoC DR01FE default-light A/B (on/off): 12564 px differ, the diff rows concentrate y 187-215 (the near water band — the reflection family fires BY DEFAULT now).
+- The channel camera (--cam 60 3 62 57.7 -0.5 60.2 --night, NO userlight flags): VLM — "a diffuse circular/elliptical pool of greenish-tan light ON the water surface at (150,85) x 125-180 y 60-110, within the channel, NOT in the sky; a faint vertical streak blended in the pool; NO artifacts above the waterline; sky clean" — the flashlight circle reflection ON the water, matching the engine's subtle reference look (the CDN refs: the glow centers on Harry, a faint spill on the water near him, no bright mirror).
+- The animation battery (t=1 vs t=11): fan 13.51%, ferris 3.14%, lissajous 16.26%, DR01FE water 1.83% — ALL animate (incl. APU00FF/APUFFFE, the owner's broken maps).
+- Camtrack headless (playwright): zero page errors on all three runs; the world-light env light = the authored pose exactly; the follow-light env light = the trailing anchor ~2.5 m along camera-forward (the y-drop follows the camera pitch); the drwater=1 vs 0 A/B — VLM: "a sharp diagonal glint streak + a brighter hard-edged light pool present only with FX on; no floating artifacts; no black floor".
+- All camtrack JS blocks node --check clean (module blocks included — the extractor's type="module" gap found and closed).
+
+### 6. THE TWIN SYNC
+- lively (core-separation): the V49 engine commit cherry-picked (the fog_poc.c half auto-merged; camtrack.html N/A) — eca44107.
+- wallpaper: the twin is BEHIND by several sessions (pre-V48 water family) — the full twin sync (V46+V47+V48+V49) stays the NEXT-SESSION queue head, exactly as V48 queued it; the 19 wallpaper PRs merged today are its own app-side fixes.
+- ripper: NO changes (the waterZones/waterRefract/userLight exports verified verbatim by both V48 audits + agent B again this session — the defects were consumer-side).
+
+### 7. THE NEXT SESSION QUEUE (S27/V50, in order)
+1. THE WALLPAPER TWIN SYNC of V46+V47+V48+V49 + the 45-asset GLB regeneration + the env/EXTRAs rules (no rain indoors; the day/night population; the unbiased EXTRAs) + the related-map EXTRAs.
+2. The reference-camera WATER COMPARISON pass (the owner's "match the camera angles of the reference images BEFORE testing" — the fixed cameras derive from the map's camera-path data (map5_s00/map6_s03 camera_paths.h) + the CDN reference shots; the PoC renders at the matched poses + the VLM compare).
+3. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
+4. The PoC all-animations suite expansion (the animtests corpus) + any APU00FF/APUFFFE camtrack-side playback checks.
+5. The PR board watch (the owner runs the audit agents after sessions).
+The commandments remain embedded at the head of this file.
