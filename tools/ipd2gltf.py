@@ -8686,6 +8686,18 @@ def main(argv=None):
                     for e in val.get("embedded_images", [])}
         for rep in reps_p:
             for v in rep.get("tex_variants_struct", []):
+                # v48 (RIP-3): the v45 DWAVE live-tile exception — the
+                # per-room cross-check twin (above) already skips the
+                # variant when the embedded image is the 32x32 LIVE TILE
+                # (the engine func_8008E4EC redirect; the 128x64 sheet
+                # rides the SH1X.envEffects.waterRefract payload); the
+                # whole-map loop was missing it, so every --whole-map
+                # export containing a waterLive room reported a FALSE
+                # "no embedded image with the expected 128x64" error.
+                if v["tex"] == "DWAVE" and any(
+                        n.lower().startswith("dwave") and d == (32, 32)
+                        for n, d in img_dims.items()):
+                    continue
                 if not any((n.split("_pal")[0] == v["tex"] or
                             n.split("_pal")[0].upper() in tex_aliases.get(
                                 v["tex"].upper(), ()))
