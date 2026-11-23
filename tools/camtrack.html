@@ -1457,9 +1457,11 @@ const SHCore = (function () {
       const ULp = this.userLight || null;
       if (ULp && ULp.mode === 1) {
         const w = ULp.world;
-        L.pos[0] = Math.trunc(w[0] * 4096);
-        L.pos[1] = Math.trunc(w[1] * 4096);
-        L.pos[2] = Math.trunc(w[2] * 4096);
+        /* w5-audit (A1-3): the engine stores an EXACT Q8-grid integer
+           Q8_TO_Q12 (<<4) — quantize to Q8 first (the C twin's form) */
+        L.pos[0] = Math.trunc(w[0] * 256) * 16;
+        L.pos[1] = Math.trunc(w[1] * 256) * 16;
+        L.pos[2] = Math.trunc(w[2] * 256) * 16;
       } else {
         /* v49 (the flashlight-circle fix): ONE light — the engine's single
          * g_WorldEnvRenderWork.light feeds the mesh lighting AND the water
@@ -1486,9 +1488,10 @@ const SHCore = (function () {
         let wy = X[1] * off[0] + Y[1] * off[1] + Z[1] * off[2] + camPos[1];
         let wz = X[2] * off[0] + Y[2] * off[1] + Z[2] * off[2] + camPos[2];
         if (ahead > 0) { wx -= Z[0] * ahead; wy -= Z[1] * ahead; wz -= Z[2] * ahead; }
-        L.pos[0] = Math.trunc(wx * 4096);
-        L.pos[1] = Math.trunc(wy * 4096);
-        L.pos[2] = Math.trunc(wz * 4096);
+        /* w5-audit (A1-3): the Q8-grid store (the world branch's form) */
+        L.pos[0] = Math.trunc(wx * 256) * 16;
+        L.pos[1] = Math.trunc(wy * 256) * 16;
+        L.pos[2] = Math.trunc(wz * 256) * 16;
       }
 
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),

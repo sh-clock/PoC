@@ -6296,9 +6296,13 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
      * world pose (the LINE travel included).                          */
         float wp[3];
         sh_user_light_world_pos(camPos, camQ, wp);
-        L->pos[0] = (int)(wp[0] * 4096.0f);
-        L->pos[1] = (int)(wp[1] * 4096.0f);
-        L->pos[2] = (int)(wp[2] * 4096.0f);
+        /* v49-audit (A1-3): the engine's light pos is an EXACT Q8-grid
+         * integer stored Q8_TO_Q12 (<<4) — bodyprog_80055028.c:272-274;
+         * quantize to the Q8 grid first so the consumers' >>4 lands on
+         * the engine grid (the float*4096 trunc could sit 1 lsb off). */
+        L->pos[0] = ((int)(wp[0] * 256.0f)) << 4;
+        L->pos[1] = ((int)(wp[1] * 256.0f)) << 4;
+        L->pos[2] = ((int)(wp[2] * 256.0f)) << 4;
     }
 
     /* v40 audit (C-F1): the decomp's ONE multiply site — effects.c:476
@@ -11768,9 +11772,10 @@ static void fx_light_anchor(const Sh1x *sx, const CamPose *cam) {
     (void)sx;
     float wp[3];
     sh_user_light_world_pos(cam->pos, cam->q, wp);
-    g_fxLightPos[0] = (int)(wp[0] * 4096.0f);
-    g_fxLightPos[1] = (int)(wp[1] * 4096.0f);
-    g_fxLightPos[2] = (int)(wp[2] * 4096.0f);
+    /* v49-audit (A1-3): the Q8-grid store (see sh_env_update_pose) */
+    g_fxLightPos[0] = ((int)(wp[0] * 256.0f)) << 4;
+    g_fxLightPos[1] = ((int)(wp[1] * 256.0f)) << 4;
+    g_fxLightPos[2] = ((int)(wp[2] * 256.0f)) << 4;
 }
 
 /* v43 — shLensFlareExec's COMPUTE half, moved OUT of fx_pass to run
