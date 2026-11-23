@@ -845,6 +845,15 @@ static uint8_t *png_decode_rgba(const uint8_t *d, size_t n, int *wOut, int *hOut
     if (!idat || w <= 0 || h <= 0 || interlace != 0 || depth != 8) { free(idat); return NULL; }
     int channels = ctype == 6 ? 4 : ctype == 2 ? 3 : ctype == 3 ? 1 : ctype == 0 ? 1 : ctype == 4 ? 2 : -1;
     if (channels < 0) { free(idat); return NULL; }
+    /* v48 (PNG-2): color-type-3 (palette) without a usable PLTE — palN 0
+     * (chunk missing, or shorter than one RGB entry) — used to decode
+     * "successfully" with palette[idx*3..] read UNINITIALIZED (the
+     * idx >= palN clamp routes every index to palette[0..2], stack
+     * garbage painted as the texture). A paletted image without a
+     * palette is spec-invalid; fail the decode like the other
+     * invalid-PNG cases. (palN >= 1 keeps the clamp: palette[0..2] is
+     * then initialized.) */
+    if (ctype == 3 && palN == 0) { free(idat); return NULL; }
 
     size_t rawN = 0;
     uint8_t *raw = inflate_zlib(idat, idatN, &rawN);
