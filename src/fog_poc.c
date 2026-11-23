@@ -10743,6 +10743,31 @@ static void sh1x_anims_tick(Sh1x *sx, double dt, const v3 *camGltf) {
         }
     }
     const int dtRaw = (int)(dt * 4096.0);
+    /* v48 (A16-4): the engine's ride block is an ELSE-IF chain
+     * (map6_s04_2.c:3493-3508): when the FERRIS rect matches
+     * (!Get(452) && PLAYER_NEAR_POS(vx,8,20) && PLAYER_NEAR_POS(vz,-28,22)
+     * && AABB) the LISSAJOUS update is SKIPPED that frame — and vice
+     * versa. The port ticked both rides independently, so inside the
+     * rects' overlap strip (engine vx in (-12,4) AND vz in (-50,-44), a
+     * ~16x6 m band) it advanced BOTH rides where the engine advances
+     * only the ferris. Pre-scan: did any ferris (driver 14) pass its
+     * full gate set this tick (event gate + rect)? */
+    int ferrisFired = 0;
+    for (int i = 0; i < sx->nAnims && !ferrisFired; i++) {
+        const Sh1xPropAnim *fa = &sx->anims[i];
+        if (fa->driver != 14 || !anim_gate_on(sx, fa)) continue;
+        /* mirror the main loop's dgNear contract: the rect freeze only
+         * applies when BOTH dgNear is set AND the camera is known —
+         * otherwise the ferris updates unconditionally and fires. */
+        if (!fa->dgNear || !camGltf) { ferrisFired = 1; break; }
+        int exq = (int)(camGltf->x * 4096.0f);
+        int ezq = (int)(-camGltf->z * 4096.0f);
+        int dx = exq - fa->dgBaseXQ12;
+        int dz = ezq - fa->dgBaseZQ12;
+        int nearX = (dx >= 0) ? (dx < fa->dgTolXQ12) : (-dx < fa->dgTolXQ12);
+        int nearZ = (dz >= 0) ? (dz < fa->dgTolZQ12) : (-dz < fa->dgTolZQ12);
+        if (nearX && nearZ) ferrisFired = 1;
+    }
     for (int i = 0; i < sx->nAnims; i++) {
         Sh1xPropAnim *a = &sx->anims[i];
         a->gated = !anim_gate_on(sx, a);
@@ -10760,6 +10785,10 @@ static void sh1x_anims_tick(Sh1x *sx, double dt, const v3 *camGltf) {
             continue;        /* engine: the update loop is gated */
         }
         if (a->sharedLeader >= 0) continue;  /* follower: leader's state */
+        /* v48 (A16-4): the engine's else-if — when the ferris branch
+         * ran this frame the lissajous update does not run at all
+         * (its angle D_800EBB36 freezes, exactly like the rect miss). */
+        if (a->driver == 15 && ferrisFired) continue;
         /* v44 (C-6): the driveGate proximity freeze. The engine runs the
          * ferris/lissajous update ONLY inside its two PLAYER_NEAR_POS
          * rects (map6_s04_2.c:3493-3508 — ferris |vx-8|<20 ∧ |vz+28|<22,
