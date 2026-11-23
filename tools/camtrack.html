@@ -2215,6 +2215,15 @@ const SHCore = (function () {
     S.rainGravity = 30;
     S.snowTypeEnable = 1;
     S.weatherTick = 0;
+    /* the C boot (snow_init, fog_poc.c:7851-7853) also arms the transition
+       lock and leaves the density selector + prevPosY at their BSS values.
+       This runs on LIVE snow state (setBootWeather(-1) = "reset to default
+       weather"), so a stale snowDensitySel (e.g. 1 from a light-snow track,
+       which keeps warm-up density at 1) or prevPosY must not ride into the
+       boot recipe's density-3 warm-up. */
+    S.transitionLock = 1;      /* field_234A = true at map load      */
+    S.snowDensitySel = 0;      /* g_SysWork.field_2349 (BSS 0)       */
+    S.prevPosY = 0;            /* g_Particle_PrevPosition.vy (BSS 0) */
     snowReset(S);
   }
 
