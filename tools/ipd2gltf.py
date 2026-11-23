@@ -3727,25 +3727,15 @@ class PlmObject:
         return self.OT_BASE_OF_FLAG_B1.get(self.flag_b1, 2)
 
 
-# The consumer's (fog_poc.c) hardcoded IPD_MODEL_LAYERS name->field_B_1 table,
-# embedded here ONLY for cross-verification of the export report: every
-# mismatch between the TRUE PLM flags byte and the consumer's table is a
-# layering defect in the rendered wallpaper and is reported loudly.
-CONSUMER_IPD_MODEL_LAYERS = {
-    "7201_1_H": 0, "7201_2_H": 0, "7201_3_H": 0,
-    "7203_18_": 2, "7203_30_": 2, "7203_31_": 2,
-    "7203_3_N": 1, "7203_6_H": 0,
-    "7203_7_B": 5, "7206_1_H": 0, "7206_3_H": 0,
-    "7207_1_B": 5, "7207_6_H": 0, "7207_7_H": 0,
-    "7207_8_H": 0, "7207_9_H": 0,
-    "7222_1_B": 4, "7222_7_B": 5,
-    "CHAIN1_1": 5, "CHAIN1_2": 3, "CHAIN1_3": 1,
-    "CHAIN2_1": 5, "CHAIN2_2": 3, "CHAIN2_3": 1, "CHAIN2_4": 5,
-    "DOOR1_BA": 4, "NOTICE_N": 1,
-    "THR0001": 0, "THR0002": 0, "THR0020": 0,
-    "THR7202": 0, "THR7203": 0, "THR7204": 0,
-    "THR7206": 0, "THR7207": 0, "TREE02": 0,
-}
+# v48 RIP-7 (D4-2): the old CONSUMER_IPD_MODEL_LAYERS cross-check table is
+# REMOVED. The consumer (fog_poc.c) deleted its hardcoded IPD_MODEL_LAYERS
+# name table in v24 (fog_poc.c:2850-2875 — "v24 reads the per-object ot_base
+# the converter emits ... the old NAME TABLE is gone"); the authoritative
+# contract is the per-node extras.ot_base this tool emits (SH1X_EXTRAS_SCHEMA).
+# The stale one-room-snapshot cross-check fired "NOT in the consumer's
+# IPD_MODEL_LAYERS table" for every object with field_B_1 != 0 absent from
+# the snapshot — 56 false problems across 5 of 6 rooms in the corpus, 0
+# genuine mismatches.
 
 
 @dataclass
@@ -6922,23 +6912,10 @@ def export_room(room, resolver, out_dir, include_unused=False, builder=None,
             "field_B_1": obj.flag_b1, "ot_base": obj.ot_base,
             "field_B_4": obj.flag_b4, "unk_B_6": obj.unk_b6,
         }
-        if inst.lookup_name in CONSUMER_IPD_MODEL_LAYERS:
-            entry["consumer_field_B_1"] = CONSUMER_IPD_MODEL_LAYERS[inst.lookup_name]
-            if entry["consumer_field_B_1"] != obj.flag_b1:
-                flag_problems.append(
-                    f"object {inst.lookup_name!r}: TRUE PLM field_B_1="
-                    f"{obj.flag_b1} (otBase {obj.ot_base}) but the consumer's "
-                    f"IPD_MODEL_LAYERS table says "
-                    f"{entry['consumer_field_B_1']} — the wallpaper would "
-                    f"layer this object in the WRONG ordering-table section")
-        else:
-            entry["consumer_field_B_1"] = None
-            if obj.flag_b1 != 0:
-                flag_problems.append(
-                    f"object {inst.lookup_name!r}: TRUE PLM field_B_1="
-                    f"{obj.flag_b1} (otBase {obj.ot_base}) is NOT in the "
-                    f"consumer's IPD_MODEL_LAYERS table — the wallpaper "
-                    f"would use the default base 2 for it")
+        # v48 RIP-7 (D4-2): the consumer's stale name-table cross-check is
+        # removed (see the CONSUMER_IPD_MODEL_LAYERS removal note above) —
+        # the verbatim PLM flags stay in the entry; the authoritative
+        # layering contract is the per-node extras.ot_base emission.
         if obj.flag_b0 or obj.flag_b4 or obj.unk_b6:
             if obj.flag_b4 in (1, 2, 3):
                 # the WATER family — exported with the class contract since
