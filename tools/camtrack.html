@@ -12400,11 +12400,11 @@ const WATERLIVE_VERT = `
                                 waterLive quads in the same collect loop,
                                 fog_poc.c:14514-14526 + :14889) */
   varying vec2 vUv;
+  varying float vW;      /* w5-audit (F15): the affine (PSX) UV unwrap */
   varying float vQcull;
   uniform float uPsx;
   uniform vec2 uPixScale;
   void main() {
-    vUv = uv;
     vQcull = shQcull;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vec4 clip = projectionMatrix * mvPosition;
@@ -12420,8 +12420,17 @@ const WATERLIVE_VERT = `
       vec2 ndc = vec2(eng.x / 320.0 * 2.0 - 1.0,
                       1.0 - eng.y / 224.0 * 2.0);
       gl_Position = vec4(ndc * clip.w, clip.z, clip.w);
+      /* w5-audit (F15): the PSX raster has NO perspective-correct UV
+         interpolation (the DuckStation UV DDA — screen-space-linear
+         gradients, fog_poc.c:8191-8244 the affine branch); premultiply
+         the UVs with the true per-vertex w and carry it — WATER_VERT's
+         flat-w form (camtrack.html:11830-11832). */
+      vUv = uv * clip.w;
+      vW = clip.w;
     } else {
       gl_Position = clip;
+      vUv = uv;
+      vW = 1.0;
     }
   }`;
 const WATERLIVE_FRAG = `
@@ -12429,6 +12438,7 @@ const WATERLIVE_FRAG = `
   uniform sampler2D uRoomDepth;  /* v4b (F5): the room true-depth reference (wfDepthRT) */
   uniform vec2 uRtSize;
   varying vec2 vUv;
+  varying float vW;      /* w5-audit (F15): the affine (PSX) UV unwrap */
   varying float vQcull;
   void main() {
     /* v4b (F4): the engine's per-quad culls — func_80059E34 drops the quad
@@ -12453,7 +12463,10 @@ const WATERLIVE_FRAG = `
     vec2 dz = texture2D(uRoomDepth, gl_FragCoord.xy / uRtSize).xy;
     float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
     if (roomD < 20.03125) discard;
-    vec4 texel = texture2D(map, vUv);
+    /* w5-audit (F15): unwrap the affine (PSX) varyings — WATER_FRAG's
+       divide form (camtrack.html:11872-11873) */
+    float iw = 1.0 / vW;
+    vec4 texel = texture2D(map, vUv * iw);
     /* the 0x2E383838 flat modulate: F5 = (T5 * 56) >> 7 (the direct
        15-bit tile view — func_80059E34 case 1; the PoC twin
        fog_poc.c:15063-15065) */
