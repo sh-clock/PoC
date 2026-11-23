@@ -11267,7 +11267,14 @@ n                    * STONE3_H — NOT ported: one GLB model per entry);
             switch (a->stoneStep) {
             case 0:
                 a->stoneStep = 1;                     /* sfx 1647 kick  */
-                break;
+                /* v48 (A16-1): the engine's case 0 has NO break
+                 * (map7_s01_2.c:1488-1493): Sfx_WithFlagsPlay +
+                 * SysWork_StateStepIncrement(1) fall STRAIGHT into
+                 * case 1's slide accumulation — the kick tick ALSO
+                 * advances the slide. The old break burned the whole
+                 * first tick on the marker alone (slide started one
+                 * 30Hz tick late). */
+                /* fall through */
             case 1: {
                 a->stoneData += dtRaw;
                 if (a->stoneData > 8192) a->stoneData = 8192; /* Q12(2.0) */
