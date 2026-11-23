@@ -13977,12 +13977,22 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                         }
                         q->tex = tex;
                         q->bright = var_s2;
-                        /* the sub-quad OTZ: MAX corner SZ (Q8) >> 3.
-                         * V44 (D-3): the corner SZ is RotTransPers()<<2
-                         * (map4_s03.c:1292) — truncates, no +0.5            */
+                        /* the sub-quad OTZ: MAX corner SZ (Q8), each corner
+                         * scaled <<2 like the engine's
+                         * `sp10[i].vz = RotTransPers(...) * 4`
+                         * (map4_s03.c:1292) BEFORE the MAX, then `>> 3`
+                         * (:1297-1300) — so the TV paint's bucket is
+                         * (Q8<<2)>>3 = Q8>>1, 4x the mesh scale (the mesh
+                         * walk is (OTZ>>1)>>2 = Q8>>3, bodyprog_80056D8C.c
+                         * :855): the engine deliberately sorts the TV
+                         * paint 4x NEARER than all mesh geometry so it
+                         * covers its own wall and culls past ~16 m.
+                         * V44 (D-3): truncates, no +0.5. The v48 form
+                         * dropped the <<2 — bucket Q8>>3 culls at ~64 m
+                         * and ties against the wall's own mesh bucket. */
                         float zm = fmaxf(fmaxf(q->v[0].z, q->v[1].z),
                                          fmaxf(q->v[2].z, q->v[3].z));
-                        int bucket = (int)floorf(zm * 256.0f) >> 3;
+                        int bucket = ((int)floorf(zm * 256.0f) * 4) >> 3;
                         if (!(bucket > 0 && bucket < 2047)) continue;
                         PostEnt pe;
                         memset(&pe, 0, sizeof(pe));
@@ -14005,7 +14015,10 @@ static int sh_tvpaint_collect(const Sh1x *sx, const mat4 *viewProj,
                 q->bright = var_s2;
                 float zm = fmaxf(fmaxf(rv[0].z, rv[1].z),
                                  fmaxf(rv[2].z, rv[3].z));
-                int bucket = (int)floorf(zm * 256.0f) >> 3;  /* V44 D-3: SZ truncates */
+                /* V44 (D-3): SZ truncates; the *4<<2 scale is the engine's
+                 * `RotTransPers(...) * 4` (map4_s03.c:1292) — see the
+                 * big-screen comment above (v48: the <<2 was dropped). */
+                int bucket = ((int)floorf(zm * 256.0f) * 4) >> 3;
                 if (!(bucket > 0 && bucket < 2047)) {
                     (*nTvq)--;               /* the engine drops this quad */
                     continue;
