@@ -3916,9 +3916,19 @@ static int camdat_load(Camdat *cd, const char *path, const char *glbName) {
                     cd->lightLineEnd[2] = (float)jat(len2, 2)->num;
                 }
                 const char *lm2 = jstr(lt, "mode", NULL);
-                if (lm2 && !strcmp(lm2, "line")) cd->lightLine = 1;
-                else if (hasStart && hasEnd && cd->lightLineSpeedMS > 0.0f)
+                /* v49-audit (A2-1): the twin arms the travel ONLY for
+                 * follow:'world' (camtrack lightModeOf :11470 — any
+                 * non-world follow is the legacy camera anchor; the JS
+                 * carrier's camera branch never calls lightWorldPos).
+                 * The ungated parse armed camera-follow lights too and
+                 * the boot fold then overrode the camera anchor. */
+                if (cd->lightFollow != 1) {
+                    cd->lightLine = 0;
+                } else if (lm2 && !strcmp(lm2, "line")) {
+                    cd->lightLine = 1;
+                } else if (hasStart && hasEnd && cd->lightLineSpeedMS > 0.0f) {
                     cd->lightLine = 1;    /* the camtrack auto-detect twin */
+                }
                 if (cd->lightLine && hasStart && hasEnd) {
                     const char *llm = jstr(lt, "loopMode", NULL);
                     if (llm && !strcmp(llm, "once")) cd->lightLineLoop = 1;
