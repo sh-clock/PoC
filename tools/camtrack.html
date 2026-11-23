@@ -9593,10 +9593,18 @@ function sh1xDriverTick(S, dt, cam) {
         a.fallArmed = 1;
         a.fallVel += 4096;                        /* Q12(1.0f) */
       }
-      /* ENGINE QUIRK (ported verbatim): mvTimer is an INT accumulator and
-       * the engine adds (float)dt < 1.0 — the truncating int store keeps it
-       * at 0 on the 30Hz grid, so the D_800E05A8 damping never decays. */
-      a.mvTimer = Math.trunc(a.mvTimer + dt);
+      /* V45 A-F3: mvTimer is a FLOAT seconds-domain accumulator (the C
+       * twin fog_poc.c:11221 `a->mvTimer += (float)dt`). The old "INT
+       * accumulator" story was FALSE for the (dt*30.0) drivers — that
+       * addend is EXACTLY 1.0f at dt=1/30, so doorRattle/kickSwing/
+       * gravityScatter always stepped — and the genuinely dead case was
+       * THIS one: += (float)dt adds 1/30 per tick, which a truncating
+       * int store kept at 0 forever, freezing varA0 = MAX(0, 4096-2*
+       * timer) at 4096 (map4_s03.c:1693-1731) so the fallTorque damping
+       * never ramped down. JS numbers are doubles = float semantics at
+       * these magnitudes (the established mvTimer twin, see the header
+       * note). */
+      a.mvTimer += dt;
       {
         let rotVx = Math.trunc(a.cur[0] * (4096 / 360));  /* C (int) cast */
         const cosV = sh1xCosQ12(rotVx);
