@@ -12178,7 +12178,18 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                     /* the engine glint projection: the mirrored point
                      * (v40: NTSC GTE H=224)                             */
                     float invd = 224.0f / d;
-                    glintPx = (int)(vx * invd);
+                    /* w5-audit (F16, reimplemented): the GTE screen store
+                     * is FLOOR (MAC>>16 == arithmetic floor) + PushSXY
+                     * saturation on the ABSOLUTE coord [-1024,1023]
+                     * (gte.cpp:353-380 — the gte_snap_screen family,
+                     * v43 E-11-2); the PR's (int) TRUNC form (and the
+                     * pre-fix C's) is a latent deviation for negative
+                     * center-relative coords. Center-rel bounds after
+                     * the absolute clamp: x [-1184,863] (abs-160),
+                     * y [-1136,911] (abs-112). */
+                    glintPx = (int)floorf(vx * invd);
+                    if (glintPx < -1184) glintPx = -1184;
+                    else if (glintPx > 863) glintPx = 863;
                     /* V48 (W-audit B): engine y-DOWN screen — negate the
                      * glTF view vy. The mirrored light point is correct in
                      * world space (gy = posY*2 - ly, the engine mirror
@@ -12186,7 +12197,9 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                      * flipped, painting the glint mirrored above the
                      * water band instead of ON it (:635-676 projects the
                      * ENGINE view y onto the y-DOWN screen).            */
-                    glintPy = (int)(-vy * invd);
+                    glintPy = (int)floorf(-vy * invd);
+                    if (glintPy < -1136) glintPy = -1136;
+                    else if (glintPy > 911) glintPy = 911;
                     /* brightness: sin(clamp(angle-40°,<=90°)) — the
                      * angle is scr_l_ang_z; r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9 */
                     int ang0 = g_flaresys.scrLAngZ - fx_q12_angle(40.0f);
@@ -12255,10 +12268,14 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                         float cdd = -cpz;
                         if (cdd > 0.05f) {
                             float civ = 224.0f / cdd;  /* v40: NTSC 224 */
-                            int aex = (int)(cpx * civ);  /* engine px, ctr */
+                            /* w5-audit (F16, reimplemented): floor +
+                             * PushSXY saturation (see the glint site) */
+                            int aex = (int)floorf(cpx * civ);
+                            if (aex < -1184) aex = -1184; else if (aex > 863) aex = 863;
                             /* V48 (W-audit B): engine y-DOWN screen — the
                              * G3 apex must negate the glTF view cpy      */
-                            int aey = (int)(-cpy * civ);
+                            int aey = (int)floorf(-cpy * civ);
+                            if (aey < -1136) aey = -1136; else if (aey > 911) aey = 911;
                             cScx = (int)(aex * fxpX) + (int)(fb->w / 2);
                             cScy = (int)(aey * fxpY) + (int)(fb->h / 2);
                             cVis = 1;
@@ -12307,14 +12324,17 @@ static int fx_water_zone_collect(Frame *fb, const Renderer *R,
                             float dd = -pz;
                             if (dd <= 0.05f) { vis = 0; break; }
                             float iv = 224.0f / dd;    /* v40: NTSC 224 (RotTransPers4) */
-                            int rex = (int)(px * iv);  /* engine px, ctr */
+                            /* w5-audit (F16, reimplemented): floor +
+                             * PushSXY saturation — see the glint site */
+                            int rex = (int)floorf(px * iv);  /* engine px, ctr */
                             /* V48 (W-audit B): engine y-DOWN screen — the
                              * ring corners must negate the glTF view py;
                              * the ring geometry itself is already AT the
                              * water plane in world space (posY), so this
                              * is what puts the visible annulus ON the
                              * water band instead of at the frame top   */
-                            int rey = (int)(-py * iv);
+                            int rey = (int)floorf(-py * iv);
+                            if (rey < -1136) rey = -1136; else if (rey > 911) rey = 911;
                             sxp[k] = (int)(rex * fxpX) + (int)(fb->w / 2);
                             syp[k] = (int)(rey * fxpY) + (int)(fb->h / 2);
                         }

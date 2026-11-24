@@ -12609,7 +12609,24 @@ const GLINT_FRAG = `
 const CONE_VERT = `
   attribute vec3 aCol;
   varying vec3 vCol;
-  void main() { vCol = aCol; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  void main() {
+    vCol = aCol;
+    /* w5-audit (F16, reimplemented): the GTE screen store is FLOOR
+       (MAC>>16 == arithmetic floor) + PushSXY saturation on the
+       ABSOLUTE coord [-1024,1023] (gte.cpp:353-380 — the C twin's
+       gte_snap_screen family, v43 E-11-2; the C's glint/apex/corner
+       sites now carry the same floor+clamp). Center-relative after
+       the absolute clamp: x [-1184,863] (abs-160), y [-1136,911]
+       (abs-112). NOT trunc-toward-zero — that was the rejected PR
+       form, copying the C's latent deviation instead of the engine. */
+    vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    if (clip.w > 0.0) {
+      vec2 cr = clamp(floor(vec2(clip.x / clip.w * 160.0, -clip.y / clip.w * 112.0)),
+                      vec2(-1184.0, -1136.0), vec2(863.0, 911.0));
+      clip.xy = vec2(cr.x / 160.0, -cr.y / 112.0) * clip.w;
+    }
+    gl_Position = clip;
+  }`;
 const CONE_FRAG = `
   uniform sampler2D uRoomDepth;
   uniform vec2 uRtSize;
@@ -12911,7 +12928,12 @@ function sh1xDrWaterFxUpdate() {
                  engine screen y is y-DOWN: px = ndc.x*160, py = -ndc.y*112 */
               const ndc = new THREE.Vector3(lx, gy, lz).project(rtCam);
               if (ndc.z < 1) {
-                const px = ndc.x * 160, py = -ndc.y * 112;
+                /* w5-audit (F16, reimplemented): the GTE screen store —
+                   FLOOR + PushSXY saturation on the ABSOLUTE coord
+                   (the C twin's floor+clamp at fog_poc.c's glint site);
+                   NOT the rejected PR's Math.trunc */
+                const px = Math.max(-1184, Math.min(863, Math.floor(ndc.x * 160)));
+                const py = Math.max(-1136, Math.min(911, Math.floor(-ndc.y * 112)));
                 /* the 48x96 px quad (x±24, y±48) in NDC */
                 const x0 = (px - 24) / 160, x1 = (px + 24) / 160;
                 const y0 = -(py - 48) / 112, y1 = -(py + 48) / 112;
