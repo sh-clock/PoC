@@ -5632,8 +5632,12 @@ static void sh_user_light_world_pos(v3 camPos, Quat camQ, float out[3]) {
             float dx = g_userLightLineEnd[0] - ax, dy = g_userLightLineEnd[1] - ay,
                   dz = g_userLightLineEnd[2] - az;
             float len = (float)sqrt((double)dx*dx + (double)dy*dy + (double)dz*dz);
-            if (len > 1e-9f && g_userLightLineSpeedMS > 1e-6f) {
-                float dur = len / g_userLightLineSpeedMS;
+            if (len > 1e-9f && g_userLightLineSpeedMS > 0.0f) {
+                /* v49-audit (A2-6): the twin's denominator clamp —
+                 * dur = len / Math.max(1e-6, speedMS) — a (0,1e-6] speed
+                 * still travels (glacially) in the twin. */
+                float dur = len / (g_userLightLineSpeedMS < 1e-6f ?
+                                   1e-6f : g_userLightLineSpeedMS);
                 double f = g_userLightLineT / (double)dur;
                 if (g_userLightLineLoop == 1)      f = (f < 1.0) ? f : 1.0;
                 else if (g_userLightLineLoop == 2) { double c = fmod(f, 2.0);
@@ -5643,7 +5647,12 @@ static void sh_user_light_world_pos(v3 camPos, Quat camQ, float out[3]) {
                 out[1] = ay + dy * (float)f;
                 out[2] = az + dz * (float)f;
             } else {
-                out[0] = ax; out[1] = ay; out[2] = az;
+                /* v49-audit (A2-5): the twin's static base is the
+                 * authored pos (lightWorldPos's `return A` =
+                 * vec3(l.pos)), not the line START. */
+                out[0] = g_userLightWorld[0];
+                out[1] = g_userLightWorld[1];
+                out[2] = g_userLightWorld[2];
             }
         } else {
             out[0] = g_userLightWorld[0]; out[1] = g_userLightWorld[1];
@@ -19713,9 +19722,12 @@ int main(int argc, char **argv) {
                            sizeof(float) * 3);
                     g_userLightLineSpeedMS = cd.lightLineSpeedMS;
                     g_userLightLineLoop = cd.lightLineLoop;
-                    g_userLightWorld[0] = cd.lightLineStart[0];
-                    g_userLightWorld[1] = cd.lightLineStart[1];
-                    g_userLightWorld[2] = cd.lightLineStart[2];
+                    /* v49-audit (A2-5): do NOT overwrite g_userLightWorld
+                     * with the line START — the twin's static/degenerate
+                     * base is the authored pos (lightWorldPos returns
+                     * A = vec3(l.pos); camtrack-authored files carry
+                     * pos == start, hand-authored ones may not). The
+                     * generic world fold above already carried lightPos. */
                 }
                 if (cd.hasLightRot) {
                     g_userLightHasRot = 1;
