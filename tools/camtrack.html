@@ -11741,7 +11741,11 @@ function lightResolveForView() {
     if (l.follow === 'world') {
       ul = { mode: 1, hasRot, rot: vec3(l.rot, [-15, 0, 0]),
              world: lightWorldPos(l, state.t) };
-    } else if (l.follow === 'camera') {
+    /* w5-audit (A5-5): the C parse DEFAULTS a missing follow to
+     * "camera" (fog_poc.c:3863) and the gizmo treats any non-world
+     * follow as the camera anchor — only the carrier dropped the light
+     * entirely (hand-authored camdats). */
+    } else if (l.follow === 'camera' || !l.follow) {
       /* v49 (D6): carry the authored offset/ahead so the ENGINE light
        * honors them (the gizmo twin) — the pre-v49 carrier dropped them
        * and the light stayed AT the camera while the gizmo showed the
