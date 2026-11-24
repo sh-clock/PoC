@@ -5583,7 +5583,18 @@ static float g_userLightWorld[3];    /* mode 1: free world pos (glTF m) */
 static int   g_userLightHasRot = 0;     /* 1 = an authored aim (CLI/camdat) */
 static float g_userLightRot[3] = { -15.0f, 0.0f, 0.0f };  /* pitch,yaw,roll */
 static int   g_userLightHasOffset = 0;  /* 1 = an authored camera-local off */
-static float g_userLightOffset[3] = { -0.08f, 0.28f, -0.12f }; /* glTF m   */
+/* v49-audit (A1-2/A4-1): the engine quantizes the Harry torso offset
+ * to the Q8 grid BEFORE the bone transform — effects.c:216 stores
+ * Q12(-0.08/-0.28/+0.12) = (-327,-1146,+491) and
+ * bodyprog_80055028.c:265-267 re-quantizes Q12_TO_Q8 (>>4, floor) =
+ * (-21,-72,+30) engine-local; the glTF (x,-y,-z) flip gives
+ * (-21,+72,-30)/256. Was three drifting float literals (one source of
+ * truth now; the JS twin carries the same values). */
+#define SH_HARRY_OFF_GLTF_X (-21.0f / 256.0f)
+#define SH_HARRY_OFF_GLTF_Y ( 72.0f / 256.0f)
+#define SH_HARRY_OFF_GLTF_Z (-30.0f / 256.0f)
+static float g_userLightOffset[3] = { SH_HARRY_OFF_GLTF_X, SH_HARRY_OFF_GLTF_Y,
+                                      SH_HARRY_OFF_GLTF_Z };  /* glTF m, Q8 grid */
 static int   g_userLightCLI = 0;        /* 1 = the CLI authored the light  */
 
 /* v49 (THE FLASHLIGHT-CIRCLE-REFLECTION FIX): the ENGINE TRAILING ANCHOR.
@@ -5661,7 +5672,8 @@ static void sh_user_light_world_pos(v3 camPos, Quat camQ, float out[3]) {
         return;
     }
     /* the verbatim Game_FlashlightAttribsSet local, engine->glTF (x,-y,-z) */
-    float ox = -0.08f, oy = 0.28f, oz = -0.12f;
+    float ox = SH_HARRY_OFF_GLTF_X, oy = SH_HARRY_OFF_GLTF_Y,
+          oz = SH_HARRY_OFF_GLTF_Z;
     if (g_userLightHasOffset) {
         ox = g_userLightOffset[0]; oy = g_userLightOffset[1];
         oz = g_userLightOffset[2];
