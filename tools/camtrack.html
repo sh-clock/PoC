@@ -12482,8 +12482,16 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
    * (the raw .idx is undefined — drTileRegen crashed reading [0], the
    * boot-time "SHView register failed" TypeError). The effectTexFlag
    * gate rides the rec's own parse (the WF-4 #209 form).              */
-  const payload = (rec.sh1xDrWave) ? rec.sh1xDrWave
-                : ((wr && wr.pixels) ? sh1xDrWaveFromExtras(wr) : null);
+  /* v49-audit (A5-2): `rec` is the SHView record ({root, meshes, shMats,
+   * attrs, hooks, tris}) — it NEVER carries sh1xDrWave (that field lives
+   * on the EDITOR's three.loaded record, set under the
+   * effectTexFlag === 'WaterRefract' gate at :7655). The dead preferred
+   * branch left ONLY the un-gated wr fallback; read the gated parse from
+   * three.loaded so the #209 WF-4 gate actually rides (the C twin gates
+   * the payload override on envFlagIsWaterRefract, fog_poc.c:1953/:1828;
+   * a non-null rec parse implies a usable wr — it requires wr.pixels). */
+  const lrec = three.loaded.get(name);
+  const payload = (lrec && lrec.sh1xDrWave) ? lrec.sh1xDrWave : null;
   if (!payload) return;
   let liveMat = null;
   for (let i = 0; i < rec.meshes.length; i++) {
