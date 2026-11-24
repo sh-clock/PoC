@@ -20233,7 +20233,8 @@ int main(int argc, char **argv) {
                    Vr.effRate, (double)Vr.selfViewTimer / 4096.0);
         }
         char out[1024];
-        snprintf(out, sizeof(out), "%s/%s", outdir, r2Shot.file);
+        if (r2Shot.file[0] == '/') snprintf(out, sizeof(out), "%s", r2Shot.file);
+        else snprintf(out, sizeof(out), "%s/%s", outdir, r2Shot.file);
         ensure_dir_simple(outdir);
         if (!write_png_rgb(out, fb2.rgb, fb2.w, fb2.h)) {
             fprintf(stderr, "failed to write %s\n", out); return 1;
@@ -20401,7 +20402,8 @@ int main(int argc, char **argv) {
         sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim, &cp.pos); /* v43: hold at the final session time (the in-loop call is post-advance, live parity; the V44 C-6 3rd arg kept) */
         render_frame(&fb, &R, &cp);
         char out[1024];
-        snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
+        if (shots[i].file[0] == '/') snprintf(out, sizeof(out), "%s", shots[i].file);
+        else snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
         ensure_dir_simple(outdir);
         if (!write_png_rgb(out, fb.rgb, fb.w, fb.h)) {
             fprintf(stderr, "failed to write %s\n", out); return 1;
