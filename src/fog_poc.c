@@ -17139,6 +17139,12 @@ static void live_draw_overlay(LiveApp *A) {
  * inert (the verbatim Spot gates).                                       */
 static void user_light_nudge(LiveApp *A, int axis, float dir) {
     CamPose cp = playback_current_pose(&A->play, A->track, &A->ovr);
+    /* v49-audit (A3-2): while the R2 self view is engaged the render and
+     * the light anchor ride r2view_pose — the nudge must freeze from the
+     * SAME pose or the first press teleports the light (live_render's
+     * discipline at the r2view_tick sites). */
+    if (A->r2.active || A->r2.returning)
+        cp = r2view_pose(&A->r2, &cp);
     v3 X, Y, Z;
     quat_axes(cp.q, &X, &Y, &Z);
     float wp[3];
