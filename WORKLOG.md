@@ -2962,3 +2962,110 @@ render_frame's per-tick inputs at t=0.0334 (1 tick, 690px).
 6. The new audit-agent PRs when they arrive (verify fully; reimplement
    wrong fixes; sole merger).
 The commandments remain embedded at the head of this file.
+
+# SESSION 9 (V51) — the 22-PR w5-audit review/merge + the 5 reimplementations + the twin syncs
+
+## 1. THE PR BATCH (the relaunched audit agents; sole merger)
+22 open PRs (16 PoC + 2 wallpaper + 4 lively), all single-commit
+independent branches. FIVE parallel verification agents (VrfA-E, each
+instructed to be critical, verify against the decomp + the twins, and
+treat NOTHING as correct): 17 APPROVE / 0 REJECT / 5 FIX-NEEDED.
+- MERGED (PoC, in order): #227 (authored camera = authored ahead, 0
+  default — the trail is the no-light default only), #228 (line arms
+  follow:world only), #229 (the line travel clock = pure playback
+  phase, += 1/30 per fired tick + the scrub/per-shot re-bases), #230
+  (A/E yaw sign fix, verified against effects.c:566-569), #231 (nudge
+  freezes from the R2 view pose), #232 (paused nudge refreshes the
+  mesh pose — sh_env_update_pose is pure), #233 (the static line parks
+  at the authored pos), #234 (the Harry offset = the Q8 grid
+  (-21,+72,-30)/256 — the engine chain Q12 trunc >>4), #236 (the
+  floor-swap reads sh1xDrWave off the EDITOR record, flag-gated like
+  the C), #237 (follow-absent keeps the camera carrier), #238 (the
+  water STRIP GTE snap — sh_wspr_project corners now gte_snap_screen),
+  #240 (WATERLIVE_VERT affine UVs — the noperspective w-unwrap; the
+  ONLY PR that bears on V50 delta (b)).
+- MERGED (wallpaper): #43 (frameTick null guard), #44 (track-id dedup,
+  first-wins per-model = the JS B-5 rule).
+- MERGED (lively): #7 (the seam light re-fold to boot parity), #8 (the
+  dt=0 prime un-consumes slot 1), #9 (the FINAL snow warm-up after the
+  densitySel re-sync + the user-OFF toggle preserved).
+
+## 2. THE REIMPLEMENTATIONS (bug right, fix wrong — not merged, closed
+with dispositions; reimplemented as commits)
+- #235 -> 39735a9: MODE-SPLIT store. The engine has TWO stores
+  (bodyprog_80055028.c): NULL branch :254-259 keeps RAW Q12 (the
+  mode-1 free-world/line analog); the bone branch :265-274 quantizes
+  Q12_TO_Q8 >>4 pre-transform, stores Q8_TO_Q12 <<4 (the mode-0/2
+  flashlight analog). The PR quantized ALL modes with trunc(wp*256)<<4
+  — wrong for mode 1 AND != TO_FIXED>>4 for negative w whose
+  trunc(w*4096) is an exact multiple of 16. Reimpl: mode 1 keeps
+  (int)(wp*4096); the rest chain trunc->>>4-><<4 (200k-case numeric
+  equivalence verified). Sites: sh_env_update_pose + fx_light_anchor
+  (mode-split) + the JS camera branch (Math.trunc>>4<<4).
+- #239 -> cherry-picked content + corrections: (1) the F11d restart
+  resets ADDED (the PR's own headline was MISSING from its diff) —
+  drTile.ctr=0/ticks=-1 at setActiveModel + startPlayAll; (2) the
+  NO-TRACK GATE 2 fallback — the tick light view-projected into the
+  frame camera (the PR's dtk=0 NEVER counted a trackless tick — a
+  regression); (3) the turn-filter approximation documented. The tOff
+  Q8-grid default was CORRECT post-#234 — the audit objection was
+  stale (it compared against the pre-234 SHCore).
+- #241 -> the GTE family fix, BOTH twins: the PR copied the C's latent
+  (int)-trunc into the JS. The engine (RotTransPers = ldv0/rtps/stsxy)
+  = FLOOR (MAC>>16) + PushSXY saturation on the ABSOLUTE [-1024,1023]
+  (gte.cpp:353-380 = the project's gte_snap_screen). Reimpl: the C's
+  four sites (glintPx/Py, apex aex/aey, corners rex/rey) + the JS
+  (glint center, CONE_VERT) now floor+clamp (center-rel bounds
+  x[-1184,863] y[-1136,911]).
+- #242 -> amended: the apostrophe BLOCKER fixed (the PR's legend string
+  broke camtrack.html — node --check SyntaxError; its "clean" claim
+  was FALSE), kSineTable[4946]=3951 -> [4950]=3958 (verified against
+  sh_sine_table.h) + +1060 -> +1056, the nclip cites re-pointed to the
+  REAL loop (:15190-15265, nclip :15198, far-cull :15260, bucket
+  :15275), the missing :6274 hunk ADDED (the stale v6 comment).
+- lively #10 -> NARROWED: only the 11 light keys (I/K/J/O/U/C/T/G/A/E
+  — plain letters) routed through the engine's live_action. The full
+  map broke the Linux -DLIVELY_PLAYER gate (8 undefined VK_ codes) and
+  let Q/ESC TERMINATE the wallpaper. Both gates verified green.
+
+## 3. THE TWIN SYNCS (all four programs)
+- lively core-separation: the ff2ca66..HEAD core delta (26 hunks, all
+  clean; both gcc gates 0 errors). KNOWN REMAINING GAP: the
+  pre-V48/V48-era batch (PNG-1/2, A18-1 JV_NULL, A23-F1
+  g_bootWeatherBits, the TV-paint &0xFF + <<2 bucket family, v44 C-6
+  ferris driveGate, kickswing settle, binspin, the R2 edge-ideal, the
+  A-3 dither two-step) — lively's base predates the V48 batch (the V49
+  sync was a flashlight-only cherry-pick); the bulk d9af2df..3cb50fa
+  apply rejected 55/107 and was REVERTED — needs a wallpaper-V50-style
+  dedicated hunk-by-hunk sync (NEXT SESSION).
+- wallpaper main: the 3cb50fa..HEAD delta (24 hunks clean; jni-stub
+  gcc gate 0; marker parity with PoC HEAD 1:1).
+- camtrack.html: single-sourced in PoC (all JS fixes landed there).
+
+## 4. THE WATER STATE (the VLM evidence — deltas remain, do NOT claim
+complete)
+A/B pre-vs-post at 3 poses: 0.00%/0.03%/0.07% (the fixes are
+correctness-grid changes; 238 = the school strip, 240 = JS-only).
+VLM verdict (steep-64deg + walkway poses, raw + 2.5x brightened):
+the reflection pool = a COLD-GREEN (#3a5a2a) soft ellipse ~15-20%
+frame width bottom-center — (a) wrong hue (cold green vs the
+reference's warm yellow-green), (b) wrong shape (a soft blob; the
+facet-edged cone fan NOT visible at these poses), (c) ~2x the
+reference's ~8% width, (d) the dapple = weak uniform noise (no
+anisotropic stretch). NO second pool. Tonality right (near-black,
+restrained). NEXT WATER TARGETS: the ring/cone radii+colors
+(func_8008EA68's shift-10 quirk :755-758, the 20/18/12-class g4
+colors + the additive semi pair blend math), why the fan is invisible
+at --cam poses (pose-gated or broken — check the fan's own gates vs
+the ring's), the dapple anisotropy.
+
+## 5. THE NEXT SESSION QUEUE (in order)
+1. THE LIVELY TWIN full sync (the pre-V48/V48 batch, hunk-by-hunk —
+   see the committed gap list in the lively sync commit).
+2. THE WATER deltas above (the ring/cone colors + radii + the fan
+   visibility + the dapple) — the reference images at matched angles.
+3. The remaining V50 queue: the twin parity raster gap (t=0.0334,
+   690px), the exact chase-cam poses, the 45-asset GLB regen + env/
+   EXTRAs rules, the wallpaper CI (+0.0.1 versioning).
+4. The droplet-path GTE snap (238's noted follow-up).
+The commandments remain embedded at the head of this file.
