@@ -3892,7 +3892,7 @@ static int camdat_load(Camdat *cd, const char *path, const char *glbName) {
             if (cd->lightAhead < 0.0f) cd->lightAhead = 0.0f;
             /* v49 (task 3): the LINE light — the camtrack editor twin's
              * travel surface (mode "line", or the start/end/speedMS>0
-             * auto-detect exactly like camtrack.html:5684-5685). The
+             * auto-detect exactly like camtrack.html:5717/:11472). The
              * camtrack lightWorldPos math (dur = len/speedMS; loop /
              * once / pingPong) is mirrored by sh_user_light_world_pos.  */
             {
@@ -5554,8 +5554,8 @@ static const v3 SH_LIGHT_OFFSET_CAM = { -0.08f, 0.28f, -0.12f };  /* engine ref 
  * SCREEN_GEOM_DIST 224/2; the old 120/0.47m was the PAL branch).
  * -1 flags "engine anchor"
  * (the Harry offset default). Disableable with --userlight off (then the
- * engine anchor applies — the camera-coincident light that engine-true
- * never flares). Day suppression is preset-driven (Spot-only presets). */
+ * engine anchor applies — the v49 2.5 m TRAIL anchor that flares by
+ * default). Day suppression is preset-driven (Spot-only presets). */
 static int g_userLightMode = 0;      /* 0 = engine anchor (default)     */
 static float g_userLightAheadM = 0;  /* mode 2: meters ahead of camera  */
 static float g_userLightWorld[3];    /* mode 1: free world pos (glTF m) */
@@ -5636,7 +5636,7 @@ static double g_userLightLineT = 0.0;   /* travel clock (30Hz tick dt) */
 static void sh_user_light_world_pos(v3 camPos, Quat camQ, float out[3]) {
     if (g_userLightMode == 1) {
         if (g_userLightLine) {
-            /* the camtrack lightWorldPos twin (camtrack.html:11446-11464):
+            /* the camtrack lightWorldPos twin (camtrack.html:11479-11497):
              * f = t/dur on start->end; loop / once / pingPong            */
             float ax = g_userLightLineStart[0], ay = g_userLightLineStart[1],
                   az = g_userLightLineStart[2];
@@ -5696,10 +5696,11 @@ static void sh_user_light_world_pos(v3 camPos, Quat camQ, float out[3]) {
 
 
 /* engine beam dir (y-down local): (0, -sin(-15deg), cos(-15deg)*cos(0)) =
- * (0, +1061, 3957) -> camera-local glTF (x, -y, -z) = (0, -1061, -3957)
+ * (0, +1056, 3958) -> camera-local glTF (x, -y, -z) = (0, -1056, -3958)
+ * (the verbatim LUT values — kSineTable[3926]/[4950])
  * (forward and 15 deg DOWN — v4 had the y sign double-negated so the beam
  * pointed UP; fixed against func_8003F4DC: vy = -sin(rot0.vx), rot0.vx =
- * Q12_ANGLE(-15 deg) -> +1060 engine = DOWN in engine y-down space)        */
+ * Q12_ANGLE(-15 deg) -> +1056 engine = DOWN in engine y-down space)        */
 static const int SH_LIGHT_DIR_CAM_Q12[3] = { 0, SH_SIN_M15, -SH_COS_M15 };
 
 /* fwd decl: fx_q12_angle lives in the v26 FX helpers below (file order) */
@@ -6302,10 +6303,13 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
     }
     }
 
-    /* v6 (user directive): light position == the camera position EXACTLY.
-     * Engine reference (NOT applied): light.pos = torsoBoneWorld * (-0.08,
-     * +0.28, -0.12) — Gfx_FlashlightPositionUpdate 0x800554C4. The beam
-     * direction below still applies the engine rotation verbatim.
+    /* v6 (user directive, SUPERSEDED by v49): the light rides the SHARED
+     * anchor — the engine Harry offset (-0.08,+0.28,-0.12, now the Q8-grid
+     * form, w5-audit A1-2) rotated by the camera frame + the ahead (the
+     * engine TRAIL 2.5 m for the no-light default, the AUTHORED ahead
+     * for camdat lights) — light.pos = torsoBoneWorld * offset —
+     * Gfx_FlashlightPositionUpdate 0x800554C4. The beam direction below
+     * still applies the engine rotation verbatim.
      * v26 SH1X v3 USER LIGHT: the camera-attached position stays the mesh-
      * lighting default; fx_pass (lens flare + water shimmer) uses the
      * engine anchor offset (-0.08,-0.28,0.12) rotated by the camera frame —
@@ -11826,7 +11830,7 @@ static void fx_light_anchor(const Sh1x *sx, const CamPose *cam) {
      * pre-v49 body resolved the same chain inline with a camera-
      * coincident mode-0 default (Gate-2 dead); the EXTRAs offset is
      * resolved ONCE at boot into g_userLightOffset (the rot twin at
-     * :19446 was already the pattern), so the sx param is no longer
+     * :19692 was already the pattern), so the sx param is no longer
      * needed here (kept for the call sites' signatures).              */
     (void)sx;
     float wp[3];
