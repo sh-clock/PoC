@@ -6327,9 +6327,31 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
      * world pose (the LINE travel included).                          */
         float wp[3];
         sh_user_light_world_pos(camPos, camQ, wp);
-        L->pos[0] = (int)(wp[0] * 4096.0f);
-        L->pos[1] = (int)(wp[1] * 4096.0f);
-        L->pos[2] = (int)(wp[2] * 4096.0f);
+        /* w5-audit (A1-3, reimplemented): the engine has TWO stores —
+         * bodyprog_80055028.c:254-259 (coord1==NULL) keeps the RAW Q12
+         * posX (the map-script free light = the mode-1 free-world/line
+         * analog: g_SysWork.lightPosition = Q12(139.7f) etc., NOT grid-
+         * aligned), while the bone branch (:265-274) quantizes
+         * Q12_TO_Q8 (>>4) BEFORE the transform and stores Q8_TO_Q12
+         * (<<4) — the Harry-flashlight analog (modes 0/2) lands on the
+         * EXACT Q8 grid. Mode-split: mode 1 keeps the verbatim NULL-
+         * branch chain (TO_FIXED trunc, the pre-fix form = correct for
+         * it); the rest chain all three macros (trunc -> >>4 -> <<4,
+         * the identity-transform form of the bone branch — the engine
+         * quantizes the OFFSET pre-transform in integer Q8, the float
+         * pipeline's single-step equivalent). PR #235's original form
+         * (trunc(wp*256)<<4 for ALL modes) was rejected: it quantized
+         * the NULL-branch analog AND trunc(w*256) != (trunc(w*4096)>>4)
+         * for negative w whose trunc(w*4096) is an exact multiple of 16. */
+        if (g_userLightMode == 1) {
+            L->pos[0] = (int)(wp[0] * 4096.0f);
+            L->pos[1] = (int)(wp[1] * 4096.0f);
+            L->pos[2] = (int)(wp[2] * 4096.0f);
+        } else {
+            L->pos[0] = (((int)(wp[0] * 4096.0f)) >> 4) << 4;
+            L->pos[1] = (((int)(wp[1] * 4096.0f)) >> 4) << 4;
+            L->pos[2] = (((int)(wp[2] * 4096.0f)) >> 4) << 4;
+        }
     }
 
     /* v40 audit (C-F1): the decomp's ONE multiply site — effects.c:476
@@ -11809,9 +11831,19 @@ static void fx_light_anchor(const Sh1x *sx, const CamPose *cam) {
     (void)sx;
     float wp[3];
     sh_user_light_world_pos(cam->pos, cam->q, wp);
-    g_fxLightPos[0] = (int)(wp[0] * 4096.0f);
-    g_fxLightPos[1] = (int)(wp[1] * 4096.0f);
-    g_fxLightPos[2] = (int)(wp[2] * 4096.0f);
+    /* w5-audit (A1-3, reimplemented): the mode-split Q8-grid store —
+     * see sh_env_update_pose; the FX anchor rides the SAME engine light
+     * (mode 1 = the NULL-branch raw Q12, the rest = the bone-branch
+     * Q8 grid: trunc -> >>4 -> <<4). */
+    if (g_userLightMode == 1) {
+        g_fxLightPos[0] = (int)(wp[0] * 4096.0f);
+        g_fxLightPos[1] = (int)(wp[1] * 4096.0f);
+        g_fxLightPos[2] = (int)(wp[2] * 4096.0f);
+    } else {
+        g_fxLightPos[0] = (((int)(wp[0] * 4096.0f)) >> 4) << 4;
+        g_fxLightPos[1] = (((int)(wp[1] * 4096.0f)) >> 4) << 4;
+        g_fxLightPos[2] = (((int)(wp[2] * 4096.0f)) >> 4) << 4;
+    }
 }
 
 /* v43 — shLensFlareExec's COMPUTE half, moved OUT of fx_pass to run

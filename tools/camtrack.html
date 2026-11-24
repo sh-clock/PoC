@@ -1487,9 +1487,15 @@ const SHCore = (function () {
         let wy = X[1] * off[0] + Y[1] * off[1] + Z[1] * off[2] + camPos[1];
         let wz = X[2] * off[0] + Y[2] * off[1] + Z[2] * off[2] + camPos[2];
         if (ahead > 0) { wx -= Z[0] * ahead; wy -= Z[1] * ahead; wz -= Z[2] * ahead; }
-        L.pos[0] = Math.trunc(wx * 4096);
-        L.pos[1] = Math.trunc(wy * 4096);
-        L.pos[2] = Math.trunc(wz * 4096);
+        /* w5-audit (A1-3, reimplemented): the engine's BONE branch
+         * (bodyprog_80055028.c:265-274) quantizes the light pos to the
+         * EXACT Q8 grid — TO_FIXED trunc -> Q12_TO_Q8 (>>4) -> Q8_TO_Q12
+         * (<<4); the camera/flashlight analog lands on the grid (the
+         * mode-1 free-world branch above keeps the NULL-branch RAW Q12
+         * store, :254-259). JS >> is the same arithmetic shift as C. */
+        L.pos[0] = Math.trunc(wx * 4096) >> 4 << 4;
+        L.pos[1] = Math.trunc(wy * 4096) >> 4 << 4;
+        L.pos[2] = Math.trunc(wz * 4096) >> 4 << 4;
       }
 
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),
