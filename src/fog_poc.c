@@ -19649,7 +19649,14 @@ int main(int argc, char **argv) {
                  * selects mode 2 (the CLI --userlight ahead:D geometry).
                  * "follow":"world" keeps mode 1 (ahead is a camera-relative
                  * extension; a world light ignores it).                    */
-                if (cd.lightAhead > 0.0f && !cd.lightFollow)
+                /* v49-audit (A1-1): an AUTHORED follow:'camera' light
+                 * takes the AUTHORED ahead (0 default = AT the camera +
+                 * the offset) — the gizmo twin and the camtrack SHCore
+                 * carrier both resolve authored-no-ahead to 0, and the
+                 * v40 A-F3 surface above documents "the default 0.32 m
+                 * camera anchor". The 2.5 m engine TRAIL is the NO-light
+                 * default only (V49's headline stays intact). */
+                if (!cd.lightFollow)
                     g_userLightMode = 2;
                 g_userLightAheadM = cd.lightAhead;
                 /* v49 (task 3): the LINE light — the camtrack twin's
