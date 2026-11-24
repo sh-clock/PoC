@@ -17160,6 +17160,13 @@ static void user_light_nudge(LiveApp *A, int axis, float dir) {
     g_userLightWorld[2] = wp[2];
     printf("[userlight] world pos now %.2f, %.2f, %.2f (mode 1)\n",
            wp[0], wp[1], wp[2]);
+    /* v49-audit (A3-4): while PAUSED no tick fires, so the FX anchor
+     * (recomputed per output frame) would move but the mesh light stays
+     * latched at the pre-nudge pose until unpause — refresh the pose
+     * once now (the boot-frame precedent calls sh_env_update_pose
+     * outside the tick grid when ticksDone == 0). */
+    if (A->play.paused)
+        sh_env_update_pose(&A->env, cp.pos, cp.q);
 }
 static void user_light_aim(int axis, float d) {
     g_userLightHasRot = 1;           /* the first press AUTHORS the aim      */
