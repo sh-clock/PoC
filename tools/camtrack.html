@@ -7806,6 +7806,9 @@ function setActiveModel(name) {
                            session clock fresh (the C's K_R — fog_poc.c's
                            room-reload resets the driver state with the
                            session clock) */
+  drTile.ctr = 0; drTile.ticks = -1;   /* w5-audit (F11d): the 30Hz ctr
+                           grid restarts with the session (the C's K_R
+                           resets g_flaresys.counter = 0 — v41-E3) */
   for (const v of three.loaded.values()) if (v.scene.parent === scene) scene.remove(v.scene);
   const loaded = three.loaded.get(name);
   if (loaded) scene.add(loaded.scene);
@@ -8526,6 +8529,8 @@ function startPlayAll() {
   state.t = 0;
   state.sessionT = 0;   /* v45 audit (F-5): play-all restart boots the
                            session clock fresh (the C's K_R discipline) */
+  drTile.ctr = 0; drTile.ticks = -1;   /* w5-audit (F11d): the ctr grid
+                           restarts with the session (g_flaresys.counter) */
   state.playing = true;
   rebuildVisuals();
   renderTrackList();
@@ -12785,9 +12790,97 @@ function sh1xDrWaterFxUpdate() {
            return skips the water branch and the ctr too)              */
         const v = new THREE.Vector3(lx, ly, lz).applyMatrix4(rtCam.matrixWorldInverse);
         const d = -v.z;
-        /* v4b: the engine/C compare the TRUNCATED Q8 depth (fog_poc.c:12513
+        /* v4b: the engine/C compare the TRUNCATED Q8 depth (fog_poc.c:12748
            `!((int)(d * 256.0f) > 112)`, lens_flare.c:73-75) — the raw float
            passed a 3.9 mm band (d*256 in (112,113)) the engine returns on. */
+        /* w5-audit (F11a/b/c/d): the 30Hz ctr grid — the C twin
+           (fx_water_scroll_sync, fog_poc.c:12717-12766) runs PER FIRED
+           TICK: GATE 2 + the fx_light_anchor light + the zone test each
+           evaluated at THAT tick's own camera/light pose (live: called
+           per tick at fog_poc.c:16562; the shot path walks every tick
+           from zero). The v48 port walked the ticks with the FRAME's
+           raw track/camera pos, no per-tick gates, seeded ticks=target
+           on the first call (path-dependent), gated the whole walk on
+           the CURRENT frame's zone verdict, and never reset on restart.
+           Known approximation (documented, like the frame-level GATE 1):
+           the per-tick pose uses the RAW track orientation
+           (evTargetQuat) — the C replays the turn-filtered pose per
+           tick; the JS turn filter runs on frame dt, so historical-tick
+           anchors are approximate. The tOff/tAhead defaults are the
+           post-A1-2 SHCore Q8-grid fold values (engine truth). */
+        const target = Math.floor(state.sessionT * 30 + 1e-9);
+        if (drTile.ticks < 0) drTile.ticks = 0;   /* F11c: recount from zero */
+        const tr = playTarget() || selTrack();
+        const ULp = env.userLight;
+        const ULw = (ULp && ULp.mode === 1 && ULp.world) ? ULp.world : null;
+        const lm = (typeof activeModel === 'function' && activeModel()) || null;
+        const lineL = (lm && lm.light && lm.light.on !== false &&
+                       lm.light.follow === 'world') ? lm.light : null;
+        const tOff = (ULp && Array.isArray(ULp.offset) && ULp.offset.length >= 3 &&
+                      isFinite(+ULp.offset[0]) && isFinite(+ULp.offset[1]) &&
+                      isFinite(+ULp.offset[2]))
+          ? [+ULp.offset[0], +ULp.offset[1], +ULp.offset[2]]
+          : [-21 / 256, 72 / 256, -30 / 256];   /* the SHCore Q8-grid default */
+        const tAhead = (ULp && ULp.ahead != null && isFinite(+ULp.ahead))
+          ? Math.max(0, +ULp.ahead) : (ULp ? 0 : 2.5);
+        let burst = 0;
+        while (drTile.ticks < target && burst < 3600) {
+          const tickT = (drTile.ticks + 1) / 30;
+          const ev = tr ? evalTrack(tr, tickT) : null;
+          let px, py, pz;
+          if (lineL) {
+            /* F11b: a world/line light is a PURE function of the phase —
+               lightWorldPos(l, t) — the line TRAVELS per tick (the C
+               advances g_userLightLineT per tick, fog_poc.c:6349) */
+            const w = lightWorldPos(lineL, tickT);
+            px = w[0]; py = w[1]; pz = w[2];
+          } else if (ULw) {
+            px = ULw[0]; py = ULw[1]; pz = ULw[2];
+          } else if (ev && ev.pos) {
+            /* F11b: the camera-follow light at the tick = the ANCHOR
+               (the SHCore V49 math: the offset in the camera frame +
+               the ahead along camera-forward) — was the RAW track pos,
+               up to 2.5 m + offset from the engine light */
+            const q = evTargetQuat(ev);
+            const aX = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+            const aY = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+            const aZ = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+            px = aX.x * tOff[0] + aY.x * tOff[1] + aZ.x * tOff[2] + ev.pos[0];
+            py = aX.y * tOff[0] + aY.y * tOff[1] + aZ.y * tOff[2] + ev.pos[1];
+            pz = aX.z * tOff[0] + aY.z * tOff[1] + aZ.z * tOff[2] + ev.pos[2];
+            if (tAhead > 0) { px -= aZ.x * tAhead; py -= aZ.y * tAhead; pz -= aZ.z * tAhead; }
+          } else { px = lx; py = ly; pz = lz; }
+          /* F11a: GATE 2 per tick — the light's depth along the tick
+             camera's forward (the frame-level GATE 1 above stays the
+             env-ramp approximation: the JS env ticks per frame). */
+          let dtk = 0;
+          if (ev && ev.pos) {
+            const q = evTargetQuat(ev);
+            const aZ = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+            dtk = -((px - ev.pos[0]) * aZ.x + (py - ev.pos[1]) * aZ.y +
+                    (pz - ev.pos[2]) * aZ.z);
+          } else {
+            /* Reimplementation fix: the NO-TRACK fallback — ev null means
+               the free camera (no tick pose); the tick light (px..pz —
+               possibly a TRAVELING line light) projected into the FRAME
+               camera's view space, the same transform as the frame GATE-2
+               d above (the PR's dtk=0 never counted a tick without a
+               track — a regression vs the pre-walk zone verdict). */
+            const vt = new THREE.Vector3(px, py, pz).applyMatrix4(rtCam.matrixWorldInverse);
+            dtk = -vt.z;
+          }
+          if (Math.trunc(dtk * 256) > 112) {
+            const tex = px, tez = -pz;
+            let inz = false;
+            for (const z of rec.sh1xWaterZones) {
+              if (!z.enabled) break;
+              if (tex >= z.minX && tex < z.maxX && tez >= z.minZ && tez < z.maxZ) { inz = true; break; }
+            }
+            if (inz) drTile.ctr++;
+          }
+          drTile.ticks++;
+          burst++;
+        }
         if (Math.trunc(d * 256) > 112) {
           /* the zone test (LensFlare_WaterZoneGet lens_flare.c:504-523):
              the LIGHT's ENGINE x/z (glTF x, -glTF z), first match     */
@@ -12798,39 +12891,11 @@ function sh1xDrWaterFxUpdate() {
             if (ex >= z.minX && ex < z.maxX && ez >= z.minZ && ez < z.maxZ) { zone = z; break; }
           }
           if (zone) {
-            /* the 30Hz ctr grid (D_800AFDAC++ per in-zone frame —
-             * the PoC twin fx_water_scroll_sync fog_poc.c:12482-12527:
-             * the counter advances on the 30Hz tick grid, the zone test
-             * evaluated per FIRED tick at that tick's own light/camera
-             * pose). The light at the tick: the AUTHORED world light
-             * (mode 1) or the camera-follow (the v6 light==camera
-             * directive — the ShEnv updatePose carrier).               */
-            const target = Math.floor(state.sessionT * 30 + 1e-9);
-            if (drTile.ticks < 0) drTile.ticks = target;
-            if (target >= drTile.ticks) {
-              const tr = playTarget() || selTrack();
-              const ULw = (env.userLight && env.userLight.mode === 1 && env.userLight.world)
-                        ? env.userLight.world : null;
-              let burst = 0;
-              while (drTile.ticks < target && burst < 3600) {
-                const tickT = (drTile.ticks + 1) / 30;
-                let px = lx, pz = lz;
-                if (!ULw && tr) {
-                  const ev = evalTrack(tr, tickT);
-                  if (ev && ev.pos) { px = ev.pos[0]; pz = ev.pos[2]; }
-                } else if (ULw) { px = ULw[0]; pz = ULw[2]; }
-                const tex = px, tez = -pz;
-                let inz = false;
-                for (const z of rec.sh1xWaterZones) {
-                  if (!z.enabled) break;
-                  if (tex >= z.minX && tex < z.maxX && tez >= z.minZ && tez < z.maxZ) { inz = true; break; }
-                }
-                if (inz) drTile.ctr++;
-                drTile.ticks++;
-                burst++;
-              }
-              if (target < drTile.ticks) drTile.ticks = target;   /* seek-back */
-            }
+            /* w5-audit (F11): the ctr catch-up moved OUT of the frame's
+             * zone/GATE-2 nesting — see the restructured block above (the
+             * C fires ticks with their own gates regardless of the current
+             * frame's zone verdict; the live-tile rewrite below stays
+             * frame-level and unchanged). */
             /* the live-tile rewrite (func_8008E5B4 — every in-zone frame;
                out of zone the tile keeps the last state, frozen ✓)     */
             drTileRegen(rec.sh1xDrWave);
