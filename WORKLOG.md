@@ -1376,3 +1376,88 @@ Wallpaper engine-lag numeric trio):
   WJ2/WJ3 Java findings (editor clock wrap, Sh1Camdat raw track index,
   CamtrackDoc weatherTarget clamp) + the documented-nit registry are in the
   agents' reports held by the coordinator; the primary can call the sync batch.
+
+## DELIVERY (wave 10 final)
+29 PRs, zero force-pushes, all branches off the current mains (PoC 0eecec5 v33.57 /
+Wallpaper 749c61e v1.20.0 / lively 365866b1@core-separation), every finding
+personally re-verified by the coordinator before filing (both sides quoted, arithmetic
+run, or md5/A-B empirically proven):
+
+PoC (17): #250 module SYNTAX-DEAD (node-proven FAIL->PASS on all 5 blocks), #251
+g_waterPlaneY double-/16 + missing negation, #252 the PoC missing its own twins'
+V53 track-level weatherTarget -1 hunk, #253 boot drawCase arg hardcoded 1 vs
+envField16 (dead parse made live), #254 snow_ground_build float->int UB (SIGSEGV
+rc=139 + hang rc=124 -> both rc=0 verified on the built binary), #255 K_R turn
+filter never reset (md5 A/B b2f90781 pre/post), #256 ShEnv.updatePose missing the
+lightFlicker env-light multiply, #257 the weather watcher coerced V53 -1 to 0
+(clobbered the boot recipe), #258 camtrack waterPlaneY nonexistent-field read,
+#259 the snow boot discipline trio (prevView zeroing + v41-AUDFX density sync +
+the authored path's dropped resets), #260 the rain-streak pre-v43 v-row, #261 the
+env primes' grid slots, #262 the b64 '==' padding (DR_WAVE always rejected —
+verified on DR0000.glb 4097->4096), #263 the 4 v48 A16 back-ports, #264 the
+waterfall sp14 hoist, #265 the TV-paint UV early wrap, #266 the gouraud color
+plane's integer lattice.
+Wallpaper (9): #56/#57/#58/#59 (the waterPlaneY/boot-arg16/snow-UB/K-R-turninit
+twins), #60 the asset manifest's USER-hash clobber (data-loss class), #61 the
+runtime override pins ignored, #62 the HW shader affine multiply->divide (both
+backends; the .spv regeneration flagged — this sandbox has no glslang),
+#63 the numeric lag trio (R2 z-negation / gravity 1337 / normals 2908),
+#64 the HW TV collect order + rain OTZ +0.5.
+lively (3): #18/#19/#20 (the waterPlaneY/boot-arg16/snow-UB twins; lively's K_R
+chain already carried turn_init).
+
+Gates run on everything: gcc -fsyntax-only on every C change (-Wall -Wextra clean
+on the full builds; make + 24 fresh renders on the K_R/snow/gouraud branches),
+node --check on ALL 5 camtrack blocks per branch (the module included — the
+finding that started the wave), md5 A/Bs (restart==fresh, benchmark==shot, the
+gouraud honesty note), the DR0000 payload measurement, and the crash/hang repros.
+
+## WAVE 10 DOCUMENTED-NOT-PR'd (verified by the agents, held for the primary's call —
+the full agent reports with two-sided quotes live in this session's wave-10 records)
+- PoC engine family: E7-1 the mvTimer multi-boundary double-step (gravityScatter
+  2x position on stall ticks + the discrete drivers' double state/RNG — the
+  engine's ONE-update V_BLANKS_MAX contract; the fix wants the per-driver
+  analysis), E7-2 the 1337-vs-vCount gravity scaling on stall ticks, E10-1
+  vcRetSelfViewEffectRate's integer-division ramp collapse (latent — the glued
+  camera never enters the band), E10-2 the self-view entry-tick rate-after-glue
+  order, E10-3 r2view_tick's fixed dt=136 on stall frames, E11-2 the K_R weather
+  restore misses 6 registers (class/wind/enables/intensity), E12-1 the boot
+  warm-up after the D0B18 arm (engine order: SnowInit BEFORE the event arm).
+- camtrack.html: C1-3/V53C-4 updatePose missing the LOOK-AT anchor branch (the
+  commit claimed it; needs the ev threading), C8-1 the cone/glint base through
+  the camera projection vs the C's fixed H=224, C9-2 the drTile ctr/tile desync,
+  C3-4 the live snow catch-up's missing stall emulation (policy question), the
+  sh1xJn/sh1xJb hostile-data strictness family (C5-4/5/6/8/9, C6-5/6), the
+  HELP_HTML doc nits (C10-1/2/3), C4-2 the legacy light-offset float drift,
+  C2-5 the field17 clamp vs the C's raw pass.
+- Wallpaper Java: WJ1-3 the governor mutating during editor sessions, WJ1-5 the
+  randomizer's stale-bag NPE, WJ1-6 the 31+ task-root regression, WJ2-1 the
+  editor clock's once/infinite wrap, WJ2-2 the missing USER LIGHT panel (the
+  "full functional replica" claim), WJ2-3..9 the size/rounding/clamp nits,
+  WJ3-1 Sh1Camdat's raw track index vs the engine's compacted array (wrong
+  track for invalid-track camdats), WJ3-4 the storage migration's unlocked
+  mutex race, WJ3-10 the CI re-run mis-bump corner, PARITY-18 CamtrackDoc's
+  weatherTarget 0..8 clamp (vs the C's -1..8).
+- Wallpaper engine lag (the parity agent's map — the twin base is PoC v33.8 +
+  selective syncs; ~25 fix families from the v43/v44/v45 audit bulk never
+  landed): PARITY-5..16 (BK<<4, weighted_avg form, llm negation, nclip D-anchor,
+  the truncation family, raster_tri fill rule, the two-prim composites, sprAbr
+  ghost3 B-F, the water OT gate, the flare order, the C-7 numeric family, the
+  GLB/propAnims family) + PARITY-17 the Wallpaper-only S32 graft (design
+  call). The primary's twin-sync batch (the lively pattern) is the efficient
+  path; the wave-10 numeric trio PR (#63) covers the three smallest verbatim
+  families as proof.
+- lively: LIV1-1 the handshake's unbounded wait, LIV1-3 the silenced --help.
+- HW renderer: WHW-4 the VK unload-without-load dlclose(NULL) corner, WHW-5/6 nits.
+
+## Standing assessment
+The general line-by-line pass found its richest harvest exactly where the premise
+predicted: the fresh V53 surface (the water-plane anchor math was wrong in all
+three trees), the twins' sync discipline (PoC behind its OWN twins; Wallpaper
+behind PoC by the v43/v44/v45 bulk; the primary's twin-sync batch remains the
+right tool for the Wallpaper gap), and the editor's JS twin (the module-killing
+syntax error + 8 engine-math back-port omissions). The stress battery's crash/hang
+pair (snow_ground_build UB) closes the only non-graceful hostile-input sites
+found in 51 fresh probes + 100 fuzz mutants.
+
+END OF WAVE 10.
