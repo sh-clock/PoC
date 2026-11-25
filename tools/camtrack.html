@@ -7682,9 +7682,13 @@ function registerModel(name, gltf) {
     if (row && info) {
       if (env && typeof env.presetIdx0 === 'number') {
         row.style.display = '';
-        info.innerHTML = '{' + env.presetIdx0 + ',' + env.presetIdx1 +
+        /* w8-audit (D7-2): presetIdx1 + field16 arrive UNVALIDATED from the
+           GLB's scenes[0].extras.SH1X.env (glbSceneSh1xExtras does zero
+           schema checks) — a hostile GLB could put markup in either;
+           interpolate them through esc() like the sibling fields */
+        info.innerHTML = '{' + env.presetIdx0 + ',' + esc(String(env.presetIdx1)) +
           '} · ' + esc(env.weather || 'none') + ' weather · ' +
-          esc(env.overlay || '?') + ' field_16=' + env.field16 +
+          esc(env.overlay || '?') + ' field_16=' + esc(String(env.field16)) +
           (typeof env.mapType === 'string' ? ' · ' + esc(env.mapType) : '') +
           ' — the room\u2019s ORIGINAL pair (unbiased, effects.c:220-267);' +
           ' the World &amp; Weather defaults are authored from it.';
