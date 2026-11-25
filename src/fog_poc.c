@@ -1329,7 +1329,7 @@ typedef struct {
     int rawVyFloor, rawAngAccel, rawAngVelFloor;  /* dampedSwing verbatim  */
     int rawKickVel, rawOpenLimit, rawBounceHi;
     int rawSettle, rawRebound;      /* kickSwing verbatim (map1_s03)         */
-    int kickPhase;                  /* kickSwing: 0 armed 1 kick 2 bounce    */
+    int kickPhase;                  /* kickSwing: 0 armed 1 kick 2 flag-set 3 settled */
     int gated;                      /* v27: driver currently gated OFF       */
     int sharedLeader;               /* v27: index of the sharedRot leader anim */
     int jsonIdx;                    /* v43 (E-02-2): the SOURCE propAnims JSON
@@ -3626,7 +3626,7 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
          *   arcBounds = raw.arcMinDeg != null && raw.arcMaxDeg != null &&
          *               num(raw.arcMaxDeg, 1) > num(raw.arcMinDeg, 0)
          * v48 audit (A18-1): the JS `!= null` gate rejects an EXPLICIT JSON
-         * null too (camtrack.html:6621; the Java twin CamtrackDoc.java:1382
+         * null too (camtrack.html:6855; the Java twin CamtrackDoc.java:1504-1505
          * `if (mn == null || mx == null) return false;` likewise), but the C
          * presence gate jget()!=NULL passes a JV_NULL node through — so
          * {"arcMinDeg": null, "arcMaxDeg": null} parsed as arcBounds=TRUE
@@ -3737,12 +3737,12 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
         /* sanitizeTrack reconstruction (same rule as the circle arc):
          *   yawBounds = raw.yawMinDeg != null && raw.yawMaxDeg != null &&
          *               num(raw.yawMaxDeg, 1) > num(raw.yawMinDeg, 0)
-         * v48 audit (A18-1): the JS `!= null` gate (camtrack.html:6767) also
+         * v48 audit (A18-1): the JS `!= null` gate (camtrack.html:7001) also
          * rejects an explicit JSON null — see the arcBounds note above. */
         t->yawBounds = jget(raw, "yawMinDeg") != NULL && jget(raw, "yawMinDeg")->type != JV_NULL &&
                        jget(raw, "yawMaxDeg") != NULL && jget(raw, "yawMaxDeg")->type != JV_NULL &&
                        jnum(raw, "yawMaxDeg", 1.0) > jnum(raw, "yawMinDeg", 0.0);
-        /* camtrack.html:6769 — same `!= null` semantics for the pitch pair. */
+        /* camtrack.html:7003 — same `!= null` semantics for the pitch pair. */
         t->pitchBounds = jget(raw, "pitchMinDeg") != NULL && jget(raw, "pitchMinDeg")->type != JV_NULL &&
                          jget(raw, "pitchMaxDeg") != NULL && jget(raw, "pitchMaxDeg")->type != JV_NULL &&
                          jnum(raw, "pitchMaxDeg", 1.0) > jnum(raw, "pitchMinDeg", 0.0);
@@ -11590,7 +11590,7 @@ static void sh1x_anims_tick(Sh1x *sx, double dt, const v3 *camGltf) {
                     * levitating stone, 5 sub-states of cutscene case 13):
                     * 1) slide vz = (stepData*Q12(0.1))/Q12(2) - Q12(140.6),
                     * stepData += dt up to Q12(2.0) (model swaps to
-n                    * STONE3_H — NOT ported: one GLB model per entry);
+                    * STONE3_H — NOT ported: one GLB model per entry);
                     * 2) rise vel += g>>1, vy += dt*vel to the -1.05 m
                     * cap (y-down: UP); 3) wobble 0.5s: rotZ +=
                     * dt*Q12_ANGLE(-25), vy = MULT(cos, Q12(0.15)) -
