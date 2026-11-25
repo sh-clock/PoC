@@ -185,6 +185,22 @@ static void ensure_dir_simple(const char *d) {
     mkdir(d, 0777);
 #endif
 }
+
+/* v8-audit (D1-1): the outdir-prefix skip must recognize EVERY absolute
+ * form the CLI can receive — POSIX '/', and on Windows the drive-letter
+ * ('C:\x', 'C:/x') and UNC ('\\\\server\\share\\x') roots too; the
+ * previous '=='/'-only test still prefixed Windows absolutes
+ * ("shots/C:\\x.png") and the write failed. */
+static int cli_path_is_abs(const char *f)
+{
+    if (!f || !f[0]) return 0;
+    if (f[0] == '/') return 1;
+#ifdef _WIN32
+    if (f[0] == '\\') return 1;
+    if (((f[0] >= 'A' && f[0] <= 'Z') || (f[0] >= 'a' && f[0] <= 'z')) && f[1] == ':') return 1;
+#endif
+    return 0;
+}
 static void ensure_parent_dir(const char *path) {
     char buf[512];
     if (strlen(path) >= sizeof buf) return;
@@ -20248,7 +20264,8 @@ int main(int argc, char **argv) {
                    Vr.effRate, (double)Vr.selfViewTimer / 4096.0);
         }
         char out[1024];
-        snprintf(out, sizeof(out), "%s/%s", outdir, r2Shot.file);
+        if (cli_path_is_abs(r2Shot.file)) snprintf(out, sizeof(out), "%s", r2Shot.file);
+        else snprintf(out, sizeof(out), "%s/%s", outdir, r2Shot.file);
         ensure_dir_simple(outdir);
         if (!write_png_rgb(out, fb2.rgb, fb2.w, fb2.h)) {
             fprintf(stderr, "failed to write %s\n", out); return 1;
@@ -20416,7 +20433,8 @@ int main(int argc, char **argv) {
         sh1x_anims_sync((Sh1x *)&R.sc->sh1x, tSim, &cp.pos); /* v43: hold at the final session time (the in-loop call is post-advance, live parity; the V44 C-6 3rd arg kept) */
         render_frame(&fb, &R, &cp);
         char out[1024];
-        snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
+        if (cli_path_is_abs(shots[i].file)) snprintf(out, sizeof(out), "%s", shots[i].file);
+        else snprintf(out, sizeof(out), "%s/%s", outdir, shots[i].file);
         ensure_dir_simple(outdir);
         if (!write_png_rgb(out, fb.rgb, fb.w, fb.h)) {
             fprintf(stderr, "failed to write %s\n", out); return 1;
