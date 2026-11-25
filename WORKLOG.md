@@ -3165,3 +3165,78 @@ Twin parity verified byte-identical by VrfD (md5 of added-line sets).
 5. The F16 family bounds audit wave (VrfA's finding above).
 6. The droplet-path GTE snap (238's noted follow-up).
 The commandments remain embedded at the head of this file.
+
+# SESSION 11 (V53) — the 4 user-tested regressions fixed + the 7-PR w9-audit clear (7/7)
+
+## 1. THE FOUR USER-REPORTED REGRESSIONS (all root-caused, fixed, VLM-verified)
+- TV SCREENS "ROTATED ON THE FLOOR" (PoC only; camtrack OK): ROOT CAUSE the
+  v48 A-1 *4 OT-bucket form (PR #175, 016e886) — its "4x NEARER" rationale
+  INVERTS the far-first OT walk: (Q8*4)>>3 sorts the paint 4x FARTHER,
+  buried under every nearer-bucketed quad sharing its pixels incl. geometry
+  physically BEHIND it (TVCOVER instrumentation: the 201_3_BA wall at ~14.7m
+  drew over the 9.2m paint). Reverted to Q8>>3 (the v40 form = the camtrack
+  twin, byte-identical) in PoC bef3a0c + the wallpaper/lively twins; the
+  literal decomp *4 (map4_s03.c:1292) documented as an OPEN engine question
+  (under the far-first walk it is not depth-comparable with mesh buckets).
+  VERIFIED: bright px 105 -> 2857 (t=3) / 3259 (t=6); VLM: all screens
+  vertical on the wall playing static, no floor intersection.
+- THE LENS-FLARE BALL IN THE CAMERA'S FACE (PoC only): the dim core quads
+  1-2 (grey 30, 45px + 0x10, 22px) drew unoccluded in the not-visible
+  branch — in-engine they hide INSIDE the light's CARRIER (Game_Flash-
+  lightAttribsSet pins the light at HarryBone_Torso + (-0.08,-0.28,0.12),
+  effects.c:204-218 — Harry's own front surfaces occlude them); the
+  bodyless user light left them floating. The occluded branch is now a
+  NO-OP (PoC 5e704f7 + twins); quad 3/ghosts/streaks stay rate-scaled
+  (the fade-out window intact). VERIFIED: ahead:1.2 -> NO ball (VLM:
+  pitch black); a light FACING the camera -> the full flare (hot core +
+  starburst + halos); angZ sweep 0/90/180deg -> rate 0/515/3072.
+- THE BOOT WEATHER RECIPE (camtrack): sh1xEnvDefaults stuffed field17 (the
+  BOOT recipe arg, Particle_EnvironmentSet's 0..6 domain) into weatherTarget
+  (the runtime D0B18 0..8 transition arg — a different machine) and left
+  bootWeather=-1 -> the hardcoded map0 SNOW on every room. NOW: bootWeather
+  = field17 VERBATIM (SU/APU 0 = NONE — no indoor weather, DR 5 rain, SPU
+  6 rain+), weatherTarget = -1 (nothing authored); setBootWeather(-1) +
+  both boot sites resolve the ROOM'S OWN (field17, field16) — GameBoot_
+  WorldEnvInit load_screen.c:34-36 — via hooks.getRoomEnv, map0 (2,1) only
+  as the env-less fallback; the UI -1 option relabeled; the C twins'
+  weatherTarget parse keeps -1 as absent (the coerce-to-0 armed a spurious
+  transition-to-none); a newly-enabled editor light defaults to a DRAGGABLE
+  WORLD light. NOTE: existing camdats keep their authored weatherTarget
+  until re-exported (the 'use original' button re-authors per model).
+- THE WATER FOLLOWING THE PLAYER: the default (no authored light) anchor
+  was camera+offset+2.5m-ahead — the shimmer glided with the flying
+  camera. The engine's light rides Harry's TORSO and every camera FRAMES
+  him: mode 0 now parks at (a) the track's LOOK-AT (the framed subject)
+  or (b) the view ray's WATER-PLANE hit +1.0m (the FIXED yaw/pitch cams)
+  with camera+ahead as the fallback; modes 1/2 unchanged; the camtrack
+  twin: updatePose + the F11 tick walk get the same anchors (PoC 5cb0bcc
+  + the wallpaper/lively twins + camtrack.html). VERIFIED: the fixed-cam
+  DR01FE test — the light ON the water plane at the framed spot; VLM: the
+  shimmer an elliptical glint ATTACHED to the surface, no floating orb.
+
+## 2. THE 7-PR w9-audit CLEAR (7/7 merged, sole merger)
+- PoC #248 + wallpaper #52 + lively #17 (the F16-bounds family): the
+  PushSXY windows are CENTER-RELATIVE — re-verified against swanstation
+  gte.cpp:691-698 (OFX added BEFORE the :353-380 clamp) + the decomp
+  (InitGeom zeroes OFX/OFY; the 7 SetGeomOffset sites are item-screen/
+  special-pass save-restores). NOTE: the PR branch predated the V53 TV
+  fix — its dark TV wall was the STALE BASE, not the F16 change (main+PR
+  renders BYTE-IDENTICAL on SPU0401 + DR01FE, 0 changed px).
+- PoC #249 (docs: 5 comment corrections), wallpaper #53 (the bump race —
+  hit twice live this session), #54 (gradle jvmargs dedupe), #55 (docs).
+Post-merge gates: PoC make 0 err/warn; wallpaper + lively gcc -fsyntax-only
+clean; camtrack 4 JS blocks node --check green.
+
+## 3. THE NEXT SESSION QUEUE (carried + new)
+1. THE WATER DELTAS (the ring/cone colors + radii + the fan visibility +
+   the dapple) at matched reference angles — the 3 CDN reference images
+   are the sewer/walkway set (VLM-described: dark murky water + faint
+   reflections) — now testable against the V53 light anchors.
+2. The F16 open question: the decomp *4 TV bucket vs the far-first walk
+   (emulator evidence needed).
+3. The 45-asset GLB regen + env/EXTRAs rules; the wallpaper CI
+   asset-insertion workflow; the wallpaper V53 twin build (the gradle
+   gate).
+4. The remaining V50 queue (the twin parity raster gap, the exact
+   chase-cam poses) + the droplet-path GTE snap.
+The commandments remain embedded at the head of this file.
