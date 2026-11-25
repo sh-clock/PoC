@@ -1482,11 +1482,41 @@ const SHCore = (function () {
         const ahead = (ULp && ULp.ahead != null && isFinite(+ULp.ahead))
           ? Math.max(0, +ULp.ahead)
           : (ULp ? 0 : 2.5);   /* authored explicit; no light = the engine TRAIL */
+        /* V53 (the water-light fix): with NO authored light the default
+         * anchor parks the light where the camera's view ray meets the
+         * WATER PLANE (+1.0 m — the Harry-torso stand-in above the
+         * surface; the engine's light rides playerBoneCoords[HarryBone_
+         * Torso], Game_FlashlightAttribsSet effects.c:210-218, and the
+         * engine cameras FRAME Harry — the ray's water hit is where the
+         * shot frames the flooded street). The shimmer then sits ON THE
+         * FRAMED WATER SPOT instead of gliding 2.5 m ahead of the flying
+         * camera (the owner's report: the water effects follow the
+         * player, not the light). Falls through to the trailing anchor
+         * when there is no water / the ray misses the plane.           */
+        let wx, wy, wz, rayHit = false;
+        if (!ULp) {
+          const wp = this.waterPlaneY;
+          if (wp !== undefined && wp > -1e8) {
+            const Zr = camAxes[2];
+            const fx2 = -Zr[0], fy2 = -Zr[1], fz2 = -Zr[2];
+            if (fy2 < -1e-4 && camPos[1] > wp + 1.0) {
+              const t = (camPos[1] - (wp + 1.0)) / (-fy2);
+              if (t > 0.5 && t < 60) {
+                wx = camPos[0] + fx2 * t;
+                wy = wp + 1.0;
+                wz = camPos[2] + fz2 * t;
+                rayHit = true;   /* falls through to the common Q8 store */
+              }
+            }
+          }
+        }
+        if (!rayHit) {
         const X = camAxes[0], Y = camAxes[1], Z = camAxes[2];
-        let wx = X[0] * off[0] + Y[0] * off[1] + Z[0] * off[2] + camPos[0];
-        let wy = X[1] * off[0] + Y[1] * off[1] + Z[1] * off[2] + camPos[1];
-        let wz = X[2] * off[0] + Y[2] * off[1] + Z[2] * off[2] + camPos[2];
+        wx = X[0] * off[0] + Y[0] * off[1] + Z[0] * off[2] + camPos[0];
+        wy = X[1] * off[0] + Y[1] * off[1] + Z[1] * off[2] + camPos[1];
+        wz = X[2] * off[0] + Y[2] * off[1] + Z[2] * off[2] + camPos[2];
         if (ahead > 0) { wx -= Z[0] * ahead; wy -= Z[1] * ahead; wz -= Z[2] * ahead; }
+        }
         /* w5-audit (A1-3, reimplemented): the engine's BONE branch
          * (bodyprog_80055028.c:265-274) quantizes the light pos to the
          * EXACT Q8 grid — TO_FIXED trunc -> Q12_TO_Q8 (>>4) -> Q8_TO_Q12
@@ -5792,8 +5822,13 @@ window.SHUI = (function () {
        * flashlightOn at boot in the PoC/wallpaper precedence)             */
       if (typeof l.on === 'boolean') SV.setFlashlight(l.on);
     } else {
-      /* no authored light: the panel defaults (nothing authored) */
-      U.lightOn = true; U.lightFollow = 'camera'; U.lightMode = 'fixed';
+      /* no authored light: the panel defaults (nothing authored).
+       * V53: follow 'world' — a newly-enabled light is a DRAGGABLE
+       * world light by default (the owner's rule: the water effects
+       * are light dependent — a world light gives the effect a stable
+       * position to respond to; the legacy camera-follow remains an
+       * explicit choice). */
+      U.lightOn = true; U.lightFollow = 'world'; U.lightMode = 'fixed';
       U.lightPos = [0, 1, 0]; U.lightRot = [-15, 0, 0]; U.lightRotAuthored = false;
       U.lightStart = [0, 1, 0]; U.lightEnd = [2, 1, 0];
       U.lightSpeedMS = 1.0; U.lightLoopMode = 'loop';
@@ -12869,6 +12904,15 @@ function sh1xDrWaterFxUpdate() {
     if (rec && rec.sh1xDrWave && rec.sh1xWaterZones && rec.sh1xWaterZones.length) {
       const V = SV.V;
       const env = V.env;
+      /* V53: the water plane height for the default-light anchor (the
+         first ENABLED zone's illumination — lens_flare.c:88
+         posY = Q4_TO_Q12(zone->illumination), the Q4 value /16 m)   */
+      env.waterPlaneY = -1e9;
+      for (const wz of rec.sh1xWaterZones) {
+        if (!wz.enabled) break;   /* the engine search terminates at disabled */
+        env.waterPlaneY = (+wz.illumination || 0) / 16;
+        break;
+      }
       /* GATE 1 (bodyprog_80055028.c:102-106): Spot mode + the blended
          EnableLensFlare flag — gates the WHOLE water branch           */
       const execOn = env.field_0 === 1 && env.cur.flashlightLensFlareIntensity !== 0;
@@ -12935,6 +12979,27 @@ function sh1xDrWaterFxUpdate() {
             px = w[0]; py = w[1]; pz = w[2];
           } else if (ULw) {
             px = ULw[0]; py = ULw[1]; pz = ULw[2];
+          } else if (ev && ev.pos && ev.lookAt &&
+                     !(lm && lm.light && lm.light.on !== false)) {
+            /* V53: NO authored light — the track's LOOK-AT target (the
+               framed subject = the Harry-torso stand-in; the PoC twin's
+               g_poseLookAt anchor)                                     */
+            px = ev.lookAt[0]; py = ev.lookAt[1]; pz = ev.lookAt[2];
+          } else if (ev && ev.pos && !(lm && lm.light && lm.light.on !== false) &&
+                     env.waterPlaneY > -1e8) {
+            /* V53: NO authored light, no look-at (FIXED yaw/pitch cams):
+               the view ray's water-plane hit + 1.0 m (the PoC twin's
+               ray-plane anchor)                                       */
+            const q0 = evTargetQuat(ev);
+            const z0 = new THREE.Vector3(0, 0, 1).applyQuaternion(q0);
+            if (z0.y > 1e-4 && ev.pos[1] > env.waterPlaneY + 1.0) {
+              const t0 = (ev.pos[1] - (env.waterPlaneY + 1.0)) / z0.y;
+              if (t0 > 0.5 && t0 < 60) {
+                px = ev.pos[0] - z0.x * t0;
+                py = env.waterPlaneY + 1.0;
+                pz = ev.pos[2] - z0.z * t0;
+              } else { px = lx; py = ly; pz = lz; }
+            } else { px = lx; py = ly; pz = lz; }
           } else if (ev && ev.pos) {
             /* F11b: the camera-follow light at the tick = the ANCHOR
                (the SHCore V49 math: the offset in the camera frame +
