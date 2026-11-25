@@ -3069,3 +3069,99 @@ the ring's), the dapple anisotropy.
    EXTRAs rules, the wallpaper CI (+0.0.1 versioning).
 4. The droplet-path GTE snap (238's noted follow-up).
 The commandments remain embedded at the head of this file.
+
+# SESSION 10 (V52) — the 16-PR w7/w8-audit clear (16/16 merged) + the CI repair wave
+
+## 1. THE PR BATCH (the relaunched audit agents; sole merger; PRs FIRST per the user's reorder)
+16 open PRs (5 PoC + 7 wallpaper + 4 lively), all single-fix independent
+branches. FIVE parallel verification agents (VrfA-E, each critical, each
+re-verifying every claim against the decomp + swanstation + the PoC twin,
+gates re-run): 16 APPROVE / 0 REJECT / 0 FIX-NEEDED.
+- MERGED (PoC, in order): #243 (rex x-clamp — 22cfc8e clamped rey/glPx/aey
+  but missed rex; center-rel bounds x[-1184,863] = the sibling form), #246
+  (map5_s00 ripple MESH mqx/mqy + SPRITE spx/spy floor+PushSXY — decomp
+  map5_s00.c:119-131/182-220 reads the SATURATED GTE store for both cull
+  and draw; clamps placed BEFORE the cull captures = engine-true), #244
+  (--shot/--r2shot absolute file= paths — cli_path_is_abs with POSIX +
+  Windows drive + UNC forms; A/B render battery byte-identical), #245
+  (docs: ~21 stale citations re-pointed at main + 4 comment corrections —
+  comment-only verified hunk-by-hunk, node --check all JS blocks green),
+  #247 (camtrack glbSceneSh1xExtras: presetIdx1 + field16 esc(String(...))
+  — the ONLY GLB-extras->innerHTML path in the file, all other fields
+  verified already escaped).
+- MERGED (wallpaper, in order): #45 (rex twin, byte-identical hunk), #51
+  (ripple twin, byte-identical), #46 (driveGate main-loop FREEZE — the v44
+  C-6 port ee33106 missed; decomp map6_s04_2.c:3493-3508 gated rides do
+  not advance), #47 (rot0PerInstN/instBase init pre-parse — the v36
+  post-parse form at :2446 ZEROED both after the parse consumed them),
+  #48 (sh_gte_ll_buggy FULL 3-term dot — 0x4A4A6412 = MVMVA LLM cv=3
+  tx=NONE(3) -> zero_T full dot; the old tx=FC mis-decode dropped l0*vx,
+  giving +X-lit surfaces zero light), #49 (subcellTable NULL-key segfault
+  -> PoC V45 JV_ARR form; the amend removed the duplicate loop, final
+  state 1:1 with PoC :1750-1758), #50 (rm fog_poc.c.orig 20295L + .rej
+  411L committed by ff27f22; 4/4 rejected-hunk integrity spot-check
+  confirmed the hand re-serialization landed everything).
+- MERGED (lively, in order): #11 (rex twin), #13 (ripple twin), #14
+  (re-land the S19 viewer-BEFORE-discovery order — the TIM gate was
+  red-by-construction; NOTE: PoC main does NOT have viewer-first, it is a
+  lively-lineage sanctioned delta; gate simulated green: --tim-file only
+  exits 0 + writes the PNG), #15 (stdin thread FILE-lock hang — getchar()
+  held stdin's lock across the blocking pipe read; graceful cmd_close
+  hung the whole process; read(0,...) raw syscall swap, exit 0.05s vs
+  >=12s hang reproduced), #16 (hoist the LIVELY printf-silencing macro
+  above the live_* helpers — 23 active printf sites leaked onto the JSON
+  IPC wire; gcc -E static proof: 0 active printf sites after), #12 (rm
+  fog_poc.c.orig 21570L = byte-identical duplicate of the live twin file).
+All merged with --no-ff, zero conflicts. Post-merge gates: PoC make rc=0;
+wallpaper gcc -fsyntax-only rc=0; lively plain + -DLIVELY_PLAYER rc=0.
+Twin parity verified byte-identical by VrfD (md5 of added-line sets).
+
+## 2. THE CI REPAIR WAVE (found while clearing)
+- PoC bump-job tag race (EVERY main run red since faac702): two bump runs
+  racing off the same version.txt — the loser's main-push fails non-FF
+  while its TAG push succeeds (independent refs) -> orphaned v33.51 tag
+  blocked every later bump at `git tag`. FIX (v53): next-free-tag skip +
+  `git push --atomic origin bumpwork:main v$NEW` + 5-round rebase-retry
+  loop. Orphan tag deleted (no release attached, not on main). FIRST
+  post-fix run: GREEN, bumped 33.50 -> 33.51, release v33.51 published
+  with 3 assets. NOTE: the first push of the fix BROKE the workflow
+  (unquoted colon in the step name "(v53: race-proof)" = YAML mapping
+  error) — fixed with a quoted name; lesson: yaml.safe_load BEFORE push.
+- Wallpaper bump: same race twin-fixed (atomic + retry + tag-skip).
+- Wallpaper unit-tests HANG (the real release blocker): testDebugUnitTest
+  hung 6h -> cancelled on EVERY main run since c540ff2 (the v48 WAJ/WAN
+  batch #24-#42; last green 3de6a01 Nov 22). No test sources changed —
+  a main-code change hangs a Robolectric test. DIAG: pushed branch
+  diag-unit-hang (per-test START logging + 15-min timeout; the last
+  STARTED test in the log = the culprit). Diagnosis pending below.
+- lively sh1-app-ci red on core-separation: the TIM gate (fixed by merge
+  of #14 above); post-merge run in flight at session write time.
+
+## 3. AGENT-VERIFIED FOLLOW-UPS (backlog, not blocking)
+- VrfA: the F16/ripple clamp family bounds question — the decomp world
+  path never calls SetGeomOffset (OFX=OFY=0 after InitGeom), so PushSXY
+  saturates the CENTER-RELATIVE coordinate (bounds [-1024,1023] directly,
+  not the derived [-1184,863]/[-1136,911]). Affects all landed F16 sites
+  equally; observable only for far-offscreen non-cull corners. Needs a
+  dedicated audit wave (or an emulator trace of sp10/field_144) to
+  re-derive the family bounds once, then patch all sites + the JS twin.
+- VrfE: residual stdout-lock family (reader-thread IPC acks hold stdout's
+  FILE lock across blocking writes on a full pipe — same exit-deadlock
+  class); the false sh1_ipc16_test.py:143 comment FIXED this session.
+- The (int)floorf(x) UB for |x|>2^31 theoretical note (gte_snap_screen
+  clamps the float first; the family sites don't — nil exposure, on
+  record).
+
+## 4. THE NEXT SESSION QUEUE (in order — carried from V51 + new)
+1. THE WALLPAPER UNIT-TEST HANG fix (diag branch in flight).
+2. THE LIVELY TWIN full sync (the pre-V48/V48 batch, hunk-by-hunk — the
+   committed gap list in the lively sync commit 86153ec8).
+3. THE WATER deltas (the ring/cone colors + radii + the fan visibility +
+   the dapple) — the reference images at matched angles (also validates
+   the unverified flashlight-circle-reflection fix).
+4. The remaining V50 queue: the twin parity raster gap (t=0.0334, 690px),
+   the exact chase-cam poses, the 45-asset GLB regen + env/EXTRAs rules,
+   the wallpaper CI asset-insertion workflow.
+5. The F16 family bounds audit wave (VrfA's finding above).
+6. The droplet-path GTE snap (238's noted follow-up).
+The commandments remain embedded at the head of this file.
