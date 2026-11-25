@@ -9169,13 +9169,26 @@ static void fx_blit_gouraud_tri(Frame *fb, int x0, int y0, const int c0[3],
             double tot = e0 + e1 + e2;
             if (tot == 0) continue;
             double w0 = e0 / tot, w1 = e1 / tot, w2 = e2 / tot;
+            /* w10 (E-10-3 class — the mesh rasterizer's v43 rule): the
+             * COLOR plane rides the INTEGER pixel position (the GPU's
+             * color accumulator is anchored at integer x/y with its own
+             * +2048 init bias — the +0.5 rounding below stays); the
+             * COVERAGE test keeps the pixel-center edge functions. The
+             * caustic ring's g4 corners (20,18,12 -> 4,4,4) genuinely
+             * gradient, so the half-pixel phase shift gave real +-1
+             * mid-triangle color divergence. */
+            double bx = (double)xx, by = (double)yy;
+            double f0 = (double)(x2 - x1) * (by - y1) - (double)(y2 - y1) * (bx - x1);
+            double f1 = (double)(x0 - x2) * (by - y2) - (double)(y0 - y2) * (bx - x2);
+            double f2 = (double)(x1 - x0) * (by - y0) - (double)(y1 - y0) * (bx - x0);
+            double c0w = f0 / tot, c1w = f1 / tot, c2w = f2 / tot;
             size_t pi = (size_t)yy * fb->w + xx;
             if (depthM > 0.0f && fb->z && fb->z[pi] < depthM)
                 continue;               /* occluded by nearer opaque geometry */
             uint8_t *p = fb->rgb + pi * 3;
             /* per-channel u8 interpolation -> 5-bit store               */
             for (int ch = 0; ch < 3; ch++) {
-                double dv = c0[ch] * w0 + c1[ch] * w1 + c2[ch] * w2;
+                double dv = c0[ch] * c0w + c1[ch] * c1w + c2[ch] * c2w;
                 int ci = (int)(dv < 0 ? dv - 0.5 : dv + 0.5);   /* round */
                 if (ci < 0) ci = 0;
                 if (ci > 255) ci = 255;
