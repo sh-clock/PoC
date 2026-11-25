@@ -5977,7 +5977,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room's OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room\u2019s OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
@@ -10540,7 +10540,13 @@ const SH1X_WATER_TIM_CLUT = [
  * SH1X-DRIVERS block must stay Node-harness-runnable, no atob) */
 function sh1xB64Bytes(b64) {
   const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const n = b64.length - (b64.endsWith('=') ? 1 : 0);
+  /* w10: subtract the REAL padding — '==' pads TWO chars (the old form
+   * subtracted one, allocating (5463*3)>>2 = 4097 for the 5464-char
+   * 'xx=='-padded 4096-byte DR_WAVE payload; the 4096 exact-length
+   * check then REJECTED it — the editor's DR-water live tile was dead
+   * for every payload-bearing GLB (DR0000/DR01FE/...). The C twin's
+   * sh_b64_decode decodes to exactly 4096.) */
+  const n = b64.length - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
   const out = new Uint8Array((n * 3) >> 2);
   let acc = 0, bits = 0, w = 0;
   for (let i = 0; i < b64.length; i++) {
