@@ -6362,7 +6362,9 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
          * pipeline's single-step equivalent). PR #235's original form
          * (trunc(wp*256)<<4 for ALL modes) was rejected: it quantized
          * the NULL-branch analog AND trunc(w*256) != (trunc(w*4096)>>4)
-         * for negative w whose trunc(w*4096) is an exact multiple of 16. */
+         * for negative w whose trunc(w*4096) is NOT an exact
+         * multiple of 16 (w*4096 = -6143.5: trunc(-383.96875)<<4 = -6128
+         * vs -6143>>4<<4 = -6144; at exact multiples the two agree). */
         if (g_userLightMode == 1) {
             L->pos[0] = (int)(wp[0] * 4096.0f);
             L->pos[1] = (int)(wp[1] * 4096.0f);
@@ -6420,9 +6422,10 @@ static void sh_env_update_pose(ShEnv *env, v3 camPos, Quat camQ) {
 
 static void sh_env_tick(ShEnv *env, int dtQ12, v3 camPos, Quat camQ) {
     /* v49: the LINE light's travel clock — the camtrack twin rides
-     * state.t, which advances EXACTLY 1/30 s per fired tick (tickPlayback
-     * :8532; the PoC's own playback advances play.t by exactly 1.0/30.0
-     * per tick, live_advance). SHENV_DT30 (136) is the Q12-TRUNCATED
+     * state.t, its FRAME clock (t += min(dt,0.1)*rate, tickPlayback
+     * camtrack.html:8540-8544 — the light phase is a pure function of
+     * it; rate != 1 scales it). The PoC's own playback advances play.t
+     * by exactly 1.0/30.0 per tick (live_advance). SHENV_DT30 (136) is the Q12-TRUNCATED
      * engine dt = 255/256 of the real tick — accumulating it left the
      * travel 1 tick behind every 256 (v49-audit A2-2). Advance the exact
      * tick dt; frozen when paused (no ticks fire) exactly like the
@@ -9404,7 +9407,8 @@ static void transform_item2(const Renderer *R, const DrawItem *it,
                  * func_80057658 (enum-1): world delta Q8 (s16) + engine-frame
                  * normal (into-surface: NEGATED glTF normal, s8 127 = 1.0, <<5)
                  * func_80057A3C (enum-2): the same normals + the light vector
-                 *   (field_28) through the engine's gte_ll (MVMMA FC bug)   */
+                 *   (field_28) through the engine's gte_ll (MVMVA LLM
+                 *   cv=3 tx=NONE — full 3-term dot, zero_T)             */
                 float wx = M->m[0]*x + M->m[4]*y + M->m[8]*z  + M->m[12];
                 float wy = M->m[1]*x + M->m[5]*y + M->m[9]*z  + M->m[13];
                 float wz = M->m[2]*x + M->m[6]*y + M->m[10]*z + M->m[14];

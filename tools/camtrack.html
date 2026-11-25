@@ -1449,7 +1449,7 @@ const SHCore = (function () {
       }
 
       /* v41 (CT-IMPL fix 4): the AUTHORED WORLD light position — the
-       * engine's mode-1 branch VERBATIM (fog_poc.c:5746-5752: L->pos =
+       * engine's mode-1 branch VERBATIM (fog_poc.c:6350-6353: L->pos =
        * (int)(g_userLightWorld * 4096.0f)) — follow "world" lights the
        * geometry from its OWN position, not the camera's eye. Otherwise
        * the v6 user directive stands (light position == camera position
@@ -2780,7 +2780,7 @@ window.SHView = (function () {
         /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
            (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
            PushSXY [-1024,1023] ENGINE-px saturation (swanstation
-           gte.cpp:353-380 — the C's gte_snap_screen, fog_poc.c:9104-9115,
+           gte.cpp:353-380 — the C's gte_snap_screen, fog_poc.c:9171-9182,
            v43 E-11-2): a vertex in front of the camera projecting past
            ±1024 engine px is PINNED there on hardware (the near-edge
            warp), so a straddling quad's visible edge slopes follow the
@@ -2965,8 +2965,8 @@ window.SHView = (function () {
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
-        /* gte_snap_screen VERBATIM (fog_poc.c:9104-9115, the flake base
-           :14539): PushSXY floor to the ENGINE lattice, THEN the
+        /* gte_snap_screen VERBATIM (fog_poc.c:9171-9182, the flake base
+           :14646): PushSXY floor to the ENGINE lattice, THEN the
            [-1024,1023] saturation (swanstation gte.cpp:353-380) — same
            family as the #195 SH_VERT fix (the #204 re-cut). */
         vec2 eng = floor(screen / uPixScale);
@@ -3023,9 +3023,9 @@ window.SHView = (function () {
                      (1.0 - (cT.y / cT.w + 1.0) * 0.5) * uRT_H);
       vec2 sH = vec2((cH.x / cH.w + 1.0) * 0.5 * uRT_W,
                      (1.0 - (cH.y / cH.w + 1.0) * 0.5) * uRT_H);
-      /* v4b: gte_snap_screen VERBATIM (fog_poc.c:9104-9115) on BOTH
-         endpoints — the C snaps the tail and the head (fog_poc.c:14630-
-         14631) then (int)-truncates them for the DDA walk (:14667-14668):
+      /* v4b: gte_snap_screen VERBATIM (fog_poc.c:9171-9182) on BOTH
+         endpoints — the C snaps the tail and the head (fog_poc.c:14737-
+         14738) then (int)-truncates them for the DDA walk (:14774-14775):
          floor to the ENGINE lattice + the PushSXY [-1024,1023] saturation.
          The raw projections left the ribbon endpoints off-lattice (the
          CT-2#7d comment's "truncated indices' pixel CENTERS" was never
@@ -3085,9 +3085,9 @@ window.SHView = (function () {
       vec3 p = iPos + position * iScale;
       vec4 clip = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       /* V44 (E-3): the C snaps ALL 4 splash ground corners
-         (gte_snap_screen under opts.ps1, fog_poc.c:14712) —
+         (gte_snap_screen under opts.ps1, fog_poc.c:14819) —
          the FLAKE_VERT snap branch verbatim (floor + the PushSXY
-         [-1024,1023] saturation, fog_poc.c:9104-9115).              */
+         [-1024,1023] saturation, fog_poc.c:9171-9182).              */
       if (uPsx > 0.5 && clip.w > 0.0) {
         vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                            (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
@@ -3552,10 +3552,10 @@ window.SHView = (function () {
         const o3 = i * 3;
 
         /* v44 (E-1) — the per-vertex GTE screen coords for the cull walk
-         * below: the C's RVert sx/sy (transform_item2, fog_poc.c:9282) — the
+         * below: the C's RVert sx/sy (transform_item2, fog_poc.c:9346-9350) — the
          * SAME clip projection SH_VERT uses and the SAME floor snap +
          * PushSXY saturation gte_snap_screen applies when ps1 is on
-         * (fog_poc.c:9104-9115); the engine's nclip reads these
+         * (fog_poc.c:9171-9182); the engine's nclip reads these
          * POST-SNAP, POST-SATURATION coords. A w <= 0 corner (behind the
          * camera) has no shader snap value — the walk skips such quads
          * (qok = 0) rather than guess a wrapped projection.             */
@@ -3568,7 +3568,7 @@ window.SHView = (function () {
           let sx = (cx / cw + 1.0) * 0.5 * 320 * gteScaleX;
           let sy = (1.0 - (cy / cw + 1.0) * 0.5) * 224 * gteScaleY;
           if (gteSnap) {
-            /* gte_snap_screen VERBATIM (fog_poc.c:9104-9115, v43 E-11-2):
+            /* gte_snap_screen VERBATIM (fog_poc.c:9171-9182, v43 E-11-2):
              * floor to the ENGINE-pixel lattice (PushSXY s32(Sx>>16)
              * truncation == floor), THEN saturate to the screen FIFO's
              * [-1024, 1023] engine-px range (PushSXY, swanstation
@@ -4627,7 +4627,7 @@ window.SHUI = (function () {
       amber to aim). <b>Line</b> = two endpoint spheres; the light travels start&#8594;end at the
       speed with the loop mode. Saved as <code>models[].light</code> (engine mode 1, the
       NULL-bone world light: the faithful preview lights the geometry from the light's OWN
-      position, fog_poc.c:5746-5752). The <b>legacy camera anchor</b> (offset/ahead) keeps
+      position, fog_poc.c:6350-6353). The <b>legacy camera anchor</b> (offset/ahead) keeps
       parsing &amp; exporting unchanged (tv_camdat.json's ahead:1.2). In DAY modes the light
       stays INERT exactly like the engine (lightMode None + the identical-pair auto-off rule).</div>
     <div class="lock-note" id="light-note"></div>
@@ -11827,7 +11827,7 @@ const WATER_VERT = `
          every strip row corner through gte_rtps/gte_stsxy
          (water.c:626-629): the strip is NOT a DrawItem; the same
          hardware floor+saturation as the C's gte_snap_screen
-         (fog_poc.c:9104-9115; the C twin's strip path —
+         (fog_poc.c:9171-9182; the C twin's strip path —
          sh1x_school_water_draw — gained the snap in the w5 audit). */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);   /* v40: NTSC 224-row GTE grid */
@@ -12346,7 +12346,7 @@ function drTileEnsure() {
   return drTile.tex;
 }
 /* the ctr composite VERBATIM (lens_flare.c:578-599 + the PoC's
- * fx_water_tile_update fog_poc.c:12768-12792):
+ * fx_water_tile_update fog_poc.c:12865-12900):
  *   poly[0] OPAQUE    u 0..32,  v = (ctr>>1)&0x1F .. +32  (clut row 0)
  *   poly[1] ABR-1 ADD u = ((ctr+1)>>2)&0x1F .. +32, v 8..40 (clut row 0)
  * both primColor (128,128,128) = x1.0 — the composite is the 5-bit
@@ -12418,8 +12418,8 @@ const WATERLIVE_VERT = `
   attribute float shQcull;   /* v4b (F4): the per-QUAD nclip+far-cull verdict (the
                                 CT-2#4/E-1 walk — the C applies BOTH to the
                                 waterLive quads in the same collect loop,
-                                fog_poc.c:15190-15265: the nclip cull at
-                                :15198, the far-cull at :15260) */
+                                fog_poc.c:15183-15290: the nclip cull at
+                                :15201-15242, the far-cull at :15276) */
   varying vec2 vUv;
   varying float vW;      /* w5-audit (F15): the affine (PSX) UV unwrap */
   varying float vQcull;
@@ -12433,7 +12433,7 @@ const WATERLIVE_VERT = `
       /* the GTE screen snap (the SH_VERT discipline — the engine's floor
          quads draw through the same GTE projection as the room): floor
          to the ENGINE lattice + the PushSXY [-1024,1023] saturation
-         (gte_snap_screen, fog_poc.c:9104-9115 / transform_item2 :9282) */
+         (gte_snap_screen, fog_poc.c:9171-9182 / transform_item2 :9349) */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
       vec2 eng = floor(screen / uPixScale);
@@ -12445,7 +12445,7 @@ const WATERLIVE_VERT = `
          interpolation (the DuckStation UV DDA — screen-space-linear
          gradients, fog_poc.c:8191-8244 the affine branch); premultiply
          the UVs with the true per-vertex w and carry it — WATER_VERT's
-         flat-w form (camtrack.html:11830-11832). */
+         flat-w form (camtrack.html:11850-11852). */
       vUv = uv * clip.w;
       vW = clip.w;
     } else {
@@ -12467,8 +12467,8 @@ const WATERLIVE_FRAG = `
      * MIN(Q8(7.61)<<(otShift+2), fog.farDistance), var_t2 = the quad's Q8
      * depth — the field_1C FAR CULL; bodyprog_80056D8C.c:1475-1476), and
      * the C twin applies the gte_NormalClip backface cull in the SAME
-     * collect loop (fog_poc.c:15190-15265) before the waterLive bucket
-     * branch (:15275). The shQcull attribute carries both verdicts
+     * collect loop (fog_poc.c:15183-15290) before the waterLive bucket
+     * branch (:15278). The shQcull attribute carries both verdicts
      * (the perVertexPass walk — the established SH_FRAG gate form). The
      * v48 comment claimed "the far-cull never applies" — false. */
     if (vQcull > 0.0) discard;
@@ -12485,7 +12485,7 @@ const WATERLIVE_FRAG = `
     float roomD = (dz.x * 255.0 + dz.y) / 255.0 * 64.0;
     if (roomD < 20.03125) discard;
     /* w5-audit (F15): unwrap the affine (PSX) varyings — WATER_FRAG's
-       divide form (camtrack.html:11872-11873) */
+       divide form (camtrack.html:11892-11893) */
     float iw = 1.0 / vW;
     vec4 texel = texture2D(map, vUv * iw);
     /* the 0x2E383838 flat modulate: F5 = (T5 * 56) >> 7 (the direct
@@ -12510,14 +12510,14 @@ function sh1xDrWaterFloorSwap(name, sh1xMats, wr) {
   const rec = SV.V.models.get(name);
   if (!rec || !rec.meshes.length) return;
   /* v49 fix: the regen consumes the PARSED payload ({idx, clut} — the
-   * sh1xDrWaveFromExtras twin at :7656), never the RAW extras object
+   * sh1xDrWaveFromExtras twin at :12287), never the RAW extras object
    * (the raw .idx is undefined — drTileRegen crashed reading [0], the
    * boot-time "SHView register failed" TypeError). The effectTexFlag
    * gate rides the rec's own parse (the WF-4 #209 form).              */
   /* v49-audit (A5-2): `rec` is the SHView record ({root, meshes, shMats,
    * attrs, hooks, tris}) — it NEVER carries sh1xDrWave (that field lives
    * on the EDITOR's three.loaded record, set under the
-   * effectTexFlag === 'WaterRefract' gate at :7655). The dead preferred
+   * effectTexFlag === 'WaterRefract' gate at :7662). The dead preferred
    * branch left ONLY the un-gated wr fallback; read the gated parse from
    * three.loaded so the #209 WF-4 gate actually rides (the C twin gates
    * the payload override on envFlagIsWaterRefract, fog_poc.c:1953/:1828;
@@ -12814,14 +12814,14 @@ function sh1xDrWaterFxUpdate() {
            return skips the water branch and the ctr too)              */
         const v = new THREE.Vector3(lx, ly, lz).applyMatrix4(rtCam.matrixWorldInverse);
         const d = -v.z;
-        /* v4b: the engine/C compare the TRUNCATED Q8 depth (fog_poc.c:12748
+        /* v4b: the engine/C compare the TRUNCATED Q8 depth (fog_poc.c:12845
            `!((int)(d * 256.0f) > 112)`, lens_flare.c:73-75) — the raw float
            passed a 3.9 mm band (d*256 in (112,113)) the engine returns on. */
         /* w5-audit (F11a/b/c/d): the 30Hz ctr grid — the C twin
-           (fx_water_scroll_sync, fog_poc.c:12717-12766) runs PER FIRED
+           (fx_water_scroll_sync, fog_poc.c:12814-12863) runs PER FIRED
            TICK: GATE 2 + the fx_light_anchor light + the zone test each
            evaluated at THAT tick's own camera/light pose (live: called
-           per tick at fog_poc.c:16562; the shot path walks every tick
+           per tick at fog_poc.c:16669; the shot path walks every tick
            from zero). The v48 port walked the ticks with the FRAME's
            raw track/camera pos, no per-tick gates, seeded ticks=target
            on the first call (path-dependent), gated the whole walk on
@@ -12830,9 +12830,17 @@ function sh1xDrWaterFxUpdate() {
            the per-tick pose uses the RAW track orientation
            (evTargetQuat) — the C replays the turn-filtered pose per
            tick; the JS turn filter runs on frame dt, so historical-tick
-           anchors are approximate. The tOff/tAhead defaults are the
+           anchors are approximate. The per-tick TICK LIGHT stays RAW — the C's
+           fx_light_anchor Q8-grid store (modes 0/2: trunc>>4<<4, fog_poc.c:
+           11842-11850) is not applied inside this walk, so a <=1 Q8-unit
+           (3.9 mm) band can flip ticks exactly on zone/GATE-2 boundaries.
+           The tOff/tAhead defaults are the
            post-A1-2 SHCore Q8-grid fold values (engine truth). */
         const target = Math.floor(state.sessionT * 30 + 1e-9);
+        /* w7-audit (C2-2): sessionT is rate-scaled (dt*rate, :8545) —
+           at editor playback rate != 1 the grid advances rate-x per real
+           1/30 s (the C/engine advance per output frame at wall-clock
+           30 Hz; the C hard-wires speed 1.0 — editor-only divergence). */
         if (drTile.ticks < 0) drTile.ticks = 0;   /* F11c: recount from zero */
         const tr = playTarget() || selTrack();
         const ULp = env.userLight;
@@ -12855,7 +12863,7 @@ function sh1xDrWaterFxUpdate() {
           if (lineL) {
             /* F11b: a world/line light is a PURE function of the phase —
                lightWorldPos(l, t) — the line TRAVELS per tick (the C
-               advances g_userLightLineT per tick, fog_poc.c:6349) */
+               advances g_userLightLineT per tick, fog_poc.c:6415) */
             const w = lightWorldPos(lineL, tickT);
             px = w[0]; py = w[1]; pz = w[2];
           } else if (ULw) {
@@ -13130,7 +13138,7 @@ const TV_VERT = `
       /* GTE RTPS: Sx = (ndcX+1)*.5*W; snap floor(Sx/scale)*scale
          (DuckStation PushSXY s32(Sx>>16) TRUNCATION == floor), then the
          PushSXY [-1024,1023] saturation — the C's sh_tvpaint_project
-         (fog_poc.c:14031-14051) saturates every TV quad corner. */
+         (fog_poc.c:14138-14164) saturates every TV quad corner. */
       vec2 screen = vec2((clip.x / clip.w + 1.0) * 0.5 * 320.0 * uPixScale.x,
                          (1.0 - (clip.y / clip.w + 1.0) * 0.5) * 224.0 * uPixScale.y);
       vec2 eng = floor(screen / uPixScale);
