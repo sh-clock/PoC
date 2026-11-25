@@ -3092,13 +3092,12 @@ window.SHView = (function () {
          pixel 1 = v(1)=8, the C's single visible texel                   */
       vec2 dir = (abs(d.x) + abs(d.y) > 0.0) ? d / len : vec2(0.0, 1.0);
       vec2 nrm = vec2(-dir.y, dir.x);        /* the screen perpendicular   */
-      /* v43 (CT-2#7d): the C's DDA paints the INCLUSIVE pixel range
-         x0..x1 = len+1 pixels (px = x0 + dx*s/len, s = 0..len). The float
-         endpoints are the truncated indices' pixel CENTERS, so the paint
-         span = the segment expanded half a pixel each way; each device
-         pixel then carries exactly its own walk step (vProf*(len+1)
-         floored in the fragment shader).                                  */
-      vec2 p = sT + (position.x * (len + 1.0) - 0.5) * dir + position.y * nrm;
+      /* w10: the C's v43 E-11-5 form — len pixels at pixel centers
+         (the s=0..len-1 walk, v = (16s+8)/len; the s=len HEAD pixel
+         (center on the v=128 edge) lies OUTSIDE the quad and is never
+         drawn — the top-left fill rule). The old (len+1) inclusive
+         span painted one extra head pixel the engine never draws.  */
+      vec2 p = sT + (position.x * len - 0.5) * dir + position.y * nrm;
       vec2 ndc = vec2(p.x / uRT_W * 2.0 - 1.0, 1.0 - p.y / uRT_H * 2.0);
       gl_Position = vec4(ndc * cT.w, cT.z, cT.w);
     }`;
@@ -3108,10 +3107,11 @@ window.SHView = (function () {
     varying float vProf; varying float vLenS; varying float vDepth;
     void main() {
       if (vDepth <= 0.05) discard;
-      /* the C's per-pixel walk: s = the integer step along the major axis,
-         v = (s*16)/(len+1) -> the 3x16 sprite's middle column texel   */
-      float sIdx = floor(vProf * (vLenS + 1.0));
-      float vF = floor(sIdx * 16.0 / (vLenS + 1.0));
+      /* the C's per-pixel walk (v43 E-11-5): s = 0..len-1, texel row at
+         the pixel center v = (16s+8)/len — NOT the head-inclusive
+         (16s)/(len+1) form                                        */
+      float sIdx = floor(vProf * vLenS);
+      float vF = floor((sIdx * 16.0 + 8.0) / vLenS);
       if (vF < 0.0) vF = 0.0;
       if (vF > 15.0) vF = 15.0;
       vec4 texel = texture2D(map, vec2(0.5, (vClut + (vF + 0.5) / 16.0) / 8.0));
@@ -5977,7 +5977,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room's OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room\u2019s OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
