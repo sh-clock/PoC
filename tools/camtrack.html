@@ -2338,8 +2338,17 @@ const SHCore = (function () {
 
   /* map0_s00 boot recipe — Particle_EnvironmentSet(2, 1) + SnowInitialize,
      exactly like the C main() boot (fog_poc.c:8236..8246) */
-  function bootWeatherMap0(S) {
-    particleEnvironmentSet(S, 2, 1);
+  /* V53 (the boot-recipe fix): the ROOM's own map-load recipe —
+   * GameBoot_WorldEnvInit (load_screen.c:34-36) calls
+   * particleEnviromentSet(field_17, field_16) VERBATIM at map load.
+   * bootWeatherApply is the generalized form; bootWeatherMap0 remains
+   * the (2, 1) = map0_s00 (field_17=2, field_16=1) FALLBACK for GLBs
+   * without SH1X.env. The old bootWeatherMap0-for-everything gave every
+   * room map0's snow (the owner's report: the boot recipe flag is not
+   * set correctly by the camtrack — the school/amusement rooms boot
+   * recipe 0 none, DR 5 rain, SPU 6 rain+). */
+  function bootWeatherApply(S, recipe, arg1) {
+    particleEnvironmentSet(S, recipe, arg1);
     S.weatherSettings = (S.weatherBits >> 12) & 0xFFFF;
     /* v12: the decomp's truncating case-0 sync — E0CB6/E0CB4 are u16
      * (particle.h:95-96) and E0CB0 is u32 (particle.c:81-82), so the
@@ -2360,6 +2369,7 @@ const SHCore = (function () {
     S.prevPosY = 0;            /* g_Particle_PrevPosition.vy (BSS 0) */
     snowReset(S);
   }
+  function bootWeatherMap0(S) { bootWeatherApply(S, 2, 1); }
 
   /* Camtrack v12 — the EDITOR's INSTANT weather application.
    * ==========================================================================
@@ -2437,7 +2447,7 @@ const SHCore = (function () {
     /* particles */
     makeSnow, snowTick, snowReset, snowBoxOrigin, snowRng, snowRand16, snowIsqrt,
     particleEnvironmentSet, shParticleWeatherTargetSet, shParticleWeatherTick,
-    snowGroundEngine, bootWeatherMap0,
+    snowGroundEngine, bootWeatherMap0, bootWeatherApply,
     shParticleWeatherApplyInstant,
     snowPositionRandomizeR
   };
@@ -3392,7 +3402,18 @@ window.SHView = (function () {
       V.snow = SC.makeSnow(null, 0, 0, 0, 0, 0, 0);
       V.env.datumM = 0;
     }
-    SC.bootWeatherMap0(V.snow);        /* the map0_s00 boot recipe        */
+    /* V53: the ROOM's own boot recipe (field_17, field_16) — the
+     * map0_s00 (2,1) fallback only for GLBs without SH1X.env       */
+    {
+      const env = rec.hooks && rec.hooks.getRoomEnv
+        ? rec.hooks.getRoomEnv() : null;
+      if (env && typeof env.field17 === 'number')
+        SC.bootWeatherApply(V.snow,
+          Math.max(0, Math.min(6, env.field17 | 0)),
+          typeof env.field16 === 'number' ? env.field16 : 1);
+      else
+        SC.bootWeatherMap0(V.snow);
+    }
     V.env.tick(0, V.camPos, V.camAxes);
     return true;
   }
@@ -3420,7 +3441,17 @@ window.SHView = (function () {
     V.snow = SC.makeSnow(ground.gh, ground.gnx, ground.gnz,
                          ground.gox, ground.goz, ground.datumQ8, ground.datumM);
     V.snow.enabled = keep.enabled; V.snow.nextWeather = keep.nextWeather;
-    SC.bootWeatherMap0(V.snow);
+    /* V53: the room's own boot recipe (see the model-load site above) */
+    {
+      const env = rec.hooks && rec.hooks.getRoomEnv
+        ? rec.hooks.getRoomEnv() : null;
+      if (env && typeof env.field17 === 'number')
+        SC.bootWeatherApply(V.snow,
+          Math.max(0, Math.min(6, env.field17 | 0)),
+          typeof env.field16 === 'number' ? env.field16 : 1);
+      else
+        SC.bootWeatherMap0(V.snow);
+    }
     V.env.datumM = ground.datumM;
   }
 
@@ -4233,8 +4264,23 @@ window.SHView = (function () {
   }
   function setBootWeather(n) {
     if (!V.snow) return;
-    if (n < 0) { SC.bootWeatherMap0(V.snow); return; }
-    SC.particleEnvironmentSet(V.snow, n, 1);
+    /* V53: -1 = the ROOM'S OWN recipe (GLB SH1X.env field_17/field_16 —
+     * GameBoot_WorldEnvInit load_screen.c:34-36), the map0_s00 (2,1)
+     * fallback for env-less GLBs; an authored recipe keeps the room's
+     * own field_16 as the mode arg (the engine never separates them). */
+    const rrec = V.models.get(V.activeModel);
+    const renv = rrec && rrec.hooks && rrec.hooks.getRoomEnv
+      ? rrec.hooks.getRoomEnv() : null;
+    const r16 = (renv && typeof renv.field16 === 'number') ? renv.field16 : 1;
+    if (n < 0) {
+      if (renv && typeof renv.field17 === 'number')
+        SC.bootWeatherApply(V.snow,
+          Math.max(0, Math.min(6, renv.field17 | 0)), r16);
+      else
+        SC.bootWeatherMap0(V.snow);
+      return;
+    }
+    SC.particleEnvironmentSet(V.snow, n, r16);
     V.snow.weatherSettings = (V.snow.weatherBits >> 12) & 0xFFFF;
     /* v12: u16 E0CB6/E0CB4 := (u16)E0CB0 — the decomp's truncating sync */
     V.snow.weatherCurrent = V.snow.weatherBits & 0xFFFF;
@@ -4325,8 +4371,8 @@ window.SHUI = (function () {
      * is what the live engine shows; modelWeather is the MODEL env default
      * (models[].env.weatherTarget — what inheriting tracks fall back to). */
     weatherSel: 2,        /* the resolved preview weather (D0B18 arg)       */
-    modelWeather: 2,      /* the model env default (inherited by tracks)    */
-    bootWeather: -1,      /* the boot recipe (-1 = map0 default) */
+    modelWeather: -1,     /* V53: -1 = nothing authored (the room's boot recipe persists) */
+    bootWeather: -1,      /* -1 = the room's own GLB env recipe */
     /* v13: DAY/NIGHT ENVIRONMENTS — the authored Auto-Mode presets and
      * the session-only preview lens. dayEnv/nightEnv mirror the MODEL env
      * (models[].env.dayEnv/nightEnv); per-track overrides ride with the
@@ -4393,6 +4439,8 @@ window.SHUI = (function () {
      weatherTarget when present, else the model env default */
   function resolvedWeather() {
     const tr = selTrackObj();
+    /* V53: the model default may be -1 (nothing authored — the boot
+     * recipe persists; setWeatherTarget(-1) is a no-op)              */
     if (tr && tr.weatherTarget != null) return Math.max(0, Math.min(8, tr.weatherTarget | 0));
     return U.modelWeather;
   }
@@ -4669,7 +4717,7 @@ window.SHUI = (function () {
       </select></div>
     <div class="wrow"><label>Boot recipe</label>
       <select class="sel" id="boot-weather" style="flex:1">
-        <option value="-1">map0_s00 default (snow, Heavy)</option>
+        <option value="-1">room original (GLB env; map0 fallback)</option>
         <option value="0">none</option>
         <option value="1">snow</option>
         <option value="2">snow + wind flag</option>
@@ -5153,7 +5201,8 @@ window.SHUI = (function () {
                        Math.max(0, Math.min(20, e.pair[1] | 0))];
         U.fxOffFlash = e.flashlightOn === true;
       }
-      if (e.weatherTarget != null) U.modelWeather = Math.max(0, Math.min(8, e.weatherTarget | 0));
+      /* V53: -1 survives — no authored weather (the boot recipe persists) */
+      if (e.weatherTarget != null) U.modelWeather = Math.max(-1, Math.min(8, e.weatherTarget | 0));
       if (e.dayEnv != null) U.dayEnv = Math.max(0, Math.min(20, e.dayEnv | 0));
       if (e.nightEnv != null) U.nightEnv = Math.max(0, Math.min(20, e.nightEnv | 0));
       if (typeof e.bootWeather === 'number') U.bootWeather = Math.max(-1, Math.min(6, e.bootWeather | 0));
@@ -5679,8 +5728,10 @@ window.SHUI = (function () {
     U.nightEnv = e.nightEnv != null ? Math.max(0, Math.min(20, e.nightEnv | 0)) : 3;
     /* v12: the model env default; the LIVE preview shows the resolved
      * weather of the SELECTED TRACK (track > model) — applied instantly */
+    /* V53: -1 survives — "no authored weather" (the room's own boot
+     * recipe persists; setWeatherTarget(-1) is the engine-true no-op) */
     U.modelWeather = e.weatherTarget != null
-        ? Math.max(0, Math.min(8, e.weatherTarget | 0)) : 2;
+        ? Math.max(-1, Math.min(8, e.weatherTarget | 0)) : -1;
     U.weatherSel = resolvedWeather();
     SV.setWeatherTarget(U.weatherSel);
     if (typeof e.bootWeather === 'number') { U.bootWeather = e.bootWeather; SV.setBootWeather(e.bootWeather); }
@@ -5880,7 +5931,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6, lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room's OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
@@ -6738,7 +6789,9 @@ function sanitizeEnv(raw) {
    * C requires type==JV_NUM, fog_poc.c:3163-3169/3390-3407) */
   if (typeof raw.dayEnv === 'number') e.dayEnv = Math.max(0, Math.min(20, raw.dayEnv | 0));
   if (typeof raw.nightEnv === 'number') e.nightEnv = Math.max(0, Math.min(20, raw.nightEnv | 0));
-  if (typeof raw.weatherTarget === 'number') e.weatherTarget = Math.max(0, Math.min(8, raw.weatherTarget | 0));
+  /* V53: weatherTarget -1..8 — -1 = nothing authored (no runtime
+     * D0B18 transition armed; the C twin keeps -1 as absent too)      */
+  if (typeof raw.weatherTarget === 'number') e.weatherTarget = Math.max(-1, Math.min(8, raw.weatherTarget | 0));
   if (typeof raw.bootWeather === 'number') e.bootWeather = Math.max(-1, Math.min(6, raw.bootWeather | 0));
   if (typeof raw.lensFlare === 'number') e.lensFlare = Math.max(0, Math.min(5, raw.lensFlare | 0));
   if (typeof raw.flashlightOn === 'boolean') e.flashlightOn = raw.flashlightOn;
@@ -7620,9 +7673,17 @@ function sh1xEnvDefaults(env) {
   else if (p0 === 7 && p1 === 4) { dayEnv = 7; nightEnv = 7; }
   else if (p0 === 9 && p1 === 9) { dayEnv = 9; nightEnv = 9; }
   else { dayEnv = p0; nightEnv = p1; }        /* unbiased for other pairs   */
-  /* weather: field17 VERBATIM (0..8, the D0B18 argument identity)          */
-  let weather = 2;
-  if (typeof env.field17 === 'number') weather = Math.max(0, Math.min(8, env.field17 | 0));
+  /* V53 (the boot-recipe fix): field17 is the BOOT RECIPE arg
+   * (Particle_EnvironmentSet's arg0 at map load, load_screen.c:34-36 —
+   * the 0..6 recipe domain), NOT the runtime D0B18 weatherTarget (a
+   * 0..8 wind-encoding transition arg — a different machine). The old
+   * form stuffed field17 into weatherTarget (arming a bogus runtime
+   * transition) and left bootWeather at -1 (which then fell to the
+   * hardcoded map0 snow everywhere — the owner's report). Now:
+   * bootWeather = field17 VERBATIM (the room's own recipe, unbiased),
+   * weatherTarget = -1 (nothing authored — no transition armed).      */
+  let bootW = -1;
+  if (typeof env.field17 === 'number') bootW = Math.max(0, Math.min(6, env.field17 | 0));
   /* flashlight: the preset-0 Dark + FlashlightAllowed signature           */
   let flash = false;
   const f0 = env.preset0 && Array.isArray(env.preset0.flags)
@@ -7630,8 +7691,8 @@ function sh1xEnvDefaults(env) {
   if (f0) flash = f0.includes('Dark') && f0.includes('FlashlightAllowed');
   else if (p0 !== p1) flash = (p0 === 6 || p0 === 7);   /* legacy heuristic */
   return {
-    pair: [p0, p1], dayEnv, nightEnv, weatherTarget: weather,
-    bootWeather: -1, lensFlare: 0, flashlightOn: flash,
+    pair: [p0, p1], dayEnv, nightEnv, weatherTarget: -1,
+    bootWeather: bootW, lensFlare: 0, flashlightOn: flash,
     psxWobble: true, dither: true, particles: true, engine: true
   };
 }
@@ -7720,7 +7781,7 @@ function registerModel(name, gltf) {
       entry.env = derived;
       toast(name + ' — World & Weather authored from the room\u2019s original env: pair {' +
             derived.pair[0] + ',' + derived.pair[1] + '}, day ' + derived.dayEnv +
-            ' / night ' + derived.nightEnv + ', weather ' + derived.weatherTarget);
+            ' / night ' + derived.nightEnv + ', boot recipe ' + derived.bootWeather);
     }
   }
   setActiveModel(name);
@@ -7733,7 +7794,9 @@ function registerModel(name, gltf) {
     const hooks = {
       getTrack: () => entry.tracks.find(t => t.enabled !== false) || entry.tracks[0] || null,
       evalTrack: (tr, t) => evalTrack(tr, t),
-      cycleDuration: tr => cycleDuration(tr)
+      cycleDuration: tr => cycleDuration(tr),
+      /* V53: the room's UNBIASED SH1X.env (the boot-recipe source) */
+      getRoomEnv: () => sh1x && sh1x.env || null
     };
     try {
       window.SHView.registerModel(name, root, hooks);
@@ -15062,7 +15125,7 @@ const EMBED = {
       markDirty();
       toast('World & Weather re-authored from the room\u2019s original env: pair {' +
             derived.pair[0] + ',' + derived.pair[1] + '}, day ' + derived.dayEnv +
-            ' / night ' + derived.nightEnv + ', weather ' + derived.weatherTarget);
+            ' / night ' + derived.nightEnv + ', boot recipe ' + derived.bootWeather);
     });
   }
   state.doc = blankDoc();
