@@ -1449,7 +1449,7 @@ const SHCore = (function () {
       }
 
       /* v41 (CT-IMPL fix 4): the AUTHORED WORLD light position — the
-       * engine's mode-1 branch VERBATIM (fog_poc.c:5746-5752: L->pos =
+       * engine's mode-1 branch VERBATIM (fog_poc.c:6350-6353: L->pos =
        * (int)(g_userLightWorld * 4096.0f)) — follow "world" lights the
        * geometry from its OWN position, not the camera's eye. Otherwise
        * the v6 user directive stands (light position == camera position
@@ -3024,8 +3024,8 @@ window.SHView = (function () {
       vec2 sH = vec2((cH.x / cH.w + 1.0) * 0.5 * uRT_W,
                      (1.0 - (cH.y / cH.w + 1.0) * 0.5) * uRT_H);
       /* v4b: gte_snap_screen VERBATIM (fog_poc.c:9171-9182) on BOTH
-         endpoints — the C snaps the tail and the head (fog_poc.c:14738-
-         14739) then (int)-truncates them for the DDA walk (:14775-14776):
+         endpoints — the C snaps the tail and the head (fog_poc.c:14737-
+         14738) then (int)-truncates them for the DDA walk (:14774-14775):
          floor to the ENGINE lattice + the PushSXY [-1024,1023] saturation.
          The raw projections left the ribbon endpoints off-lattice (the
          CT-2#7d comment's "truncated indices' pixel CENTERS" was never
@@ -4627,7 +4627,7 @@ window.SHUI = (function () {
       amber to aim). <b>Line</b> = two endpoint spheres; the light travels start&#8594;end at the
       speed with the loop mode. Saved as <code>models[].light</code> (engine mode 1, the
       NULL-bone world light: the faithful preview lights the geometry from the light's OWN
-      position, fog_poc.c:5746-5752). The <b>legacy camera anchor</b> (offset/ahead) keeps
+      position, fog_poc.c:6350-6353). The <b>legacy camera anchor</b> (offset/ahead) keeps
       parsing &amp; exporting unchanged (tv_camdat.json's ahead:1.2). In DAY modes the light
       stays INERT exactly like the engine (lightMode None + the identical-pair auto-off rule).</div>
     <div class="lock-note" id="light-note"></div>
@@ -12837,7 +12837,7 @@ function sh1xDrWaterFxUpdate() {
            The tOff/tAhead defaults are the
            post-A1-2 SHCore Q8-grid fold values (engine truth). */
         const target = Math.floor(state.sessionT * 30 + 1e-9);
-        /* w7-audit (C2-2): sessionT is rate-scaled (dt*rate, :8543-8544) —
+        /* w7-audit (C2-2): sessionT is rate-scaled (dt*rate, :8545) —
            at editor playback rate != 1 the grid advances rate-x per real
            1/30 s (the C/engine advance per output frame at wall-clock
            30 Hz; the C hard-wires speed 1.0 — editor-only divergence). */
