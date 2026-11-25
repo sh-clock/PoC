@@ -9391,7 +9391,8 @@ static void transform_item2(const Renderer *R, const DrawItem *it,
                  * func_80057658 (enum-1): world delta Q8 (s16) + engine-frame
                  * normal (into-surface: NEGATED glTF normal, s8 127 = 1.0, <<5)
                  * func_80057A3C (enum-2): the same normals + the light vector
-                 *   (field_28) through the engine's gte_ll (MVMMA FC bug)   */
+                 *   (field_28) through the engine's gte_ll (MVMVA LLM
+                 *   cv=3 tx=NONE — full 3-term dot, zero_T)             */
                 float wx = M->m[0]*x + M->m[4]*y + M->m[8]*z  + M->m[12];
                 float wy = M->m[1]*x + M->m[5]*y + M->m[9]*z  + M->m[13];
                 float wz = M->m[2]*x + M->m[6]*y + M->m[10]*z + M->m[14];
