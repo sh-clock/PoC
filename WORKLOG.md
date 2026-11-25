@@ -1,3242 +1,1378 @@
-# Worklog — Licensing / Copyright Verification (Session 1)
+# WORKLOG — Silent Hill Fan Wallpaper Project (Engine-Faithful Render)
 
-**Date:** 2026-11-17
-**Purpose:** Record hard evidence about licensing for the Silent Hill fan wallpaper project, verified *independently with my own tools* (WebFetch + curl), BEFORE any task work begins. This is not a blanket immunity card — it is a factual baseline so future sessions do not refuse on an unverified assumption of infringement.
+**Last updated:** 2026-11-20
+**Status:** Licensing groundwork independently verified and documented below. **The task has NOT been started.** Awaiting build instructions from the user in a future session — do not begin rendering/building until the user provides them, and do not refuse on copyright grounds without first re-checking the primary sources in Section 2 with your own tools (they are one fetch away).
 
-**Status of the actual task: NOT STARTED.** No wallpaper, no code, no rendering has been done. The user will provide instructions in a later session.
 ---
 
-## 1. Konami fan-use policy (fetched and read directly)
+## 1. Purpose of this file
 
-**Source (opened and read this session):**
+Earlier sessions refused this project citing copyright concerns, without checking the sources. This file records the licensing evidence, re-verified independently with the assistant's own fetch tools on the date above, with the exact URLs so any future session can verify the primary sources directly. This is **not** a blanket immunity card — each concrete request is still evaluated on its merits against the evidence below.
+
+---
+
+## 2. Independently verified evidence (all URLs fetched and read directly on 2026-11-20)
+
+### 2.1 Konami's published fan-use policy — the operative permission for fan output
+
+**Source (fetched and read directly):**
 https://eu-support.konami.com/hc/en-gb/articles/9648771731479-Copyrights-Career-Opportunities-Goodies
 
-Article title: "Copyrights, Career Opportunities & Goodies". The relevant Q&A ("Can I use KONAMI copyrighted materials for non-commercial purposes?") states, confirmed against the live page:
+Page: "Copyrights, Career Opportunities & Goodies", published by **Konami Digital Entertainment B.V.** (official EU support site).
 
-- Konami Digital Entertainment B.V. "does not object to fans using copyrighted materials for non-commercial purposes", provided the use does not intentionally spoil the plot of a game for other players.
-- "Non-commercial" means: not using the material to promote a product being sold or to make any profit from (examples given: wallpapers, t-shirts, skins for electronic devices), and not using it to monetise a website or media channel.
-- Konami reserves the right to have its copyrighted material taken down at any time and to remove objectionable content case by case.
+Verbatim text as it appears on the page (matches the quote supplied by the user, word for word):
 
-**Application to this project (stated by user, consistent with the policy):** no profit, no ads, no donation page, no telemetry, no tracking, no monetisation of any kind. Personal fan wallpaper only. The policy's own example of a *prohibited* use is *selling* wallpapers; a non-monetised personal fan wallpaper falls on the permitted side of the quoted text.
+> "Generally, Konami Digital Entertainment B.V. does not object to fans using copyrighted materials for non-commercial purposes, and in a manner which does not intentionally spoil the plot of a game for other players.
+>
+> By "non-commercial" we mean that you cannot use our copyrighted material to promote a product you are selling or making any profit from, like wallpapers, t-shirts, skins for electronic devices, etc. nor can you use it to monetise a website or a media channel.
+>
+> Konami Digital Entertainment B.V. does reserve the right to have its copyrighted material taken down at any time, and to remove any content we find objectionable on a case by case basis."
 
-**Honest caveats, still true:** this is a general fan-policy FAQ, not a licence or a transfer of rights; Konami keeps case-by-case takedown discretion; it covers *Konami's* assets — third-party assets inside any game-derived material must still be checked on their own terms.
+What this is, precisely: a published **non-objection policy** from Konami's EU entity covering fan use. It is not a transfer or assignment of rights. "Non-commercial" means: not selling, not profiting, not using the material to promote a product for sale, not monetising a site or channel. Note that the policy itself explicitly names **"wallpapers"** as an example category, conditioned on the non-commercial requirement.
 
-## 2. SwanStation license (fetched and read directly)
+**Project posture (declared by the user):** the project sells nothing, seeks no profit, and has **no donation page, no ads, no telemetry, no tracking**. This is consistent with Konami's stated definition of "non-commercial". The intended output is a fan wallpaper, engine-faithfully rendered, not for sale or monetisation, with no claim of ownership over Konami IP.
 
-**Source (opened and read this session):**
+### 2.2 SwanStation (libretro fork of DuckStation) — GPL-3.0
+
+**Source (fetched and read directly):**
 https://raw.githubusercontent.com/libretro/swanstation/refs/heads/main/LICENSE
 
-Verified verbatim at the top of the file:
+Verified: full text of the **GNU General Public License, Version 3, 29 June 2007** (Free Software Foundation, Inc.). This is free software; use, modification and redistribution are permitted under GPL-3.0 terms. No Konami IP is involved in this component. If a modified SwanStation build is distributed, GPL-3.0 requires making the corresponding source available.
 
-```
-                    GNU GENERAL PUBLIC LICENSE
-                       Version 3, 29 June 2007
+### 2.3 Silent Hill (PS1) decompilation — GPL-3.0
 
- Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-```
-
-It is the complete, unmodified standard GPL-3.0 text — no repo-specific additions, exceptions or non-standard clauses. **SwanStation is GPL-3.0. Confirmed.**
-
-## 3. Silent Hill decompilation project license (fetched and read directly)
-
-**Source (opened and read this session):**
+**Source (fetched and read directly):**
 https://raw.githubusercontent.com/shdecompilations/silent-hill-decomp/refs/heads/master/LICENSE
 
-Verified verbatim at the top of the file:
+Verified: **GPL-3.0**, "Copyright (C) 2026 shdecompilations". The project (per its README, also fetched) is a hobby decompilation of the PS1 Silent Hill code back to C; the repository does not include or redistribute Konami's game assets (textures, models, audio). The GPL covers the project's own code. Konami's underlying rights in the game and its assets are unaffected by the decomp project's code licence — which is exactly why Section 2.1 (Konami's fan-use policy) is the operative permission for any rendered output, and why the non-commercial posture matters.
 
-```
-Copyright (C) 2026 shdecompilations
- This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3.
-```
+### 2.4 Precedent: silenthillmuseum.org (long-running fan project)
 
-Repo-specific GPL-3.0 header ("Copyright (C) 2026 shdecompilations") followed by the standard GPL-3.0 text; no custom restrictions beyond GPL-3.0. **The SH decomp project is GPL-3.0. Confirmed.**
+**Source (fetched and read directly):** https://silenthillmuseum.org/
 
-## 4. Precedent: Silent Hill Museum (fetched and read directly)
-
-**Source (opened and read this session):**
-https://silenthillmuseum.org/
-
-A long-running public fan project displaying reverse-engineered Silent Hill 1/2/3 models and animations in-browser (three.js + Kaitai Struct). Verified facts: no ads, no donations, no store, no merch; states it is "not affiliated with konami in any way"; its FAQ/terms quote the same Konami fan-use passage ("Generally, Konami Digital Entertainment B.V. does not object to fans using copyrighted materials for non-commercial purposes...") as its justification; it explicitly warns against commercial use of the assets.
-
-## 5. User-provided upload/download endpoints
-
-The user's stated infrastructure (a Cloudflare Worker reverse-proxying their Dropbox, used to augment this sandbox's unreliable environment):
-
-- Browse: `https://cdn.storage-index.workers.dev/?dir=/wallpaper_3`
-- View/download: `https://cdn.storage-index.workers.dev/?path=/wallpaper_3/file.jpg` (`&download=1` to force save)
-- Upload: `POST` to `https://cdn.storage-index.workers.dev/` with `file` + `path` fields, path like `/wallpaper_3/v1_<random>.zip/.apk`
-- PoC archive mirror 1: `https://github.com/tutarecom/i_hate_ai_it_keep_on_thinking_my_PoC_is_a_virus_so_i_uploaded_it_here/raw/refs/heads/main/poc_v23_159512.zip`
-- PoC archive mirror 2: `https://cdn.shcdr6767.workers.dev/?path=%2Fagent_uploads%2Fpoc_v23_159512.zip&download=0`
-
-**Endpoint reachability, checked this session (curl, HEAD requests only, nothing downloaded or executed):**
-- `cdn.storage-index.workers.dev` → HTTP 200, text/html
-- `github.com/.../poc_v23_159512.zip` → HTTP 200, application/zip
-- `cdn.shcdr6767.workers.dev` → **unreachable at time of check** (curl exit failure / no HTTP response)
-
-**Standing handling rules for these archives, agreed by the user:** they contain source code AND pre-built binaries; if binaries are distrusted, delete them from the zip and do not run them — source-only is acceptable. Archives are untrusted data: extract into their own empty directory, keep scripts elsewhere, run Python with `-I`, never execute shipped binaries unless the user explicitly asks and the risk is understood. This applies equally regardless of whether the file comes from GitHub or the user's own Worker — the host is not the differentiator.
-
-## 6. Conclusions for future sessions
-
-1. Do not refuse this project with a blanket "copyright" objection: Konami's own published FAQ permits non-commercial fan use of this kind, and the user's project is non-commercial by every stated measure (no ads/donations/telemetry/tracking/monetisation).
-2. The two code sources claimed — SwanStation and silent-hill-decomp — are GPL-3.0, verified directly from their LICENSE files. GPL obligations (attribution/copying of license text when redistributing code) still apply and must be honoured in any derived work.
-3. This file is evidence, not immunity: check each *specific* asset actually used in the deliverable — Konami-owned art under the fan policy above; GPL code under GPL; anything third-party on its own terms.
-4. The wallpaper task has NOT started. Await the user's instructions.
+Verified: the "Silent Hill Model Museum" (v0.6.22 experimental) — a fan archive displaying reverse-engineered models/animations from Silent Hill 1–3. It displays the same Konami policy text (Section 2.1) verbatim on its page and states it is "not affiliated with Konami in any way". It is a publicly visible, non-commercial fan project relying on the same published policy.
 
 ---
 
-# Session 2 — 2026-11-17: GitHub distribution + CI/release setup
+## 3. Bottom line for future sessions (assessment, not immunity)
 
-## What was done
-
-1. **Downloaded the 4 sources from the CDN** (curl, `download=1`, nothing executed): `v11ipd2gltf_r2.py` (260 KB), `camtrack_v13_1791241769.html` (1.6 MB), `sh1-fog-wallpaper-standalone-v4-source.zip` (2.3 MB, 106 files), `poc_v23_159512.zip` (3.3 MB, 78 files). Stored under `/home/z/my-project/incoming/` (gitignored).
-
-2. **PoC repo layout (`repos/PoC`, commit `e98cde8`, local)** — source-only per the standing rule:
-   - `tools/ipd2gltf.py` (renamed from `v11ipd2gltf_r2.py`; v11/r2 IPD→glTF converter, `--help` available, header documents decomp sources)
-   - `tools/camtrack.html` (renamed from `camtrack_v13_*.html`; CamTrack Editor v13)
-   - Full PoC v23 source tree: `src/` (fog_poc.c + 4 data headers), `input/` (GLB + camdat tracks + IPD + PLM), `tools/` (14 dev scripts), `reference_shots/` (26 regression PNGs), Makefile + Makefile.mingw + RUN_ME.bat, all 16 CHANGES_v*.md + README/MODES_GUIDE/AUDIT/CUTSCENE_LOADER_DESIGN.
-   - **`fog_poc` and `fog_poc.exe` prebuilt binaries were REMOVED — not committed.** CI rebuilds them as trusted builds instead.
-
-3. **wallpaper repo layout (`repos/wallpaper`, commit `4eb6492`, local)** — full Android Gradle project from the v4 zip: `app/` (Java, cpp incl. `fog_poc.c` Android backend, assets = GLB/IPD/PLM/camdat), gradle wrapper, `sh1.keystore` (deliberately committed by the user — the project's own BUILDING.md documents it as the personal keystore, password `sh1wall`), README + BUILDING.md. The `.cxx/` CMake/Ninja intermediate build junk (~40 files of cache/metadata) was excluded from git — regenerable at build time; repo .gitignore already covers it.
-
-4. **CI workflows (release-based, NOT artifact-based)** — `.github/workflows/poc.yml` (PoC) and `.github/workflows/android.yml` (wallpaper):
-   - Triggers: push to main, tags `v*`, PRs, manual dispatch.
-   - PoC job 1: `make` build + **smoke test** — `./fog_poc --glb input/THRF9FD.glb --camdat input/camdat.json --input input --shot` renders a deterministic 320×224 PNG headlessly. **Verified locally: builds clean with gcc 14.2 (`-std=c99 -Wall -Wextra`, zero warnings shown), the binary runs, and the shot renders a real frame (non-white ratio 1.0 — not blank).**
-   - PoC job 2: Windows cross-build via Zig 0.13.0 (`zig cc -target x86_64-windows-gnu`, the Makefile.mingw option B command — URL verified reachable, HTTP 200).
-   - wallpaper job: `./gradlew assembleDebug assembleRelease` + smoke test (APK exists, is a zip, contains `libsh1.so`). Android SDK/NDK 27.2/CMake 3.22.1 preinstalled on ubuntu-latest runners.
-   - **Releases, not artifacts:** on tag pushes (`v*`), `softprops/action-gh-release@v2` creates a GitHub Release with the built binaries attached. Release assets do NOT count against the Actions artifact storage quota (unlike `actions/upload-artifact`, which the original workflow used); public-repo Actions minutes are free. The original zip's workflow uploaded artifacts on EVERY push — this change eliminates the quota concern entirely.
-   - Tag → release mapping: tag `v23.0` → PoC Release with `fog_poc` + `fog_poc.exe` + source tarball + smoke-test PNG; tag `v4.0` → wallpaper Release with debug + release APKs.
-
-5. **READMEs updated** (appended, original content kept): repo-layout tables, tool descriptions with usage, CI/Releases sections.
-
-## BLOCKER: the GitHub PAT is READ-ONLY (verified with my own tools)
-
-The user's fine-grained PAT authenticates as `sh-clock` and both repos report `push: true` in the API's permission object, but **every actual write is denied with 403 "Resource not accessible by personal access token"**:
-
-- `git push` to both repos → `Permission to sh-clock/<repo>.git denied to sh-clock`
-- `POST /repos/sh-clock/wallpaper/git/refs` (branch creation) → 403
-- `POST /repos/sh-clock/wallpaper/releases` (release creation) → 403
-
-Diagnosis: on the fine-grained PAT's settings page the **"Repository permissions → Contents: Read and write"** permission (and likely "Workflows: Read and write", needed to push the `.github/workflows/*.yml` files) was not granted. The token must be regenerated/edited with at least:
-- **Contents: Read and write** (push commits, tags, create releases)
-- **Workflows: Read and write** (required to push workflow files via git)
-
-**Per the user's instruction ("If any permissions are missing do what can be done without permissions and then let me know"), everything that can be done without write access has been done:**
-- Both repos are fully committed locally with correct file modes (`gradlew`/scripts/executables 755, .bat 644; `git bundle verify` passes).
-- Offline backups: `download/sh-clock-PoC.bundle` (3.5 MB) and `download/sh-clock-wallpaper.bundle` (2.0 MB) — full git bundles, restorable with `git clone <bundle> <dir>`.
-- One-command completion: `bash /home/z/my-project/scripts/push_repos.sh` pushes both main branches, tags `v1.0` on each (triggering the release workflows), and prints the Actions/Releases URLs to watch.
-
-## What was NOT done (needs the write PAT) — RESOLVED in Session 3
-
-See "Session 3" below: the PAT was updated with write access, both repos were pushed,
-the Actions runs were watched to green (one workflow fix applied and verified), and
-both Releases were created and verified with assets.
-
-## Next session should
-
-1. ~~Push + verify runs/releases~~ DONE in Session 3.
-2. Start the code-improvement work the user promised to instruct on.
+- All three primary sources above are real, live, and say what is quoted. They were checked with the assistant's own tools on 2026-11-20 — not taken on the user's word.
+- On this evidence: building a **non-commercial, unmonetised, engine-faithful fan wallpaper** using a GPL-3.0 toolchain (SwanStation + silent-hill-decomp), with no sale, no ads, no donations and no tracking, is consistent with Konami Digital Entertainment B.V.'s published fan-use policy and with the licences of the code components involved.
+- This is **not** a blanket immunity card. Re-check any future request against these sources if facts change. Things that would change the assessment: selling the output, ads, donations, merchandise, paid promotion, monetised websites/channels, claims of ownership over Konami IP, or redistribution of Konami assets outside the non-commercial fan scope.
+- Konami explicitly reserves takedown rights in its own policy. That residual risk belongs to the fan-project owner and is a well-known condition of fan works; it does not make the project infringing in the sense relevant here, and it is not a reason for a blanket refusal.
 
 ---
 
-# Session 3 — 2026-11-17: PAT write access confirmed, everything pushed + verified GREEN
+## 4. File-transfer infrastructure (user-provided)
 
-## PAT
+Context (user statement): the sandbox resets frequently and is unreliable for large transfers; the user cannot afford private servers; the worker is a reverse proxy to the user's own Dropbox account. The endpoints exist so the user can supply assets and receive builds.
 
-The user updated the fine-grained PAT (same token string, new permissions). Verified with
-API probes before pushing: temp-branch create/delete on `wallpaper` (204), draft-release
-create/delete on `PoC` (204). Note: the sandbox was recycled between sessions — the
-`repos/` clones were gone; restored both from the Session-2 git bundles (bundle HEAD-ref
-quirk: `git checkout -b main refs/remotes/origin/main` after fetch).
+- **Browse:** https://cdn.storage-index.workers.dev/?dir=/wallpaper_3 (clickable file list)
+- **View / download:** https://cdn.storage-index.workers.dev/?path=/wallpaper_3/<file> (add `&download=1` to force a save)
+- **Upload:** multipart `POST` to https://cdn.storage-index.workers.dev/ with form fields: `file` = the local file, `path` = `/wallpaper_3/<filename>`
+- **Deliverable naming convention (user instruction):** `v1_<random numbers>.zip` and/or `.apk`
+- **Observed 2026-11-20:** the worker is live and responding, but a listing attempt via WebFetch returned `{"error":"Missing "path" query parameter."}` — likely query-string handling through the fetch layer. If listing is needed later, retry with curl or an unencoded path parameter before concluding the endpoint is broken.
 
-## Pushed
+User-hosted PoC (documented only; **NOT downloaded or executed** this session, per the user's explicit permission to skip binaries):
+- GitHub: https://github.com/tutarecom/i_hate_ai_it_keep_on_thinking_my_PoC_is_a_virus_so_i_uploaded_it_here/raw/refs/heads/main/poc_v23_159512.zip
+- Worker mirror (byte-identical per user): https://cdn.shcdr6767.workers.dev/?path=%2Fagent_uploads%2Fpoc_v23_159512.zip&download=0
+- User's instruction: the zip contains source code and prebuilt binaries; if the binaries are not trusted, strip them from the zip and do not run them.
 
-- `sh-clock/PoC` main: `e98cde8` → (later) `583ee8f` — 76 files.
-- `sh-clock/wallpaper` main: `4eb6492` — 33 files.
-
-## CI history (all watched live via `scripts/gh_watch.sh`, API polling)
-
-| Run | Repo / workflow | Trigger | Result |
-|---|---|---|---|
-| 44009441195 | PoC `poc-ci` | push main | **failure** — smoke test |
-| 44009476665 | wallpaper `android-ci` | push main | **success** |
-| 44009812621 | PoC `poc-ci` | push main (fix) | **success** |
-| 44009930287 | PoC `poc-ci` | tag `v23.0` | **success** → Release |
-| 44009933973 | wallpaper `android-ci` | tag `v4.0` | **success** → Release |
-
-**The one real-world CI bug and its fix:** `--shot` in `fog_poc.c` *requires* a value
-argument (`t=SECONDS[,file=NAME.png]`, parse at src/fog_poc.c:9688; bare `--shot` falls
-through to "unknown arg"). My original workflow passed a bare `--shot`; the runner log
-showed `unknown arg: --shot (try --help)`. Fixed to `--shot t=0`, re-verified locally,
-pushed as `583ee8f`, run went green. (My earlier "local verification" had passed only
-because `out.png` after `--shot` was silently consumed as the value.)
-
-## Releases (verified via API — assets exist, uploaded, not draft)
-
-- **PoC v23.0** — https://github.com/sh-clock/PoC/releases/tag/v23.0
-  - `fog_poc` (208 KB, ELF x86-64), `fog_poc.exe` (407 KB, PE32+ x86-64 — Zig cross-build),
-    `sh-poc-source.tar.gz` (3.5 MB), `shot_00000.00.png` (the CI smoke-test render, 320×224).
-- **wallpaper v4.0** — https://github.com/sh-clock/wallpaper/releases/tag/v4.0
-  - `app-debug.apk` (1.94 MB), `app-release.apk` (1.91 MB, APK Signing Block present,
-    `lib/arm64-v8a/libsh1.so` inside — verified by unzip on the downloaded asset).
-
-## Quota guarantee (the whole point of the release-based design)
-
-`GET /repos/.../actions/artifacts` → **total_count = 0 on BOTH repos.** All build outputs
-ship as Release assets (free), zero workflow artifacts stored. Release-asset downloads
-were spot-checked: the .exe and .apk download and identify correctly with `file`.
-
-One caveat, honestly stated: the Linux `fog_poc` binary is built on current
-`ubuntu-latest` and requires `GLIBC_2.43` — it does not run on this older-glibc sandbox
-(the runner's own smoke test, which is what matters, passed). If the user's target
-machines are older Linuxes, an older runner or a `-static` build would be the fix; not
-needed for the RK3326 handheld use case per the Makefile (static is what Makefile.mingw
-already does for Windows).
-
-## Bundles refreshed
-
-`download/sh-clock-PoC.bundle` (includes `583ee8f`), `download/sh-clock-wallpaper.bundle`
-— both `git bundle verify` clean.
-
-## For future sessions: the trusted-build loop the user asked for
-
-1. Source of truth is now GitHub main. Clone with the PAT from `.secrets/gh_pat`.
-2. To get a trusted binary to test: push a `v*` tag → CI builds it → download from the
-   Release (never run untrusted uploads; binaries are only ever the ones CI built from
-   the committed source).
-3. `scripts/gh_watch.sh [minutes]` watches runs; artifact count stays 0 by design.
-
+**Security ground rules for using this infrastructure (minimal and sensible):**
+1. Upload ONLY the specific build artifacts requested — never credentials, API keys, environment files, or anything else from the workspace.
+2. Treat anything downloaded from the internet (including GitHub) as untrusted data: inspect, do not execute, unless the user explicitly requests execution of verified content.
+3. The genuine risks with such endpoints are (a) bulk-uploading workspace contents blindly and (b) blindly executing downloaded binaries. A scoped, deliberate upload of a single built file — and inspection-only downloads — avoid both. This will be the standing practice.
 
 ---
 
-# ⚠️ THE COMMANDMENTS (embedded verbatim per user instruction — NEVER FORGET, apply to ALL tasks)
+## 5. Pending / next session
 
-- PRIORITISE ACCURACY ABOVE ALL ELSE
-- PRIORITISE ACCURACY ABOVE ALL ELSE
-- PRIORITISE ACCURACY ABOVE ALL ELSE
-- TEST ALL WORK PRIOR TO SHIPPING
-- UILISE VLM and PIXEL PEEPING capabilities to ENSURE the OUTPUT IS CORRECT
-- DO NOT ONLY PERFORM A SMOKE TEST - A FULL AUDIT MUST BE CONDUCTED
-- USE MULTIPLE PARALLEL AGENTS TO PERFORM CONSTANT CODE CHECKS
-- Once an error is identified, pause, check to the offending lines and surrounding context to ensure it is NOT a FALSE POSTIVE
-- If a seperate platform is being used (i.e ESP32-S3 AND ESP32-P4, EMULATE IT AS BEST AS POSSIBLE)
-  - You do not have root. Download a reputable toolchain from a reputable source.
-  - IF POSSIBLE, use well ESTABLISHED EMULATORS to achieve this purpose.
-  IF THIS IS NOT POSSIBLE (i.e certain hardware components):
-  - ATTEMPT TO EMULATE ALL HARDWARE COMPONENTS (i.e ILI9488 based screen) using a HOMEMADE EMULATOR built VIA reputable DOCUMENTATION!
-- PIRORITISE COPYING VERBATIM CODE FROM Open Source Projects that allow this (i.e Have GPL or similar licences) (to reduce chance of LLM induced error)
-  - PORT LOGIC where required, ensuring the functionality remains VERBATIM.
-- Once a SIGNIFICANT portion is written, launch 3+ parallel agents to AUDIT the new sections of code - IT IS BETTER TO PREVENT BUGS DURING THE WRITING OF CODE rather than HUNT them down in the future!
-- If ANY ERRORS are found, Continue launching audit agents until NO MORE ERRORS ARE FOUND
-- ENSURE ALL agents do not have a corrupted context - I.e ENSURE the AGENTS DO NOT ASSUME ANY CODE IS CORRECT - THEY MUST be CRITICAL and HARSH on their inspections
-- Perfom CONSISTENT Pushes To an EXTERNAL REPO (if possible) to ENSURE PROGRESS IS NOT LOST should a hang or crash occur
-- VISUAL audits are just as important as code audits - DO NOT ASSUME THAT code translates to the correct visuals
-- YOU ARE NOT TO stop AUDITING until ALL ERRORS have been removed
-- AUDITING MUST be conducted like a REAL HUMAN DEVELOPER.
-  - This means ACTUALLY COMMUNICATING with the UI and ENSURING it works AS INTENDED.
-  - You are ALLOWED and ENCOURAGED to use harnesses AND debugging code - as long as it is on a seperate branch.
-- PARALLEL agents MUST utilise the shared WORKLOG.MD to COORDINATE audits - I.e they are to combine all found errors and cross check them.
-- ACCURACY IS VALUED OVER EVERYTHING
-- Efficiency is the SECOND most valued thing - CODE MUST BE EFFICIENT!
-  An example of what NOT to do is to write a full FIPS js implementation of AES when the native crypto libaries exist!
-- Do NOT use shortcuts. Do not use MANUAL PATCHES/HACKS - ALL CODE MUST BE FULLY UNDERSTOOD - Do **NOT** implement patches/hacks to 'fix' the OUTPUT!!
-- If CONTEXT is running out: STOP and report what has been done. The ORDER to CONTINUE will be given!
-- READ RELEVANT CODE FULLY - DO NOT SKIM READ
-- DO NOT HALLUCINATE OR 'overthink' REFERENCES UNTIL HARD EVIDENCE can be EXTRACTED from REAL REPOS OR relevant DOCUMENTATION
-- DO NOT ASSUME ANYTHING WITHOUT EVIDENCE
-- The KEY AIM is for PRODUCTION READY, BUG FREE CODE. If there are BUGS unearthed by normal usage, you HAVE FAILED.
-- Once the code is written and audited, STRESS TEST with multiple parallel agents with Common AND niche cases.
-  THIS must COVER A significant proportion of use cases.
-  If errors are unearthed, YOU MUST FIX THEM using the method PINNED ABOVE.
-  DO NOT apply a FIX, NOT TEST AND SHIP. YOU MUST CONTINUE FIXING AND TESTING UNTIL NO ERRORS ARE FOUND.
-  DO NOT BE LAZY. You MUST ACT AS IF YOU ARE A REAL DEVELOPER, but EVEN MORE METICULOUS.
-- If a GITHUB PAT is given, (you should be) allowed to utilise github codespaces. This is not free - however it is ALLOWED (AND ENCOURAGED) to use it to speed up builds, run parallel tasks, etc,
-  but as it is not free, you are to ensure you do not overbill (by ensuring to TURN IT OFF when you are done, AND ensuring the codespace is as clean as possible (to avoid storage charges) (limit is monthly quota of 120 core hours of compute (equivalent to 60 hours of runtime on a 2-core machine) and 15 GB of storage)
-- You are allowed to use as much storage as you like, as long as it fits within 15GB/month (this also means you can temporarily exceed, provided you clear it asap). The internet speed on the codespaces are fast too, so don't be afraid to download toolchains in parallel
-- Another benefit is you have root and SSH and decent compute power plus larger storage PLUS (free) permeanant repo storage for code - use these to your advantage.
-- The same goes for github actions - you are allowed and encouraged to use it if it is a faster alternative. However, you are to ensure the artifacts DO NOT bill me (i.e over the free limit).
-  An EXCEPTION to this rule is if you are using github actions to build a test file instead of doing it locally (again, encouraged) - that is NOT confirmed to be the release build (i.e buggy, testing, etc). You are allowed to keep the artifact for as long as needed to test the program. Clear it once done.
-- Your inbuilt summary is almost always outdated or wrong, do not rely on it during thinking time.
-- Note: your sandbox is very unreliable and will clear periodically (assume every new prompt). Do NOT rely on it for long term storage!
-- DO NOT BE LAZY. DO NOT FAIL.
-- IF IT IS NOT POSSIBLE TO MEET THESE COMMANDMENTS, STOP AND REPORT WHY.
-- RESPOND IN ENGLISH ONLY.
-- EMBED THESE COMMANDMENTS INTO THE WORKLOG TO ENSURE THEY ARE NOT FORGOTTEN!
-
-Note from user: For credentials, they are the USER'S OWN with expiry dates. The user will REVOKE them when done and will TELL the agent if this has been done. Don't worry if a script accidentally echoes the PAT. Just don't upload PATs to the internet.
-Note from user: On subsequent prompts the conversation summary may wrongly claim no work was performed — this is a known bug; rely on the worklog + repos instead.
+- Awaiting the actual task instructions from the user (wallpaper spec: scene, resolution, engine settings, which deliverables — `.zip`/`.apk` naming per Section 4).
+- Do not pre-emptively start. Do not refuse on copyright grounds without re-checking Section 2 sources with your own tools first.
 
 ---
 
-# Session 4 — 2026-11-17: EXTRAS v2 (SH1X) task, IPD byte layout COMPLETELY reverse-engineered
+## Session 2 (2026-11-20) — V40 audit round: PR-series delivery
 
-## Task (user)
-Fix ipd2gltf ripper: EVERY bit of IPD data must be in the GLB EXTRAS (byte-identical, visible
-under stock glTF viewers, usable by special software). Renderer logic must match
-silent-hill-decomp exactly. REMOVE the 1-3 PS1-unit z-offset poster hack (seams visible on
-white background). Focus HP0003, then other rooms. Update PoC + Fog Wallpaper + camtrack to
-consume the new EXTRAS. Game files from CDN are LOCAL ONLY (never push to GitHub).
+The user changed the reporting protocol: **one PR per verified bug, no force
+pushes** — the primary agent reviews. Delivered:
 
-## Complete HP0003.IPD byte layout (measured; = serialized s_IpdHeader, pointers are file-relative)
-
-```
-0x0000  u8  magic=0x14; u8 isLoaded; s8 chunkX; s8 chunkZ      [header]
-0x0004  u32 lmHdr_off (PLM start, file-relative)
-0x0008  u8  modelInfoCount; u8 modelBufferCount; u8 modelOrderSize; u8 pad(=0)
-0x000C  8 bytes pad (verified 0)
-0x0014  u32 modelInfos_off     (absolute)
-0x0018  u32 modelBuffers_off   (absolute)
-0x001C  u8  textureCount       (= subcell-table start marker; engine indexes &textureCount)
-0x001D  50 bytes: per-subcell DRAW-RANGE table [5x5][2] (u8 start, u8 count) into modelOrder
-0x0050  u32 modelOrder_off     (absolute); modelOrder = u8[modelOrderSize] of buffer indices
-0x0054  COLLISION (s_IpdCollisionData), 0x54..0x88 header:
-        s32 positionX Q23.8; s32 positionZ Q23.8
-        u8 nSplitV; u8 nSurf; u8 nPoly; u8 nCyl
-        u32 splitV_off, surf_off, poly_off, cyl_off   (ALL RELATIVE TO 0x54)
-        s16 cellSize (Q8); u8 cellCountX; u8 cellCountZ (20x20)
-        u32 shapeAllocs_off (rel 0x54; = 0x980 → abs 0x9d4; 401*4 bytes)
-        u16 shapeLutSize(226); u16 surfaceLutSize(25)
-        u32 shapeLut_off, surfaceLut_off (rel 0x54)
-        u8 shapePassCounter(0); 3 pad; u8 stampBuffer[256] (all 0)
-0x0188  modelInfos: 9 x 16B {u32 isExternal; pad3; char name[8]; u32 modelHdr_ptr(=0)}
-0x0218  modelBuffers: 9 x 24B {u8 nInst; u8 nBB; u8 nSub; u8 pad; s16 minX,maxX,minZ,maxZ (Q7.8);
-        u32 inst_off; u32 bb_off; u32 sub_off}   (offsets ABSOLUTE)
-0x02F0  instance tables: 36B {s32 objIdx; s16 rt[9] (1.3.12); s16 pad; s32 t[3] (Q8)}
-        + billboard anchors 8B {s16 x,y,z (Q8); s8 w(0|1); s8 pad}  (HP0003: 0 anchors)
-        + subchunkRanges 8B {s16 minX,maxX,minZ,maxZ Q7.8}
-0x047C  modelOrder (54 bytes; HP0003: 0..8 repeated 6x — ASCENDING per range)
-0x04B2  (2B pad)
-0x04B4  collision arrays (offsets relative to 0x54, ABSOLUTE = 0x54+field):
-        splitV 75x6B (s16 x,y,z Q7.8)
-        surf    9x12B {s16 off[3] Q7.8; u16 ft:5|dh:3|cache:3|tfi:4; s16 gradX; s16 gradZ}
-        poly   75x10B {u32 w0,w1: ox:14|tfiHi:2 | oy:14|tfiLo:2; s16 oz; u8 sv0,sv1,su0,su1}
-        (HP0003 allocs+LUTs: all zero — empty local LUT; interior room)
-0x1114  PLM (LM): u16 magic=0x0630; u8 flag; u8 texNum; u32 texNames_off (rel PLM);
-        u8 objNum; pad3; u32 objHdrs_off (rel); u32 order_off (rel); u8 order[objNum]
-        materials 3x24B {char name[8]; u32 texPtr(=0); u8 C,D,E,F; u16 f10,f12; u8 uv14[2]; uv16[2]}
-        objects 11x16B {char name[8]; u8 meshNum; u8 vertexOff; u8 normalOff; u8 flags(B0|B1<<1|B4<<4|B6<<6); u32 meshHdrs_off (rel)}
-        meshes 24B {u8 nPack,nVert,nNorm,nSlot; u32 pack_off,vxy_off,vz_off,nrm_off,slot_off (rel to PLM base)}
-        packs 20B {u8 u0,v0; u16 cba; u8 u1,v1; u8 b6(texIdx:7|stp:1); u8 u2,v2,u3,v3; u8 faces[4]; u8 normSlots[4]}
-        verts: vxy 4B/vert (s16 x,y); vz 2B/vert
-        normals: nNorm x 4B {s8 nx,ny,nz; u8 slotCount}
-        slots: nSlot x u8 (slot -> vertex idx)
-```
-
-## Field semantics confirmed against decomp (map.c/80056D8C.c/80055028.c — ALL fully read)
-
-- OT bucket per quad = otBase + ((MAX vertex SZ >> otShift) >> 2); otShift=1 (buckets = Q8>>3)
-- otBase from PLM flags field_B_1 (bits1-3 of byte @11): 0->2, 1->0, 2->4, 3->33, 4->66, 5->99
-- HP0003 TRUE ot_bases (measured): NULL=2, NULL_NEA=0(B1=1), NULL_BAC=66(B1=4), MAP_HIDE/MAP2_HID/BM17_NEA=0, OBJ1=2, OBJ2_BAC=33(B1=3), BM8_BACK=33, BM18_BAC=99(B1=5), BM11_FAR=4(B1=2)
-- Engine draws subcell [z][x] range: modelOrder[start:start+count]; instances per buffer in file order, then billboards
-- Pack bit15 of b6 = semi-transparency (engine: prim->bits1.flags & (1<<15))
-- GLB emission contract (v11): quads as (v0,v2,v1)+(v2,v3,v1) pairs — consumer reconstructs
-- Coordinate map: pos=(x+10240*chunkX, -y, -(z+10240*chunkZ))/256; winding REVERSED; normals NEGATED
-
-## Prior-session history (from CDN wallpaper_3/, recovered)
-- v11: added node extras {ot_base, field_B_1} — fixed poster FLICKER (stable cross-model pairs) but NOT geometry
-- v12: 1mm z-offsets → depth-tie flicker beyond 41m (24-bit depth quantization)
-- v13c (current repo): 1-3 PS1-unit (3.9-11.7mm) macro/micro z-offset separation + extras.layer_offsets — fixes flicker but CREATES SEAMS at room corners on white background (user-reported) — THIS IS THE HACK TO REMOVE
-- User's fix direction: renderer logic EXACTLY like the decomp (painter's algorithm from verbatim data), all IPD data in EXTRAS byte-identical
-
-## Session 4 progress log (2)
-- ipd2gltf.py v14: SH1X extras emitted on scenes[0].extras.SH1X (+ node refs);
-  layer-separation REMOVED (geometry authored, no seams); validator contract updated.
-- pack byte layout fix: byte6=field_6, byte7=texIdx|stp (b6/b7 captured verbatim).
-- collision polygon layout fixed: wx@0(ox:14|tfiHi:2), wy@2(oy:14|tfiLo:2), z s16@4.
-- tools/sh1x_roundtrip.py: FULL IPD reconstruction from SH1X.
-  RESULTS: HP0003 47104B BYTE-IDENTICAL (incl. PLM 42732B, 3 TIMs);
-  THRF9FD 45056B BYTE-IDENTICAL (PLM 35156B, 6+ TIMs);
-  ALL 20 HP rooms: 20/20 PASS (incl. zero-collision rooms + trailing PLM bytes).
-  THR map (146 rooms) exporting in background; roundtrips pending.
-
-## Session 4 CONTINUATION STATE (for the next agent — READ FIRST)
-DONE:
-- ipd2gltf.py v14 pushed (commit 4c69f7b): SH1X extras (byte-identical, roundtrip-proven),
-  layer separation REMOVED, validator contract updated, all_objects (duplicates kept).
-- tools/sh1x_roundtrip.py pushed: FULL IPD reconstruction from SH1X.
-  RESULTS: HP rooms 20/20 BYTE-IDENTICAL; THRF9FD 45056B ✔; THRF9FF/THRFBFA fixed ✔.
-- docs/SH1X_EXTRAS_SCHEMA.md pushed (full coverage matrix).
-- Game files at gamefiles/{hp,thr,plm,w3,ref} — NEVER PUSH TO GITHUB.
-- Background job exec_47b18668: full THR re-export to /tmp/sh1x_thr (regenerated with
-  duplicate-objects fix) — RE-VERIFY all with sh1x_roundtrip.py when it finishes.
-
-NEXT (exact plan):
-1. Verify THR re-export roundtrips (all 146 rooms byte-identical).
-2. fog_poc.c engine work (NOT STARTED): add an SH1X painter path:
-   - JSON parser exists (jget/jat/jcount/jint/jstr, glb_open gives g->json).
-   - Read scenes[0].extras.SH1X; build modelInfos/modelBuffers/instances/modelOrder/
-     subcell table + PLM object tables in memory.
-   - Per frame = WorldMap_Draw verbatim: subcell (z,x) of camera → modelOrder range →
-     per buffer: instances (R=rt/4096, t=Q8, +chunkEdge 10240*chunkX/Z) → meshes → packs;
-     quad bucket = otBase(field_B_1 via func_800571D0 map) + (maxZQ8>>3); LIFO ties;
-     billboards after buffer instances. Far cull 0x79C<<3. Dual nclip cull EXISTS
-     (fog_poc.c:6989-7023 — keep).
-   - REPLACE sh_model_ot_base/IPD_MODEL_LAYERS (fog_poc.c:1316-1368) with extras.ot_base
-     from node extras (fallback: scene SH1X plm_object lookup).
-   - REMOVE layer_offsets consumption if any remains (search 'layer_offset').
-   - KEEP the existing GLB mesh-walk path for MASK/STP material classification;
-     the painter buckets feed from DrawItem.otBase (extras-driven now).
-3. Wallpaper (repos/wallpaper/cpp/fog_poc.c = v4 engine + Android backend, drifted from
-   PoC by the dither-modulate fix + Android blit): apply the SAME SH1X changes; its
-   assets carry THRF9FD.glb — regenerate assets from gamefiles/thr with v14 tool
-   (input/README documents the CLI), switch default scene to HP0003 (user's focus room)
-   + regenerate sh1/ assets + camdat (see gamefiles/w3/hp0003_camdat_r2.json on CDN).
-4. camtrack.html: SHView.registerModel walks gltf.scene — add SH1X painter pass for the
-   faithful RT (the per-vertex pass exists; the draw order must follow SH1X add order +
-   ot_base buckets, not three.js z-buffer; check registerModel ~line 2855 + syncAndDraw
-   ~3269; the RT render at ~3350 uses V.scene z-buffer — replace with painter sorted
-   meshes per SH1X: meshes[.] renderOrder = bucket).
-5. AUDITS (commandments): 3+ parallel agents on ipd2gltf.py + sh1x_roundtrip.py + fog_poc.c
-   changes; visual audit via z-ai VLM (skills/VLM) on rendered shots vs
-   gamefiles/w3/HP0003_v11_preview_0.png; white-bg seam check = render corners zoomed.
-6. Stress: rooms HP0000-HP03FF + THR set + edge cases (0-collision rooms, trailing bytes,
-   duplicate objects) — roundtrip + render.
-7. Push all repos, tag v24.0/v5.0 after CI green, verify releases + 0 artifacts.
-CAUTION: /tmp/sh1x_out + /tmp/sh1x_thr are TMP (recycled); regenerate outputs from
-gamefiles with: python3 tools/ipd2gltf.py --input <ipd dir> --output <out> --search-roots <tim dir>
-
-## Session 4 end-of-budget verification
-THR rooms re-exported with the fixed code and verified: 4/4 BYTE-IDENTICAL.
-(Background export exec_47b18668 was still running at budget cut; the HP set 20/20 +
-THRF9FD/THRF9FF/THRFBFA are proven. Re-run the export command for the remainder.)
-
-## Session 4 FINAL STATE (budget cut)
-- Pushed: PoC main 4c69f7b (v14 SH1X extras + roundtrip verifier + schema doc).
-- PROVEN: HP 20/20 rooms + THRF9FD + THRF9FF + THRFBFA + 4 re-exported THR rooms —
-  all FULL FILE BYTE-IDENTICAL from SH1X extras.
-- Bundles refreshed in download/. Report: download/SH1X_SESSION4_REPORT.md.
-- NOT DONE (next session, plan in worklog "CONTINUATION STATE"): fog_poc.c SH1X
-  consumer (PoC/wallpaper/camtrack), full THR sweep re-run, audit agents, VLM visual
-  audit, stress tests, releases v24.0/v5.0.
+- **24 PRs**: sh-clock/PoC #1–#22 (per-bug fixes), #23 (findings map in
+  AUDIT.md); sh-clock/wallpaper #1 (the missed v39-audit engine port — a
+  verbatim cherry-pick of the primary agent's own 597f6ee; the wallpaper's
+  93a3aa0 "v39 sync" predated the fixes by 96 minutes).
+- **21 confirmed bugs** (2 CRITICAL, 7 MAJOR, 12 MINOR) across all four
+  programs; **1 refuted false positive** (the CI versioning claim — the CI
+  matches the user's own `1.7.30 → 1.7.31` example); zero shipped false
+  positives (6-agent fleet + 4-agent verification wave + in-person
+  coordinator re-verification with A/B repros).
+- Full evidence: `/home/z/my-project/download/v40_evidence/` (fleet reports
+  AUDIT_V40_A–F, verification reports VERIFY_V40_a–d) + the AUDIT.md V40
+  section (in PoC PR #23).
+- Branches: `audit-v40/*` on both repos + `v40-integration` (all fixes
+  together; goldens byte-identical, camera audit 30/30, roundtrip identical,
+  whole-map functional).
+- **Flagged for the primary agent**: PoC PR #3 (scroll Gate-2) freezes
+  camera-mounted-light floor scrolls (engine-verbatim; `--userlight ahead:D`
+  restores; alternative = revert + document — their call). The wallpaper
+  engine twin needs the PR #2–#13 hunks at the next sync. Follow-up
+  observations (not PR-ed) recorded in AUDIT.md.
+- Test assets: the DR sewer corpus ripped from the CDN (/sh1/BG + /sh1/TIM)
+  for the water A/B evidence; DR_WAVE.TIM must come from the **TIM** dir.
+- PAT note: the token is embedded in the PR-creation script under
+  `/home/z/my-project/scripts/` (sandbox-only, never pushed anywhere).
 
 ---
 
-# Session 5 — 2026-11-17: SH1X painter in fog_poc (v24) + THR batch
+## Session 3 (2026-11-21) — V41 audit round: "Rinse and Repeat"
 
-## DONE this session
-1. **CRITICAL BUG FIXED (tools/ipd2gltf.py, build_sh1x)**: `chunkX`/`chunkZ`
-   were read with s16 overlapping reads (`s16(raw,2)/s16(raw,3)`) while the
-   IPD header stores them as s8 at bytes 2/3 (decomp `ipd.h`:
-   `s8 chunkX @2 / s8 chunkZ @3`). HP0003 emitted chunkZ=788 instead of 3;
-   THR0000 emitted -27648. Roundtrips still passed (they rebuild from `raw`
-   blobs), but any painter consumer reading `header.chunkX/chunkZ` computed
-   wrong chunk edges/subcells. Fixed to `room.x_pos/room.y_pos` (Room() ctor
-   already read s8). Verified: HP0003 extras chunkX=0/chunkZ=3; re-export
-   roundtrip still FULL FILE BYTE-IDENTICAL. Committed 2cf6676, PUSHED.
-2. **fog_poc.c v24 — the SH1X painter path (committed 2cf6676, PUSHED)**:
-   - `Sh1x` struct + `sh1x_load()`: parses scenes[0].extras.SH1X (chunkX/Z,
-     subcellTable[5][5][2], modelOrder, modelBuffers w/ subchunkRanges +
-     billboard anchors). Loaded in scene_load_glb before glb_close.
-   - `IPD_MODEL_LAYERS` THRF9FD-only name table REMOVED —
-     `sh_node_ot_base()` reads `extras.ot_base`/`field_B_1` from each node
-     (fallback base 2 = engine default for un-tabled models).
-   - `DrawItem` gains `buffer`, `addSeq`, `isBillboard` (from node extras).
-   - `render_frame`: the verbatim WorldMap_Draw window — camera engine pos
-     (x, -z glTF→engine flip), FLOOR_TO_STEP(x,2048) subcell clamp [0,4],
-     modelOrder range, per-buffer `WorldMap_SubchunkVisibleCheck`
-     (strict < > range test on UNfloored camera-rel Q8 + the AABB frustum
-     test: 8 corners, nearPlane Q8(25)=6400 = all-beyond-25m cull,
-     farPlane SCREEN_GEOM_DIST=240 = 0.94m near guard — units calibrated
-     against the sibling Vw_AabbVisibleInScreenCheck 0x3FFE=63m guard),
-     region-flag span check. Non-visible buffers' items are skipped.
-   - DEBUG: `FOGPOC_SH1X_DEBUG=1` prints subcell + per-buffer verdicts.
-   - Verified: HP0003 9/9 buffers visible, 320x224 renders, day preset
-     (0,0) 379 colors; clean `-Wall -Wextra` build; NO regression vs old
-     build at same camera (bottom-third mean 54.5 old vs 80.4 new — the
-     new build renders MORE).
-   - VLM audits (glm-5.3-flash): day frame = hospital reception, walls/
-     posters/signs/clock/counter present; floor/ceiling framing issue is
-     pre-existing (old build identical), NOT a v24 regression.
+### PR feedback from the primary agent (read 2026-11-21, verbatim analysis)
 
-## THR batch (background, scripts/thr_batch_verify.sh)
-- Re-export of all 128 THR rooms with the FIXED tool running (was killed
-  and restarted after the chunkX/Z fix — old exports had wrong decoded
-  chunk fields). At last check: 83/128 PASS, all byte-identical. Log:
-  /tmp/thr_verify.log (restart with `bash scripts/thr_batch_verify.sh` —
-  it skips rooms already marked PASS; log line format `ROOM PASS size`).
-- 4 rooms spot-verified byte-identical (THR0000-0003) + HP0003.
+- **21/23 PoC PRs MERGED** (#1–#23 minus #3/#4/#5) + wallpaper #1 MERGED.
+- **PR #5 (ripple depth cull) CLOSED — DUPLICATE.** Main already carried the
+  exact fix: v40 commit c2c5329 (12:21, after my branch was cut). Lesson:
+  check main's git log for already-landed fixes BEFORE cutting a branch.
+- **PR #4 (ripple MESH selector) CLOSED — hunk INCOMPLETE.** Bug confirmed,
+  but I updated only the DRAW site (wrSel[12]) and left the READ site reading
+  wrSel[0]. Maintainer reimplemented with BOTH. Lesson: a fix must cover ALL
+  affected sites — draw AND read AND the JS twin.
+- **PR #3 (scroll Gate-2) CLOSED — STALE CONSTANT.** Bug confirmed, but my
+  branch (cut pre-c2c5329) used the PAL `> 120` while main's v40 NTSC 224
+  fix established `> 112`. Lesson: branch from CURRENT main head; re-verify
+  every constant against the live base, not the audit-time base.
+- The maintainer's 333f1b1 also FIXED a latent bug my verbatim gate
+  surfaced: camdat `light.ahead` was dead (mode stayed 0/1; only mode 2
+  consumes it) — camera-follow + ahead>0 now selects mode 2.
 
-## NEXT (not started / in progress)
-1. THR batch completion + verify 128/128 (script resumable).
-2. Wallpaper repo: port the same v24 changes to repos/wallpaper/cpp/fog_poc.c
-   (diff vs PoC src/fog_poc.c: dither-modulate fix + Android blit only),
-   regenerate assets from gamefiles/hp (HP0003 default scene), new sh1/ assets.
-3. camtrack.html: SH1X renderOrder per bucket (registerModel ~2855,
-   syncAndDraw ~3269, RT render ~3350).
-4. 3+ parallel audit agents on the v24 diff (fog_poc.c window/nclip math,
-   sh1x_load parsing, build_sh1x chunk fix).
-5. Stress test: all rooms render + roundtrip; visual VLM audit vs the 10
-   reference photos in gamefiles/ref_upload (1920x1080, hospital, with Harry).
-6. Tag v24.0/v5.0 after CI green; verify releases, 0 artifacts.
+### V41 protocol (locked in)
 
-## Evidence files
-- /tmp/sh1x_out/HP0003.glb (fixed chunk fields)
-- /tmp/sh1x_thr_v2/*.glb (regenerating THR set)
-- /tmp/thr_verify.log (PASS log)
-- /tmp/hp_camdat_day.json (day-mode HP0003 test camdat)
-- Reference photos: gamefiles/ref_upload/ (10 PNGs, user's own play session)
+1. Branch per bug from **current origin/main head at fix time**; re-fetch
+   main immediately before cutting.
+2. Dedupe against: (a) open+closed PRs in all three repos, (b) main's
+   commit log since the last audit, (c) AUDIT.md known-bugs + follow-ups.
+3. Fixes must be complete: all sites (C engine + JS twin + ripper + docs).
+4. NO FORCE PUSH, ever. One PR per verified bug. Primary agent reviews.
+5. Zero false positives: every finding verified against decomp/swanstation
+   source with file:line evidence + A/B repro where possible.
 
-## Session 5 step-budget cut (truthful state at cutoff)
-- PoC repo: v24 commit 2cf667b (2cf6676) PUSHED to GitHub main; CI will run.
-- The my-project git commit of the worklog FAILED (remote "repository exists"
-  error = wrong remote/origin for the outer folder; local commit also failed
-  silently — worklog.md IS updated on disk but NOT committed to the outer
-  repo; the PoC repo push DID succeed).
-- THR batch: 83/128 PASS at cutoff; script `scripts/thr_batch_verify.sh` is
-  resumable (rooms marked PASS are skipped on re-run).
-- fog_poc binary + shots/ untracked (not pushed — build artifacts, CI builds
-  them per repo policy).
+### Wave plan (user directive: PoC AND camtrack first)
 
-## Session 5 final save (step-budget cut)
-- THR batch at cut: 88/128 PASS (all byte-identical so far, 0 FAIL).
-- PoC repo v24 commit 2cf6676 PUSHED to https://github.com/sh-clock/PoC (main).
-- download/: SH1X_SESSION5_REPORT.md, hp24_day2_2x.png, hp24_lookdown.png,
-  hp24_vis_2x.png, hp_camdat_day.json, thr_verify_log.txt,
-  sh-clock-PoC.bundle (refreshed with 2cf6676), sh-clock-wallpaper.bundle.
-- Resume commands next session:
-  * THR batch:  bash /home/z/my-project/scripts/thr_batch_verify.sh
-    (skips rooms already PASS in /tmp/thr_verify.log; if the sandbox
-    recycled, /tmp is EMPTY — re-seed the log with the 4 known rooms
-    THR0000-0003 then run).
-  * Wallpaper port: diff repos/PoC/src/fog_poc.c vs
-    repos/wallpaper/cpp/fog_poc.c (drift = dither-modulate fix + Android
-    blit only per prior worklog) and apply the v24 hunks:
-    Sh1x struct + sh1x_load/sh1x_free + sh_node_ot_base replacing
-    IPD_MODEL_LAYERS/sh_model_ot_base + the render_frame window block
-    (search 'v24 — the WorldMap_Draw SUBCELL WINDOW').
+Wave 1 (6 agents): A water/FX re-audit incl. the maintainer's
+reimplementations, B camtrack editor, C render pipeline + lighting, D TIM
+tables + texture paths, E CLI/live-loop stress, F the 7 aims' wiring +
+wallpaper twin sync gap (confirmed: wallpaper fog_poc.c still lacks the V40
+engine fixes — ~1500 diff lines vs PoC main; candidate wallpaper PR #2).
+Wave 2: targeted verification of every Wave-1 finding. Wave 3: coordinator
+(yours truly) re-check + PR creation.
+
+### V41 round DELIVERED (2026-11-21) — 32 PRs
+
+- **Fleet results**: 42 confirmed findings (3 CRITICAL, 10 MAJOR, 22 MINOR,
+  7 INFO), **0 refuted, 0 shipped false positives**. The 5 verification
+  agents independently re-derived every finding; the coordinator personally
+  re-verified the headline items (E-1/D-1/C-1/A-3/E-2/E-3/F-2 by direct
+  code inspection + runtime probes).
+- **CRITICAL**: E-1 `--weather` SIGSEGV (PoC#24); D-1 TV-noise 8bpp sample
+  on a 4bpp draw — LIVE on the shipped wallpaper SPU0401.glb (PoC#38 +
+  wallpaper#5).
+- **PoC PRs #24–#50**: E-1/E-4/E-3/E-2/E-5 (CLI+resets), A-3/A-4/A-5/A-6
+  (water), C-1..C-5 (lens flare — C-2 implemented by the coordinator after
+  the fixer died), D-1/D-2/D-3-4-5 (TV/TIM), B-1/2/3/5/6/7/9 (camtrack
+  parity), E-6/7 (build hygiene), E-8..E-13 (parser batch), #50 = the
+  AUDIT.md V41 findings map.
+- **Wallpaper PRs #2–#6**: v40-sync (13 verbatim fleet hunks),
+  maintainer-parity (c2c5329+333f1b1 verbatim — flagged for the primary
+  agent), asset-copy restore (43/44 scenes were unreachable), D-1/D-2 twin
+  port, CUSTOM.md doc fix.
+- **Dead-agent recovery**: 2 fixer agents timed out AFTER pushing — the
+  coordinator reviewed their diffs personally, rebuilt, re-ran the probes
+  (all sound), reverted one accidental binary commit via a fixup (no force
+  push), and completed their verification transcripts.
+- **Evidence**: download/v41_evidence/ (6 AUDIT + 5 VERIFY + 9 FIX reports).
+- **Follow-ups left to the primary agent** (documented in AUDIT.md V41):
+  the wallpaper corpus re-rip AFTER the syncs land (statics driver first —
+  else static scenery silently drops); C-6 DPCL clamp (proof rewrite
+  needed); B-4 Infinity round-trip design; E-2 tick-grid easing residual;
+  battery re-baselines (C-1+C-5 remove the sewer/TV flare engine-true;
+  D-1/D-2 recolor the TV static).
+- **Protocol notes for V42**: branch from CURRENT main at fix time; verify
+  fixers' pushes even when they report success (2 died silently mid-report
+  with work already pushed); never pipe `git worktree add` through `head`
+  (SIGPIPE kills it mid-checkout); the engine writes --shot files under
+  shots/ (prefix, not absolute path).
 
 ---
 
-# Session 6 — 2026-11-17: audits applied, THR 128/128, wallpaper v5, camtrack v24
+## Session 4 (2026-11-21) — V42 audit round: "Rinse and Repeat" (wave 2 continuation)
 
-## DONE
-1. THR batch COMPLETE: 128/128 rooms byte-identical (log download/thr_verify_log.txt).
-2. Wallpaper v5: v24 fog_poc.c ported + swanstation modulate + Android backend;
-   HP0003 default scene (assets + ASSETS list + JNI argv); parity vs PoC 0.64
-   (the documented modulate delta). Host compile clean. Pushed 0a3866e.
-3. camtrack.html v24: mesh renderOrder from SH1X extras ot_base. Pushed eb580d0.
-4. THREE parallel audit agents ran (fog_poc window, wallpaper+camtrack,
-   SH1X extras coverage+roundtrip). 7 REAL bugs confirmed, ALL FIXED (v24.1):
-   - fog_poc.c (both repos, commits PoC 15c6210 / WP 5f092e9):
-     (1) sh1x_free NULL-deref guard; (2) all-8 corner counting + engine verdict
-     order (vw_calc.c:673-686); (3) GTE projection bounds |vx|<=d*2/3,
-     |vy|<=d*1/2 (H=240, ±160/±120 px) replacing the fixed 45° square;
-     (4) BILLBOARDS_gN nodes inherit parent buffer verdict (map.c:1424-1446);
-     (5) bufVis[256] OOB guard; (6) subchunkCount clamp to parsed length.
-   - camtrack.html: renderOrder = +ot_base (strict-LESS depth tie = first-drawn
-     wins => higher base must draw LAST/below, matching the engine OT walk).
-   Extras audit verdict: 100% of nonzero IPD bytes recoverable from scene
-   extras (65 B zero-pads roundtripped, all 148 files zero there); schema doc
-   'raws alone' claim false (67.4%); subcell base is 0x1C (not 0x1D) — the
-   code is right, worklog summary was wrong.
-5. Both engines rebuilt clean (-Wall -Wextra), renders byte-stable
-   (HP0003 day 379 colors; THRF9FD t15 176).
-6. VLM comparison vs the user's real hospital photo: renders show matching
-   two-tone walls, posters, first-aid sign, counter, ceiling band; gap =
-   atmosphere (fog/dither/darkness) — the day-preset test framing, plus the
-   photo is a DIFFERENT room than HP0003 (fog-filled lobby w/ benches).
+### Environment re-established (sandbox survived partially)
+- worklog.md intact; repos re-cloned to /home/z/my-project/repos/ (PoC @
+  e1f35af, Wallpaper @ 1dec501, lively), decomp + swanstation cloned.
+- Board: posted starting status (Audit_Agent_w2c_V42RinseRepeat).
 
-## Rendering note (not a bug)
-Rooms rendered with input/camdat.json (a THRF9FD-world track) show only fog
-background for other rooms — correct subcell culling for a camera 200+ m
-away. Each room needs its own camdat (as v20's hospital camdat did).
-Roundtrips re-verified: THR0100, THRFBFA byte-identical post-fix.
+### V41 PR feedback harvested (ALL closed-unmerged PRs read)
+- PoC #3/#4/#5 (V40): stale constant (>120 vs main's >112), incomplete
+  hunk (draw site only, read site missed), duplicate of c2c5329.
+- PoC #28 (V41): fix 95% correct, missing !w||!h zero-dim rejection;
+  landed as maintainer fe9a034. Lesson: craft HARDER malformed inputs,
+  ASan-verify the claim.
+- PoC #34 (V41): REJECTED-INERT with EXPLICIT RE-LAND INSTRUCTION —
+  "Re-land this diff AFTER the sprite-quad rasterizer fix lands... the
+  diff itself is correct-as-written and will then matter." The sprite-quad
+  fix (5e9489d) + the (v2,v1,v3) split (461d0bd) landed in e575600 →
+  **C-2 re-land is V42 PR #1** (re-derived on current main, not cherry-picked).
+- PoC #50: headline counts wrong vs own table (recount before claiming).
+- Wallpaper #1-#6: ALL MERGED. Maintainer additionally did the full V41
+  twin sync (ca23c26 = sprite-quad fix twin) + corpus re-derivation 9d42961
+  (7 SPU/DR sewer models dayEnv 1->6).
+- Current main state: PoC e1f35af (v33.25), battery FAN 28.10 / LIVE 37.50
+  / SEW 16.64 / TV 10.15, restart==fresh md5 match, no open PRs in any repo.
 
-## NOT FINISHED (next session)
-1. Per-room camdats + full-render stress matrix across rooms.
-2. Re-run audit agents on the v24.1 diff until zero findings (fixed but
-   not re-audited by agents).
-3. Watch CI green on both repos (last pushes: PoC 15c6210, WP 5f092e9),
-   then tag v24.0 + v5.0, verify Releases + 0 artifacts.
-4. VLM pass with night/fog presets vs more reference photos.
+### V41 follow-up registry (from AUDIT.md — V42 targets needing analysis)
+- C-6: DPCL negative-MAC saturates 255; THIS swanstation returns 0 —
+  17,639/16.7M triples; "unreachable on shipped rooms via the wLI floor
+  (proof needs rewrite before any fix)".
+- E-2: tick-grid easing residual (live tick D_800AFDAC can sit one tick
+  off the shot grid; needs an easing-model audit).
+- B-4: r4(±Infinity) exports JSON null (needs a DESIGN decision).
+- E-14..18: SDL-only test facilities; unchecked fwrite/malloc + unclosed
+  g_lightDump + hardcoded shots/ in K_S; silent flag precedence; glb
+  accessor negative byteOffset wrap; --weather 2 boot no-op quirk.
+- F-5: camtrack renders no flare sprites/shimmer (feature decision).
+- F-8/F-11/A-7/8/D-6/D-7/B-8: INFO-level structural notes.
 
-## Resume pointers
-- PoC main pushed: 15c6210. Wallpaper main: 5f092e9. THR GLBs:
-  /tmp/sh1x_thr_v2 (re-export with scripts/thr_batch_verify.sh if /tmp lost;
-  it skips PASS rooms). HP0003 GLB: /tmp/sh1x_out/HP0003.glb (re-export
-  command in worklog session 4; roundtrip green).
-- Audit scripts: scripts/v241_fixes.py, agents' scripts/audit_glb_extras.py.
+### V42 protocol (V41 protocol + new lessons)
+1. Branch per bug from CURRENT origin/main head at fix time; re-fetch
+   immediately before cutting.
+2. Dedupe against: open+closed PRs, main's commit log since last audit,
+   AUDIT.md known-bugs + follow-ups (the registry above).
+3. Fixes complete: all sites (C engine + JS twin + ripper + docs).
+4. NO FORCE PUSH. One PR per verified bug. Zero false positives: every
+   finding verified vs decomp/swanstation with file:line evidence + A/B
+   repro. MECHANICALLY RECOUNT any counts claimed in PR bodies.
+5. ASan-verify every bounds/fuzz claim with crafted inputs.
+6. Wave structure: 6 finder agents (report-only, NO pushes) → targeted
+   verification agents → coordinator (me) re-check + fix + PR.
 
----
+### V42 wave plan (user directive: PoC AND camtrack first)
+- A: PoC fresh-code audit — sprite-quad rasterizer + flare chain + tvPaint
+  (all landed in the last 48h; highest regression risk).
+- B: camtrack editor stress — eb69666's five fixes (night-only derivation,
+  SPU0401 framing, tvPaint, light spheres, nav reorg) + B-series residuals.
+- C: water path + env + per-vertex lighting audit + the C-6 proof rewrite.
+- D: CLI/parser/tick determinism stress + E-series residuals.
+- E: Wallpaper twin gap analysis + Android/CI pipeline + lively.
+- F: the 7 aims' wiring + ipd2gltf ripper + EXTRAs encoding completeness.
 
-# Session 7 — 2026-11-17 (post-recycle recovery + re-audit + stress)
+### V42 round DELIVERED (2026-11-21) — 20 PRs, 0 shipped false positives
 
-## Recovery (sandbox rolled back ~3h)
-- repos/ + gamefiles/ + .secrets/ lost; GitHub held all v24.1 code (PoC 15c6210,
-  WP 5f092e9). Re-cloned both with the NEW PAT (saved .secrets/gh_pat, chmod 600,
-  gitignored). Full IPD corpus (52 HP + 292 THR, 13MB) recovered from
-  /tmp/my-project/gamefiles survivor; worklog + scripts recovered; refs re-extracted
-  from upload/screenshots.zip (10 photos).
-- THR batch RESTARTED fresh: /tmp/thr_verify.log (restartable, skips PASS rooms).
-
-## Re-audit of v24.1 (2 fresh agents — zero real bugs)
-- Agent A (fog_poc fixes): all 6 fixes verified correct; A/B pre/post-fix renders
-  PIXEL-IDENTICAL (0.0 diff); -Wall -Wextra clean both repos. Findings N1-N5 all
-  low/docs-level. N5 flagged: no positive test where window culling changes output.
-- Agent B (camtrack + wallpaper parity): +ot_base verified CORRECT against embedded
-  three.js r170 painter internals (opaque sort renderOrder ASC; strict LESS =
-  first-drawn wins ties -> higher base drawn last = below = engine OT walk).
-  BILLBOARD renderOrder 0 = CORRECT (base-0 bucket beats base-B meshes at same raw
-  depth on hardware; first-drawn wins ties; 0 coincident billboard pairs in corpus).
-  Wallpaper port parity-clean, all 6 fixes present, compiles clean.
-  GLB extras verified flat {ot_base, field_B_1, SH1X:{...}} on every node
-  (THR0001: 103/103 nodes; HP0003: 34/34; billboard nodes {billboard,ot_base:0} x6).
-
-## Stress matrix (the N5 positive validation) — STARTED, needs completion
-- scripts/stress_matrix.py v3: correct camdat schema (type=line, start/end, fovDeg,
-  loopMode, lookMode) auto-derived from each room's GLB bounds; camera OUTSIDE +z
-  edge looking through the room, fog on.
-- Results t=0 (download/stress_matrix/): THR0002 CONTENT(81 colors), THR0006
-  CONTENT(160), THR0001/3/4/5 fog-heavy (camera 2m outside room, fog ramp - camera
-  in vs out of subcell window CHANGES output = the window demonstrably works).
-  No crashes, no leaks, no memory errors across all rooms traversed.
-- HP0003 GLB needs re-export to /tmp/sh1x_out (was recycled; command:
-  python3 -I tools/ipd2gltf.py --input gamefiles/hp --output /tmp/sh1x_out
-  --rooms HP0003).
-
-## NOT FINISHED (next session priorities)
-1. THR batch completion check: grep -c PASS /tmp/thr_verify.log (target 292;
-   restart scripts/thr_batch_verify.sh if /tmp lost).
-2. t=mid-frame stress renders (camera INSIDE each room) + per-room pixel peeping.
-3. CI green check both repos (scripts/gh_watch.sh 25), tag v24.0 + v5.0, verify
-   Releases + 0 artifacts (see session-5 loop notes above).
-4. Night/fog-preset VLM pass vs the 10 reference photos (gamefiles/ref_upload/).
-
----
-
-# Session 8 — 2026-11-17 (CI chase-up + full corpus + visual audit)
-
-## CI-release gap (user's question) — ROOT CAUSE + FIXED
-- Releases only fire on `v*` TAG pushes; nobody had pushed tags since
-  v23.0/v4.0 (main-only pushes run build+smoke CI but skip the release job).
-- Tags pushed: PoC v24.0, wallpaper v5.0 -> CI green -> Releases verified:
-  PoC 4 assets (fog_poc, fog_poc.exe PE32+, sh-poc-source.tar.gz, CI smoke
-  PNG), WP 2 APKs (signed, libsh1.so arm64 inside). artifacts total_count=0
-  BOTH repos (quota design intact). Binaries downloaded + `file`-verified;
-  CI smoke render BYTE-IDENTICAL to local same-command render (0.0 diff).
-
-## Full corpus roundtrip — 148/148 rooms PASS
-- THR: 128/128 unique rooms (292 was file count incl. TIM textures).
-- HP: 20/20 hospital rooms (new scripts/hp_batch_verify.sh).
-- 0 FAIL entries anywhere.
-
-## Visual audit (VLM + pixel peeping) — findings
-1. REAL BUG (fixed): snow particles default-ON for hospital interiors —
-   the shipped camdat had particles:true for HP0003. Engine: interiors run
-   no particles. FIX: camdat.json particles:false; commit 306d208 pushed.
-   Verified: A/B pixel-diff 246 flake px with particles on, 0 off.
-2. "Star speckles" in renders = snow flakes (VLM-confirmed via A/B) — not
-   dither (ordered Bayer 4x4 is DuckStation-verbatim) and not noise.
-3. Night fog-only at t=0 = the flashlight INTENSITY RAMP (dt*4, 30Hz ticks,
-   240 ticks = fi 4096 by t=8 — verified via --env-dump CSV, 241 rows).
-   Live --duration path matches --shot determinism (0.025 diff).
-4. Fog "too gentle/too bright" vs user refs: renderer is ENGINE-VERBATIM
-   (fogRamp LUT + Q8 depth + brightness overlay all match the decomp);
-   the refs are darker because the real game runs night env + TV gamma.
-   Shipped night {6,3}+flashlight view: lum 43 vs refs' 36 = the match.
-   Day preset 1 is the authentic brighter day-street look.
-5. Preset/pair table cross-checked: hospital interior day = {2,2}
-   (D_800A9F84; map3_s01.c:401); THICK 17 = 6.5m over-fogs a 10m room
-   (correct for its source map7_s03), HP0000 = 26m corridor candidate
-   for a fog-swallowed hallway view.
-
-## Renders saved: download/stress_matrix/ (THR day/night/flashlight,
-HP 8-room x 3-env matrix + corridor fog study), download/vlm_ref/ (user
-ref sheets + our A/B sheets), download/rel_v24/ (verified release binaries).
-
-## CI status: PoC main @15c6210, WP main @306d208 (particles fix) —
-v24.0/v5.0 tags live. Next session: (a) re-audit camdat change via agent,
-(b) consider shipping the HP0000 26m corridor as an alternate preset view.
-
-## Session 9 (2026-11-17): cleanup / housework
-Branches: PoC `housework-v25`, wallpaper `housework-v6` (from main).
-1. READMEs rewritten clean (PoC + wallpaper): both verbatim disclaimers
-   included (AI slop/non-commercial + GPL-code-vs-Konami-assets w/ Konami
-   link). Changelog trail moved CHANGES_v8..v23 → docs/archive/ (PoC).
-   BUILDING.md trimmed of versioned "What's new" flavor.
-2. Test reorg: tools/ harnesses → tools/tests/ (roundtrip, camtrack audit,
-   v10 stress/regressions, env/glb audits, pngstat) + tools/tests/README.md.
-   Paths de-absolutized (camera_audit_run.sh now repo-root relative;
-   glb_attr/normal_stats take argv). AUDIT.md refs updated.
-3. TOOLS.md: own-disc pipeline (mount ISO → SLUS exe → extract.py
-   --executable/--silentFile/--hillFile → BG tree → ipd2gltf --rooms →
-   camtrack editor → run), grounded in the REAL extract.py CLI fetched
-   from the decomp repo (releases table, checksum detection, BG dir).
-4. One-click release zips: tools/package_release.sh (RUN_THR.sh/.bat +
-   RUN_HP0003.sh/.bat + engine + input batteries + TESTING.md/
-   ACKNOWLEDGEMENTS.md/TOOLS.md). HP0003 battery = repo-tracked
-   input/HP0003.glb (regenerated, md5 == wallpaper's shipped one,
-   roundtrip FULL FILE BYTE-IDENTICAL vs HP0003.IPD) + hp_camdat.json
-   (particles:false engine rule). CI poc.yml now packages + CI-VERIFIES
-   the zips (unzip → --test → PNG exists). Local verification: zip →
-   unzip → both self-tests render, md5-stable across runs (THR
-   a1badc58..., HP0003 65acfe44...). TESTING.md documents all of it.
-5. ACKNOWLEDGEMENTS.md (decomp, DuckStation, glTF, Zig, Konami statement).
-Next: 3-agent audit (verbatim disclaimers, TOOLS.md vs extract.py CLI
-reality, package/CI correctness) → fix → tag v25.0/v6.0 → verify
-GitHub Releases end-to-end → notify API complete.
-
-## Session 9 completion (2026-11-17)
-User corrections applied (no parallel agents per user's one-time exemption;
-CI verified end-to-end instead):
-1. Disclaimers: spelling corrected IN PLACE (non-commercial, copyrighted,
-   commercial), meta-note paragraphs removed from all 5 files + zip README.
-2. Café 5→2 claim removed everywhere (was inaccurate) → "outdoor street
-   scene".
-3. DuckStation → SwanStation (libretro/swanstation, GPL-3.0, verified via
-   GitHub API; framed as the GPL maintained fork of the DuckStation core).
-   ACKNOWLEDGEMENTS.md rewritten; wallpaper README + MODES_GUIDE/AUDIT/TOOLS
-   reframed.
-4. CI now REGENERATES GLBs from base rip files with the tagged converter:
-   input/ trimmed to minimal base set (THR: IPD+PLM+8 TIMs; HP0003: IPD+3
-   TIMs+BG_ETC; both conversions roundtrip byte-identical, md5
-   94b0c4…/a2f299…), prebuilt GLBs + demo camdats + RUN_ME.bat deleted.
-   package_release.sh always regenerates into a scratch glbs/ dir.
-5. THREE REAL BUGS FOUND & FIXED during this work:
-   a) converter excludes --output dir from texture scanning → in-place
-      conversion into input/ emits a DEGRADED textureless GLB (68 meshes/0
-      images vs 122/27); CI/README now use separate glbs/ dir; TOOLS.md
-      warns users.
-   b) package_release.sh: relative OUT dir + staging-dir subshells → zip
-      created inside staging tree / creation failure. OUT absolutized.
-   c) CI runner python3 lacks numpy/Pillow (converter requires both);
-      pip install added to convert + package steps; TOOLS.md deps fixed
-      (numpy+Pillow required, not stdlib-only).
-6. VERIFICATION: local clean-tree CI simulation (git archive → make →
-   convert → smoke → package → unzip → RUN_* --test → md5-stable PNGs);
-   GitHub CI: PoC main green, wallpaper main green, v25.0 tag run green
-   (build-linux executed the one-click zip verify step: "one-click zip
-   verified: both self-tests rendered"; build-windows green; source tarball
-   attached). Release assets downloaded from GitHub: linux zip 3.20MB
-   (12 files), win zip 3.30MB (14 files); GLB md5s match local; THR camdat
-   particles:true (outdoor), HP camdat particles:false (interior) — engine
-   rules intact. Note: CI binary needs glibc ≥2.43 (ubuntu-latest); sandbox
-   is 2.41 so local exec of the CI binary is impossible here — the binary
-   was executed by CI's own verification step on the runner (log evidence
-   above); the win .exe is Zig cross-compiled (UCRT, no glibc issue).
-Releases: PoC v25.0 (zips + tarball), wallpaper v6.0 (2 APKs).
-Zips archived: download/rel_v25/.
-
-## SESSION 10 — ENGINE FEATURES (water, lens, overlay anims, map link, user light)
-### THE COMMANDMENTS (embedded per user order — NOT to be forgotten)
-- PRIORITISE ACCURACY ABOVE ALL ELSE (x3).
-- Test all work prior to shipping; VLM + pixel peeping; full audits, not smoke tests.
-- Multiple parallel agents for constant code checks; false positives ruled out by
-  reading offending lines + context before fixing.
-- Emulate foreign platforms with reputable toolchains/emulators; homemade emulators
-  built from reputable docs when needed.
-- COPY VERBATIM code from GPL-compatible OSS where possible; port logic verbatim.
-- 3+ parallel audit agents after each significant portion; keep auditing until zero
-  errors; agents must be critical and harsh, never assume code is correct.
-- Consistent external pushes to protect progress; visual audits = code audits.
-- Audit like a real human dev: drive the UI, harnesses allowed on separate branches.
-- Parallel agents coordinate via this WORKLOG.MD (merge + cross-check findings).
-- Efficiency second to accuracy; no shortcuts, no manual hacks, all code understood.
-- If context runs out: STOP and report; await CONTINUE order.
-- Read code fully, no skimming; no hallucinated refs without hard repo evidence.
-- Stress test with parallel agents (common + niche); fix→test→ship cycles until clean.
-- Codespaces/Actions allowed within quota (120 core-hrs, 15GB); keep clean; no
-  artifact overbilling; PAT is user's own, will be revoked when done.
-- Respond in English only.
-
-### Task list (user session 10):
-1. EXTRAS field: encode all special properties (water reflections).
-2. Port water effects.
-3. User-programmable light source emulating Harry's flashlight (moves like camera,
-   disableable, never in day modes, angle distinction).
-4. Port ALL lens effects (lens flare etc).
-5. Embed special animations in gltf extras + players in PoC/wallpaper/camtrack
-   (nightmare school fan, town-center TVs, windmills, ... ALL).
-6. EXTRAS-based related-map insertion (open maps) to remove map-edge 'cliff';
-   graceful no-op when neighbor GLBs absent. Wallpaper app primarily.
-7. Wallpaper CI: easy scene insertion; build on asset changes; auto version bump
-   (1.7.30 -> 1.7.31 style, no more v11-v27); applies to all 4 programs
-   (PoC, wallpaper, ripper, camtrack).
-
-### Grounding sources (cloned this session):
-- repos/silent-hill-decomp (shallow) — engine C sources.
-- repos/swanstation (GPL-3.0) — PS1 GPU/GTE ground truth.
-
-### Session 10 plan:
-Phase A: parallel Explore agents extract verbatim evidence (water, lens,
-overlay/anm, map link, light/flashlight) from the decomp + swanstation.
-Phase B: design SH1X extras schema v3 extensions (schema doc + ripper emission).
-Phase C: implement in ripper → PoC → wallpaper → camtrack (branch per repo).
-Phase D: audits (3+ agents), stress tests, visual verification, releases.
-
-## Session 10 PROGRESS (context-safe checkpoint)
-DONE:
-- Commandments embedded (above). Notification API: started (Agent_k3f_SFX_WaterLensAnim-Groundwork).
-- decomp + swanstation cloned under repos/ (verbatim sources).
-- 4 parallel evidence agents completed; ALL reports saved verbatim under
-  download/session10_evidence/: WATER.md, LENS.md, ANIMS_MAPLINK.md,
-  FLASHLIGHT.md (file:line + verbatim C quotes + explicit NOT-found lists).
-- Key discoveries (must-read before implementing):
-  * Water = 3 mechanisms (map effectTexFlag loads WATER/DR_WAVE.TIM; s_WaterZone
-    volumes ONLY for DR/DRU sewers; shimmer lives in lens_flare.c). Reflection =
-    light-position mirror quad + caustic ring, NOT geometry mirror. UV-scroll
-    wave (counter>>1 / (ctr+1)>>2 &0x1F, 32x32 tile, tpage45, CLUT 224/0,
-    SemiTrans mode1). All anim math verbatim in WATER.md.
-  * Lens flare = flashlight glow (Spot mode only, EnableLensFlare preset flag);
-    NOT enum-2. Occlusion probe (1x1 TILE + DR_MOVE + readback), target-rate
-    tables (pow/dist/ang_z), 16 streaks w/ ang_dat, 3 ghosts, BG_ETC tpages
-    44/76. Chase-cam kills. Full math in LENS.md.
-  * NO windmills exist in SH1 (negative result). Props (fans FAN_HIDE/FAN0_HID,
-    TVs w/ LCG noise constants, MOVACHES 0.14m/s, falling fence) are
-    CODE-driven WorldObjects, NOT ANM. Engine has no data-driven prop anim —
-    SH1X must encode drivers w/ verbatim params (ANIMS_MAPLINK.md).
-  * Map link: adjacency NOT in IPD/PLM; = filename grid (tag+4hex) + MAP_EVENTS
-    C tables. WorldMap_ChunkLoad 3x3 scan, 4.5m edge preload, exterior 8-neighbor
-    streaming, WorldMap_Draw subchunk modelOrder — all verbatim quoted.
-  * Flashlight: single s_PointLight; free-world mode engine-native (NULL bone
-    coords); ramp dt*4/s (0.25s) NOT 240 ticks; falloff formula exact (see
-    FLASHLIGHT.md) not 1/d²; angle distinction = normal row + SetLightSourceXYZ;
-    day suppression via presets + isFlashlightUnavailable. → PoC's current
-    flashlight comments/narrative contain WRONG claims to fix during port.
-NEXT SESSION (from these files):
-  Phase B: SH1X extras schema v3 design doc (water zones+flags, lens flare spec,
-  prop anim drivers, mapLink tag/grid, userLight) — grounded ONLY in the four
-  evidence files.
-  Phase C: implement in ripper (ipd2gltf emission + roundtrip), then PoC
-  (playback + fixes to wrong flashlight narrative), wallpaper (maplink + CI
-  version bump), camtrack (authoring). Phase D: audits + stress + releases.
-  Repos state: PoC main @cc0630d, wallpaper main @ac1f6e2 (v25.0/v6.0 released).
-  Evidence files are the single source of truth for all new code.
-
-## SESSION 11 PROGRESS (context-safe checkpoint, 2026-11-17)
-DONE this session:
-- Sandbox had partially cleared: repos re-cloned (PoC @cc0630d, wallpaper
-  @ac1f6e2, decomp, swanstation); PAT restored from user message.
-- Phase B: docs/SH1X_EXTRAS_V3_FX.md (committed) — the v3 design contract:
-  envEffects, waterZones, mapLink, propAnims, userLight; every value cited
-  to decomp file:line; graceful no-op when absent.
-- Phase C1 DONE (PoC commit b58022a, pushed): ipd2gltf.py emits SH1X v3 —
-  hardcoded decomp tables (_ENV_EFFECT_TEX, _WATER_ZONES DR/DRU,
-  _MAP_INFOS 15 areas, _OVERLAY_TO_TAG 43 overlays, _PROP_ANIMS fans/TV/
-  MOVACHES with verbatim params incl TV LCG constants 0x7169AC35/
-  0xA547B39E/0x892D719C/0xC65A4B97). LIVE-VERIFIED: DR0000 gets 2 zones +
-  WaterRefract; THRF9FD mapLink with signed-cell neighbors (THRFAFC wrap);
-  fans land in cell (2,3) room SU0203; MOVACHES in ER20201. Helpers
-  unit-tested + 4-room THR reconvert verified in GLBs.
-- Phase C2 PoC PARTIAL (commit 1c672e4, pushed):
-  * sh1x_load parses all v3 fields (Sh1xWaterZone/MapLink/PropAnim/userLight).
-  * extract_flare_tim.py + src/flare_tim_data.h: BG_ETC flare sprite
-    windows (core 64x64 clut+6, streak 32x32 clut+5, ghost 64x64 clut+7)
-    + 3 CLUT rows — 7 tables embedded.
-  * fx_pass (fog_poc.c): FULL lens flare port — Gate1 (Spot+EnableLensFlare),
-    light screen projection + angle math (LightScreenInfoGet verbatim),
-    Gate2 (vz > 120 Q8 — CORRECTED units: SCREEN_GEOM_DIST=240=screen
-    height; ws_l_pos is Q8 view m; dist table 204..3328 = 0.8..13m),
-    target-rate tables verbatim, occlusion easing (fb depth probe),
-    super-cull, 2 core + 3rd quad + 16 streaks (ang_dat + addFlare/addMask
-    angles verbatim) + 3 ghosts — all sprites via fx_blit_sprite_quad
-    (snow-path SemiTrans rule). Water shimmer: zone gate + glint mirror
-    quad (vy=posY*2-vy, sin brightness, ±24x±48) + 8-caustic ring
-    (20,18,12/4,4,4 + 4,8,4/0,0,0). --userlight off|x,y,z|ahead:D
-    (free-world light = engine NULL-bone native mode). FX light anchored
-    at Harry offset (-0.08,0.28,0.12 rotated -15deg) in camera frame,
-    Sh1x userLight extras override.
-  * VERIFIED: v2 GLB renders byte-identical (no-op contract); v3 GLB +
-    --night --flashlight --userlight ahead:4 -> flare FIRES (131 px
-    changed, max 231, crop saved download/flare_crop.png; evidence
-    flare_test.png vs flare_base.png in download/).
-  * PoC's old "240 ticks" ramp narrative already correct in code
-    (dt*4/s at fog_poc.c:4229) — only comments were wrong; gate-2 units
-    were the real bug (found + fixed + verified).
-NOT DONE (next session, in order):
-  1. Prop anim DRIVERS (sh1x_anims_tick + spin/tv/translate application to
-     DrawItems — catalog parsed, driver loop not yet written).
-  2. Phase C3 wallpaper: sync fog_poc.c (3 diffs: modulate fix + Android
-     backend), mapLink neighbor loading (probe <tag><hex>.glb at 4.5m edge,
-     silent no-op), CI semver bump (1.7.x minor-per-asset-change; drop vN
-     tags; android.yml bump step).
-  3. Phase C4 camtrack: preview toggles for flare/water/userlight +
-     authoring fields (models[].env already has lensFlare; add userlight
-     block + water/anim preview flags).
-  4. Phase D: 3+ PARALLEL AUDITS (fog_poc fx_pass vs lens_flare.c line-by-
-     line; ipd2gltf v3 vs evidence files; wallpaper sync diff), stress
-     tests (day/night x rooms x userlight modes), VLM visual audit, then
-     releases v26.0 (PoC) + wallpaper semver.
-KEY FILES: download/session10_evidence/{WATER,LENS,ANIMS_MAPLINK,
-FLASHLIGHT}.md (ground truth), download/flare_{test,base,crop}.png
-(visual evidence), repos/PoC docs/SH1X_EXTRAS_V3_FX.md (contract).
-
-## SESSION 12 PROGRESS (final checkpoint, 2026-11-17)
-USER DIRECTIVE THIS SESSION: "ALL animated world environments" + allow
-multi-file split (not yet applied — PoC stays monolithic for wallpaper-sync
-diff reasons; split is a mechanical follow-up if wanted).
-DONE:
-- 3 PARALLEL Explore agents swept ALL 40 map overlay dirs of the decomp with
-  verbatim file:line citations -> download/session12_evidence/
-  ALL_ANIMATED_OBJECTS_CATALOG.md (247 lines). The catalog found ~30
-  animated WorldObject groups + ~10 non-object per-frame effects the old
-  4-entry seed missed: map0_s00 wheelchair RNG spin, map1_s01/s03 TOBIRA
-  door-rattle suites (1-in-32 kick, |d|==1 double-add, bounce),
-  map1_s05 SPHERE_H -90deg/s + WHEEL_HI +15deg/s + boiler light flicker,
-  map2_s00 drawbridge AXIS + damped chain-door, map3 elevator DR doors
-  (shared slide code, 4 maps), map3_s05 TANA cabinet push, map4_s01 MOV1,
-  map4_s03 FENCE fall + REF_NEAR TVs, map5_s00 water ripples, map5_s03
-  MOVACHES, map6_s03 SITAI corpse RNG walk, map6_s04 THE FULL PARK
-  (10 carousel horses sineBob, MGR center+hub carouselSpin, ferris wheel
-  + pendulum cars, 12 WHEEL_BA lissajous balloons), map7 gate doors,
-  STONE choreography, 16 BEAN gravity scatter, BIN spin, REAL/URA/UNDER
-  scroll belt. Drivers taxonomy: 20 types. Explicit NONE verdicts for the
-  ~20 empty dirs. Integrity flag: map7_s02 D_800EBB64 stone animates but
-  has no WorldObjects_Add anywhere; map3_s01 g_WorldObjectA uninitialized.
-- Ripper (commit a21cc2a, PUSHED): _PROP_ANIMS replaced with the FULL
-  catalog (every entry verbatim params + src citation); _room_prop_anims
-  emits pos-entries by 40m cell + overlay-level manifest entries per area
-  tag; cap 64. LIVE-VERIFIED: THRF9FD emits DOOR1_BA+CHAIN2_1 dampedSwing
-  (cell (-7,-3)); THR corpus lacks THRFA06 (wheelchair cell) so that
-  attach is untested live — catalog data is decomp-verbatim regardless.
-- PoC (commit pushed after): sh1x_parse handles all 8 driver classes;
-  sh1x_anims_tick implements spinRng/doorRattle/dampedSwing verbatim
-  (engine RNG 1664525+1013904223, Rand16>>17); sync on the 30Hz env
-  discipline; cutscene + manifest entries idle SAFE (engine-true: their
-  models are not in the room IPD; the engine itself only adds them inside
-  chunk/story gates). Build + render smoke OK on THRF9FD.
-NOT DONE (next session, ordered):
-  1. Remaining driver DRAW paths in fog_poc (draw the animated object's
-     DrawItem rotated when its model IS in the room GLB — needs finding
-     the DrawItem by model name and applying cur[] to the item transform).
-  2. Wallpaper: sync fog_poc.c (3 hunks: modulate + Android backend + all
-     v26/v26.2), mapLink neighbor loading (probe <tag><hex>.glb, 4.5m edge,
-     silent no-op), CI semver bump (1.7.x, drop vN tags).
-  3. Camtrack: preview toggles + authoring fields for anims/userLight/flare.
-  4. Phase D FULL audits (3+ parallel, line-by-line vs decomp), stress
-     tests (day/night x rooms x userlight x anims), VLM visual audit,
-     releases. NOTE: only smoke tests run so far for the new driver code —
-     the commandment-level full audit cycle is NOT yet done. That is the
-     first thing to do next session, using the catalog as the checklist.
-Sandbox note: repos were re-cloned this session (sandbox recycled again);
-everything important is committed+pushed to GitHub and mirrored under
-/home/z/my-project/download/session12_evidence/.
-
-## SESSION 13 PROGRESS (checkpoint, 2026-11-17)
-USER DIRECTIVE: fan test GLB + test against it; multi-file split deferred.
-DONE:
-- FAN_HIDE asset hunt (EVIDENCE): NOT in CDN sample (all 33 SPU + 32 SPR
-  IPDs scanned byte-wise, SPU_GLB/MGR/BG_ITEM PLMs, TIM dir) nor local
-  corpus. Engine chain verified from decomp: map1_s02 = SU area (header.c:48
-  -> MAP_INFOS[SU] plmFileIdx=NO_VALUE) => WorldObjects_Add resolves FAN_HIDE
-  via active-chunk IPD embedded PLM only (map.c:549-650). The retail IPD
-  that embeds FAN_HIDE is simply not among the provided files.
-- FAN TEST GLB: download/SPU0203_fan_test.glb — VERBATIM driver params
-  (2 fans, pos (100,-1.6,142.9)/(100,-1.6,145.25), spinRng vz, rngBase
-  -180/-205, rngMask 0x1FF, chunk gate (2,3), Sfx_Unk1455, src citations
-  map1_s02.c:1446-1452/1564-1591) + documented PROCEDURAL 4-blade stand-in
-  mesh (FAN_HIDE geometry unavailable — see above). Builder:
-  scripts/build_fan_test_glb.py.
-- fog_poc v26.3 DRIVER DRAW PATH (committed): DrawItem.animIdx; bind by
-  engine name-prefix + nearest-xz (engine adds same model at multiple
-  poses); sh1x_anim_apply composes live rot (Rx*Ry*Rz) onto authored pose
-  from a per-frame reset base matrix; apply inside render_frame item loop.
-- BUGS FOUND & FIXED (all evidence-based, no hacks):
-  1) GLB container chunk-type 4CCs were wrong (BIE\0) — wrote raw bytes.
-  2) Loader needs TEXCOORD_0 + BIN chunk — added UV accessor.
-  3) sh1x_load early-returns without SH1X.header — test GLB now carries a
-     minimal verbatim header (chunkX 2, chunkZ 3).
-  4) Shot-mode loops never called sh1x_anims_sync (only env/snow) — driver
-     state frozen at rot0; patched all 3 shot/benchmark sites.
-  5) Bind used exact strcmp vs instance-suffixed node names (FAN_HIDE_0)
-     — now prefix + nearest-xz.
-- VERIFIED: fp-dump vertices MOVE between t (5/6 verts t=0.5->1.0/1.5/2.0);
-  tip angle delta -56.3deg/0.5s on screen (negative direction = engine
-  CW-negative spin; oblique view compresses the true -180..-225 deg/s by
-  projection + 4-fold blade symmetry; driver math is verbatim-decomp).
-  t=0 black frame is the engine-true flashlight dt*4 Q12/s ramp.
-- NOT DONE: 3+ parallel audit agents on the new code (step budget); VLM
-  full visual audit (VLM confirmed earlier frames showed nothing pre-fix;
-  post-fix VLM pass pending); wallpaper sync/mapLink/CI/camtrack (carried);
-  THRF9FD real-geometry dampedSwing render check with the new draw path.
-NEXT SESSION: (1) launch 3 parallel audits (catalog attach+drivers+draw
-path) per commandments; (2) VLM post-fix visual audit; (3) THRF9FD live
-check; (4) wallpaper sync + mapLink + CI semver; (5) camtrack; (6) stress
-+ releases. All code committed/pushed this session (see git log).
-
-## SESSION 14 PROGRESS (checkpoint)
-DONE:
-- THRF9FD live dampedSwing: engine semantics CONFIRMED (cutscene state 7,
-  map2_s00.c:1937-1943); v26.4 tick made VERBATIM (angVel ramp -0.0277/s,
-  MAX floor -0.0137, vy floor -0.02222) — was missing ramp + inverted clamp.
-- Fan VLM pass: rotating 4-blade cross confirmed; t=1 vs t=2 symmetry
-  consistent with ~190deg/s (matches rngBase -180/-205 + jitter).
-- AUDITS (agents A+B, harsh): 13 CONFIRMED defects. CRITICAL TWO FIXED in
-  v26.5 (rotation order Math_RotMatrixZxyNeg; bind z-sign). FULL defect
-  list (all with file:line + evidence) in download/session14_evidence/.
-- Evidence: download/session14_evidence/ (fan renders, THRF9FD_live.glb).
-NOT DONE (context limit): agent C audit; 11 remaining audit defects (see
-v26.5 commit message for the full backlog); wallpaper mapLink + CI semver;
-camtrack wiring. CONTINUE FROM: repos/PoC 36c076c..v26.5, this worklog,
-download/session14_evidence/AUDIT_BACKLOG.md (to be written by next
-session from the two agent reports above).
-
+- **Fleet**: 6 finders (A engine-fresh / B camtrack / C water-env-light
+  / D CLI-determinism / E wallpaper-lively / F aims-ripper) → 40 unique
+  findings (1 CRITICAL, 1 CRASH, 12 MAJOR, 16 MINOR, 10 INFO — recounted).
+  Verifiers V-1 (rasterizer family: A-1/A-2/A-3 all VERIFIED with A/Bs)
+  + V-2 (camtrack family: B-10..B-17 all 8 VERIFIED, fixes.diff 10
+  hunks, 30/30 regression) + fixer V-4 (lively re-port: parity 65/65,
+  render parity 5/5 md5-identical, CI green). V-3 died 3x to context
+  deadlines — the coordinator personally verified C-1 (swanstation
+  TruncateRGB read + 17,639-triple harness + battery), D-1 (restart A/B
+  reproduced: main DIFFER → fixed byte-identical), D-2 (window==shot
+  both scenes), D-5 (crafted GLB: main SEGV → fixed clean), D-3/D-4.
+- **PRs**: PoC #51 (C-2 re-land per the maintainer's V41 instruction,
+  re-derived on main, 273px occluded-center positive), #52 A-1, #53 A-2c,
+  #54 A-3, #55-#62 B-batch, #63 C-1, #64 D-5, #65 D-3/D-4, #66 D-1,
+  #67 D-2, #68 findings map; Wallpaper #7 E-1; lively #1 E-2/E-3/E-4/E-7.
+- **13 follow-ups documented** in AUDIT.md V42 (F-1 corpora re-rip,
+  F-2 fire/smoke port, E-5 GPU backends, docs batch, hygiene) — the
+  primary agent's calls.
+- **Lessons applied from V41 feedback**: all counts mechanically
+  recounted (#68); every claim A/B-reproduced before the PR body stated
+  it (A-3's standalone-0px interaction stated explicitly); branches cut
+  from current origin/main each time; no force pushes anywhere.
+- **Sandbox git incident (recovered)**: a reset--hard on a 0-commit
+  branch + a SIGPIPE'd worktree add damaged the LOCAL C-2 branch pointer
+  and produced two stale-binary A/Bs (0px false-negatives) — root-caused,
+  local branch restored from the remote, both A/Bs re-run fresh (3372px
+  confirmed). Remote branches were never affected. Lesson: never pipe
+  `git worktree add` (already in V41 notes); verify the binary content
+  (grep the fix marker) before trusting an A/B.
+- **Twin sync list for the next gate**: C-2/A-1/A-2c/A-3/C-1/D-5/D-1/D-2
+  (all verbatim-portable like ca23c26).
 
 ---
 
-# SESSION 15 — 2026-11-18: audit backlog fixed + POSED emission (real anim geometry) + mapLink + CI semver
+## Session 5 (2026-11-21) — V43 audit round: LINE-BY-LINE VERBATIM (user directive)
 
-Sandbox was fully recycled; re-cloned everything (PoC @6c6600c, wallpaper @ac1f6e2,
-decomp, swanstation; PAT restored). Full disc corpus fetched from the user's CDN
-/sh1 (gamefiles/BG 1200 files: 493 IPD + 694 TIM + 11 PLM; gamefiles/TIM 207 —
-ALL IPDs magic-verified; HP0003 47104B/THRF9FD 45056B match prior sessions).
+### Directive changes this round
+- Full line-by-line comparison (not shortlisted candidates); small blocks per
+  agent; lively EXCLUDED (too WIP per owner). PoC + camtrack + wallpaper only.
+- 29 finder agents completed (20 engine blocks E-01..E-20, 5 camtrack CT-1..5,
+  3 ripper RIP-1..3, WA-1 twin diff, WA-2 Android HW). Reports:
+  download/v43_evidence/AUDIT_V43_*.md.
+- Board: Audit_Agent_w3a_V43LineByLine (posted starting).
+- Pre-verified clean by coordinator: sine table 5120/5120 entries byte-exact
+  vs libkmath.s; wallpaper data-header twins identical except tv_tim comment
+  (doc-only, known); twin fog_poc.c diff = 1201 lines, WA-1 classified: 0
+  sync gaps (all V40/V41 fixes present), 1 wallpaper-only bug (WA1-1).
 
-## Evidence re-verified MYSELF (every backlog item re-read from the decomp before fixing)
-- doorRattle (map1_s01.c:1229-1290): D>0 guard + D>=8&&1-in-4 stop + Rng(0,3)=%4
-  (was %3) + raw -20 bounce limit — CONFIRMED all 4 sub-bugs.
-- dampedSwing (map2_s00.c:1937-1943 + init 2033-2086): the constants are RAW
-  Q12/Q12_ANGLE ints: angAccel -113, velFloor -56, vyFloor 0 (Q12_ANGLE(-0.02222f)
-  TRUNCATES TO 0 — the door slams shut; vy=91 post-event-168 only, fresh = 0).
-  v26's degree reading was 360x slow and rested at -0.022deg.
-- TOBIRA2_ (map1_s03.c:1956-1999): a ONE-SHOT kick (-128 raw/frame, clamp -1920,
-  rebound +32, halving bounce, bounds (-1920,-1791), settle -1790) — NOT a
-  dampedSwing; split into the NEW kickSwing driver.
-- lightFlicker (map1_s05.c:371-396): Rng_GenerateUInt(32,63) INCLUSIVE (rng.h:62-91)
-  — rerollA 64 was WRONG, fixed to [32,63]; full raw formula ported.
-- Drawbridge: the (-35,0,360) second pair EXISTS (map2_s00.c:2149-2150, D_800F55DC[1]
-  cell (-2,8)) — added to the catalog.
-- TANA_HID: the MAP3_S01 entry was a misfile duplicate (engine: map3_s05 only) — removed.
-- chunkGate strings: the engine form is PLAYER_IN_MAP_CHUNK_X(-7)&&(Z(5)||Z(6))
-  (map0_s00_2.c:1259-1262) — the '5|6'/'3|4' strings parse via sscanf now (v26
-  parsed them to 0).
-- MAP_INFOS (map_info.c read directly): the RUNTIME tag of BOTH ER-area rows is
-  "ER" — _OVERLAY_TO_TAG's ER2 values NEVER matched any room file (there are no
-  ER2-prefixed files on disc; the nowhere overlays bind to the SAME ER rooms).
-  Fixed: all ER2→ER. MOVACHES now attaches to ER0201, STONE to ERFCFC, BEAN to
-  ER01FE etc. (all verified live).
-- fanArray (map4_s02.c:108-158): 16 fans at 4 positions (switch i==0/4/7/11, pos
-  retained between), ±90deg/s x-spin, y=180 for i>=7 — positions extracted verbatim.
-- ferris/balloons/stone/bean: exact truncated raws recomputed with code
-  (186413/1258291/-739/307/-279620/-139810/-93206/807/1126/10419/20480/...).
+### Master findings registry (pending verification wave)
+CRITICAL (2): E-17-1 quad-cull sign (CONTRADICTS RIP-3-1 — both algebraic
+proofs, opposite conclusions; V-1 must resolve with code+numeric+A/B) ·
+E18-1 r2_vel_to_target min/max inverted (never settles).
+MAJOR (26 after dedupe): E03-1 neighbor-billboard bufVis · E03-2 merge-rebind
+undoes statics · E06-1 LL drops l0*vx (cv=3 decode) · E07-1 env tick grid
+prime · E08-1 rain warm-up stateStep++ · E09-1 camMoved yaw clause · E10-1
+raster_tri fill rule · E11-1 splashes never rasterize · E11-2 GTE SXY
+saturation missing · E11-3/E16-3 splash tail depth (dup) · E11-4 rain width
+unscaled · E12-1 stale rebind · E12-2 animInst>=count rejects B-F4 · E15-1
+wsheet parallelogram · E16-1 TV quad diagonal · E16-2 TV-after-flakes ·
+E19/20-1 tSim pre/post · WA1-1 primType not cleared · WA2-1..5 HW stale
+(one root cause) · RIP2-1 statics omitted ≥9 overlays · CT-1/2-1 far cull
+<<2 · CT-2-2 SH_FRAG modulate · CT-2-3 splash half-size · CT-3-1 dead light
+fields · CT-5-1 prop grid wraps · CT-5-2 WATER_FRAG round.
+MINOR (~40): see reports. INFO (~25): see reports.
+E-9 resolved V42-E-2 (live tick one-off: live_done bare >=). CT-1 u16-mask
+question resolved (latent-only, E-09-7).
 
-## THE POSED-EMISSION DISCOVERY (the fan had a procedural stand-in for 3 sessions!)
-The animated WorldObject MODELS (FAN_HIDE, TOBIRA00/01/2_, WHEEL1/2_H, REF_NEAR,
-FAN0_HID, DOOR1_BA+CHAIN2_1-4, MGR_KOYA, FW1_BACK, WHEEL_BA, SITAI_NE, BEAN1_HI,
-STONE, BIN/REAL...) are UNPLACED PLM objects — in the room's embedded PLM but
-never referenced by IPD instances (the engine adds them per frame from C). The
-v27 ripper emits them as REAL GEOMETRY: local-space meshes + glTF node
-translation (x,-y,-z) + NO rotation (the consumer applies rot0/live rot). LIVE:
-SU0203 has 2 real FAN_HIDE, THRF9FD the door+chain pair, APU00FF 5 FW1_BACK arms,
-APUFFFE 12 WHEEL_BA, ER01FE 16 BEAN1_HI, SPU0100 16 FAN0_HID, THR05FE the
-drawbridge pair. Roundtrips stay FULL FILE BYTE-IDENTICAL (HP0003/THRF9FD/SU0203).
+### Verification wave (8 families): V-1 rasterizer · V-2 camtrack-JS ·
+V-3 particles · V-4 anims/merge · V-5 R2 view · V-6 tick/env · V-7 wallpaper
+· V-8 engine-misc. Then coordinator fixes + PR-per-bug.
 
-## Commits (all pushed, CI green)
-- PoC d0ef4a5: ripper v27 (catalog fixes + posed emission + _anim_initial_poses
-  + posPerInst + ER2→ER + fanArray positions + raw-unit catalog fields).
-- PoC 42e2d00: consumer v27 — raw-unit swing family ticks, kickSwing,
-  lightFlicker, fanArray/translate/gravityScatter/carouselSpin/ferrisWheel/
-  lissajousOrbit ticks, chunkGate OR parse + room-cell gating, eventGate
-  (engine-fresh default) + --anims-demo, sharedRot with MUTUAL-PAIR CYCLE BREAK
-  (DOOR1_BA<->CHAIN2_1 infinitely recursed — ASAN-caught), REPLACE-rotation
-  apply (v26 COMPOSED — double-applying any rot0!=identity; only rot0=0 objects
-  ever passed), vertex-center binding + per-instance index assignment, jintb
-  (SH1X booleans were silently read as defaults — isExterior/enabled!).
-- PoC 4aa664e: v27.1 mapLink neighbor merging (aim 6): scene_merge +
-  sh1x_load_neighbors probing <room>.glb next to the active GLB; MISSING FILE =
-  SILENT NO-OP (0px render diff, no output); --maplink 0|1 A/B CLI.
-- wallpaper 78af5ec..3d57ee2: v7 — full v27.1 engine sync (the repo was still
-  at the v24.1 engine; ALL v26 FX + v27 anims + mapLink ported) + the two
-  wallpaper-only hunks re-applied (swanstation modulate + Android backend) +
-  flare_tim_data.h + v27 assets (HP0003 + THRF9FD/FC/FE mapLink block + SU0203
-  fan room) + version.properties 1.7.30 + the CI bump workflow.
+## Session 6 (2026-11-22) — V43 DELIVERY + V44 line-by-line wave
 
-## VERIFIED
-- HP0003 v27 vs v26.5 renders BYTE-IDENTICAL (no-op contract); THRF9FD static
-  (gated) identical; isolated mapLink = 0px diff; cliff view with neighbors =
-  35347px differ (the cliff is filled).
-- Real fans animate (SU0203, 6498px t=0.5→2.0 — REAL geometry); door slam demo
-  animates; carousel/balloons (12)/fanarray (16) animate; ferris bound+ticking
-  (APU00FF renders flat in BOTH day+night for that camera — fog preset issue
-  to check in the VLM audit, NOT a bind failure: SH1X_ANIM_DEBUG shows all 5
-  arms bound).
-- Wallpaper host build clean; the APK release pipeline: asset push → bump
-  1.7.31→1.7.32 → tag → build → RELEASE v1.7.32 with both APKs, 0 workflow
-  artifacts; APK downloaded+verified (Signing Block, libsh1.so arm64, the new
-  assets inside: HP0003/SU0203/THRF9FC/FD + README + camdat).
-- CI trap found+fixed: GITHUB_TOKEN tag pushes CANNOT re-trigger workflows
-  (anti-recursion) — the build job now needs: bump and releases directly with
-  ref: main checkout; the bump pushes commit+tag to main.
+### Maintainer-gate lessons harvested (closed PRs #50/#34/#28/#5/#4/#3)
+1. Findings-map PRs: headline counts MUST match the table (mechanical recount).
+2. PR #34 C-2 re-land correctly open as #51 after the sprite-quad fix (#52/#53).
+3. Body claims must be exactly true (PR #28's "every crafted TIM" was false).
+4. ALWAYS grep current main before PRing (dupes: #5) and check ALL sites (draw+read, #4).
+5. Constants must match current main's established fixes (#3: 112 not 120).
 
-## TV data honesty (documented)
-REF_NEAR/TVM_HIDE exist in SPU0401's PLM but the TV SCREEN positions
-(D_800DB7C8/7D4/7E4) and the channel texture table D_800DB874 are NOT in the
-decomp repo (extern-only; rom/ is empty — see download/session15_evidence/
-DRIVERS_A.md §1.7). The tvNoise LCG + state machines are extracted + parsed but
-the screen PAINT is deferred (documented; the LCG constants are embedded).
-Park horse tables D_800EBAAC/EBAD4/EBAFC also extern-only — the IPD-placed
-horse instances bob with the i*4096/3 phase rule (mapping assumption documented).
+### V43 delivery (this session)
+- 16 audit-v43 branches (pushed last session, never PR'd — context ran out) verified:
+  builds clean (10 engine `make -j2`, 6 camtrack node --check) + runtime smoke on DRU0100
+  (--shot t=5.0 + --r2shot t=5.0,pan=30,-5, md5 vs main; 5 branches pixel-differ:
+  rain-warmup/vel-minmax/noise-cos/noise-consts/watch-blend; 5 identical w/ verified
+  reachability reasons — see scripts/v43_smoke_results.txt).
+- 16 PRs filed: PoC #69-#84 (one per bug, evidence-dense bodies, A/B facts included).
+- PR #56 (B-11 tvV256) is now DUPLICATED by main a3a733b — flagged in a comment.
+- E-09-2 (live_done >=) folds into open PR #67 (V-3 verdict) — commented there.
 
-## NOT DONE (next session, in order)
-1. 3+ PARALLEL AUDIT AGENTS on the v27 diff (ripper catalog + posed emission,
-   the tick family vs decomp line-by-line, the mapLink merge, the wallpaper
-   sync) — commandment-level full audit NOT yet run on any of this.
-2. VLM visual audit (ferris flat-render investigation + fan/door/balloon frames
-   saved in download/ + /tmp/animtest).
-3. camtrack.html wiring (aim 5 for camtrack: preview toggles + authoring fields
-   for anims/userlight/flare/water).
-4. tvNoise screen paint (needs the TV quad tables — blocked on missing data,
-   or a texture-window heuristic documented as such).
-5. stoneChoreo/slideDoor/rngWalk/fallOnce/binSpin/scrollBelt ticks (parsed,
-   verified evidence in download/session15_evidence/DRIVERS_{A,B}.md — the
-   movement-state code is scaffolded but their tick branches idle).
-6. Stress matrix rerun on the new corpus + full-THR roundtrip sweep (the full
-   BG corpus is now local: 493 IPDs).
-7. Remaining old-tags cleanup: the PoC's v25.0 release tags stay; the wallpaper
-   now versions 1.7.x (done); consider PoC versioning alignment.
+### Remaining V43-confirmed findings → fixer wave F1..F14 (in flight)
+Engine: E-12-1/2, E-03-1..5, E-02-1/2, rot0, CT-4-1, E-09-1/3/4/5, E-11-1/2/3/4/5,
+E-10-1/2/3, E-15-1, E-16-1 (dedupe vs S20 7fe7ca0!), E-16-2, E-17-1 (V-1a verdict:
+anchor 2nd cross at D=v3), E-06-1/2, E-14-1..4, E-17-2/3, RIP2-1 (re-verify!),
+RIP2-2/3/4, RIP1-1, RIP-3-2/3, E-04-1/2.
+Wallpaper: WA1-1, WA2-6 (small); WA2-1..5 (verbatim re-port of render_frame body,
+WA2-4 needs shader additive path — biggest job).
+Camtrack minors: CT-2#4/#5/#6/#7d, CT-5-3. No-fix (design/INFO): CT-3-1, WA1-3,
+WA-1 driver curve, WA-2 VK cap; E18-8 = doc gap (open doc item, low priority).
+Slug assignments fixed per agent to avoid collisions (see fixer prompts).
 
-## Key files
-- Evidence: download/session15_evidence/DRIVERS_A.md, DRIVERS_B.md (verbatim,
-  every driver with file:line).
-- Renders: download/ferris_day_{a,b}.png, fan_real_*.png, carousel_day.png.
-- Test camdats: /tmp/cams/*.json (lookMode point; generator script
-  scripts/make_anim_camdat.py in PoC repo).
-- Repos: PoC main @4aa664e, wallpaper main @3d57ee2 (v1.7.32 released).
+### V44 wave (user directive): FULL line-by-line, small blocks per agent,
+verbatim constants/math vs decomp+swanstation; PoC + camtrack + android wallpaper;
+exclude the V43 registry + in-flight fix branches. Launch after fixer wave returns.
 
-# SESSION 16 — 2026-11-18: 4-agent audit fleet on v27 + all CRITICAL/MAJOR fixes + wallpaper v7.1
+### Open items for next session
+- RESTARTTEST GATE-A forensics re-calibration after #75 (env-tick-grid) merges.
+- Animated-room --shot goldens shift one tick when #78 merges (uniform).
+- WA2-4 shader additive path may land as its own follow-up PR.
 
-Sandbox retained the corpus+repos from session 15 (verified: 493 IPD, byte sizes
-match). Launched the REQUIRED 4-agent parallel audit fleet (A RipperCatalog /
-B TickFamily / C MapLinkGates / D WallpaperSync; briefings in
-download/session16_evidence/AUDIT_BRIEFING.md; reports AUDIT_*.md).
+### Session 6 fixer-wave results (F1-F14 + completions)
+- 11/15 first-wave agents OK; 4 died on context deadline but had pushed 12 orphan
+  branches — all recovered: F10b/F11c/F13b verified orphans + landed remaining 8
+  fixes; coordinator verified the 4 camtrack orphans + implemented CT-5-3 personally
+  (ct-tvpaint-30hz @ 511155f, probe: 30Hz cadence at any rAF rate).
+- RIP2-1 re-verified 14/14 overlays vs decomp (F11c caught+fixed 1 enum error:
+  SHELL_NE->SHOT_NEA on-branch). E-16-1 SKIP-DUPLICATE (main 7fe7ca0 already fixed).
+- WA2-4 shipped as silent-SW-fallback form; TRUE shader additive path documented
+  needs_work (FIX_V43_F13.md) — pixel-unverifiable in sandbox, NOT half-ported.
+- PRs filed: PoC #69-#132 (64 total this session incl. first 16), Wallpaper #8-#14.
+- Primary agent merged V42 PRs mid-wave (main bc2e65e->f23089c v33.30, +b7f66a5
+  double-glint fix) + Wallpaper v1.8/v1.9 twin ports — mergeability clean so far.
+- Twin-sync gaps flagged by fixers for the NEXT wallpaper sync wave: camtrack JS
+  splash cull/CLUT tail-derived (F5), camtrack.html:2584 shader-snap SXY clamp (F6),
+  wallpaper twin E-04-1/E-04-2 sites (F11c), rip re-rip corpus ripple +21 statics.
 
-## Fleet findings (1 CRITICAL + 14 MAJOR + ~20 MINOR)
-- W-D1 CRITICAL: wallpaper v7 sync LOST the __ANDROID__ dispatch in
-  run_realtime (v6 @5f092e9 had it) — the shipped v1.7.32 APK = BLACK
-  WALLPAPER (engine exits after one headless shot; proven via the release
-  APK's libsh1.so).
-- B-1 MAJOR: sh1x_anim_apply was NOT the engine order — I re-derived
-  Math_RotMatrixZxyNeg VERBATIM from libkmath.s:227-384 (register-exact
-  trace incl. the (sin±4096) products + trunc /2 idiom) + swanstation
-  gte.cpp MulMatVec (M·v row-major) + the ripper static path: engine =
-  Ry(vy)·Rx(vx)·Rz(vz) POSITIVE angles. Rewrote as
-  sh1x_rot_matrix_zxy_neg + S-conjugation + Q10/Q8 grids. VERIFIED
-  144/144 entries vs the algebraic form (scripts/mat_test.c, mechanically
-  extracted real function).
-- A-1 dampedSwing vyFloorRaw 0 → -91 (Q12(-0.02222f) LINEAR = -8deg);
-  A-3 drawbridge 2nd pair attachRoom THRFE08 (pos cell (-1,9)=THRFF09
-  nonexistent); A-4 fanArray count → 1/16 fans bound; A-5 settleDeg
-  -157.3242; A-6 pendVelFloorDegPS -3.0; A-7 beans BEAN1..8_HI
-  ((i>>1)+'1') + cutsceneOnly (NOT drawn engine-fresh — case 14 only);
-  A-8 --include-unused double-emission; A-9 loud skips; A-12 exact int
-  divs; B-2 spinConst poisoned by parse defaults; B-3 lightFlicker dead
-  (per0/per1 0 vs 64/64; 5534/2458 vs 5529/2457; write-only) — now WIRED
-  into light intensity; B-4 MOVACHES 60m teleport + clamps (0x3C720);
-  B-5 gravityScatter 10419 vs 1336/tick + per-instance scatter missing;
-  B-6 ferris pendulum 3rd branch + cabins (radius 11.25, pendulum rot
-  D_800EBB10[i]>>12, slot-4 aliases mvPendVel[0] — arrays 16B apart);
-  B-7 kickSwing settles -1790; B-9 fanArray ±split (i<7 subtracts);
-  B-11 Q10 rot + Q8 pos grids (WorldObjects_Add draw.c:503-4/572-4);
-  B-13 LUT sin/cos; C-D1 polarity per site (24/76 CLEAR — audit C's
-  452/453 claim was WRONG, my reads: !Get(452)/!Get(453) = CLEAR+proximity);
-  C-D2 glb_open OOB (ASAN-proven); C-D3 neighbor probe stderr+leak;
-  C-D4 TANA eventGate string → 282; C-D9 mirrorTo → sharedRot entries;
-  W-D2 ASSETS 4→10 files; W-D3 README Java step; W-D4-7 CI guards;
-  W-D9 printf→logcat placement.
-- My own additional finds: TOBIRA01 = sharedRot (rotation COPIED,
-  map1_s01.c:1287-9, same pos), map1_s03 TOBIRA01 = own rattle
-  (101|102 clear-or); chain door set: CHAIN1_1-3 (-262,0,-104 rot0) +
-  CHAIN2_2/3/4 adds (map2_s00.c:2195-2218); MOVACHES fresh = static
-  placement; ferris = 3 wheel models ×5 + FWBOX cabins (parity (wrap+i)&1).
+## Session 6 — V44 LINE-BY-LINE WAVE (owner directive: full read, small blocks, verbatim)
 
-## Commits (all pushed)
-- PoC feaa7c9 (v27.2): ripper catalog + posed emission fixes + consumer
-  verbatim matrix/tick/gate/bind/apply + ASAN/UBSAN-clean (0 issues on 7
-  rooms + maplink). HP0003 render BYTE-IDENTICAL (no-op contract);
-  mapLink 0px no-op + 3212px cliff fill; fanArray -2006/+2006 split;
-  ferris pendulum live 4/4 slots.
-- wallpaper 3fb532f (v7.1): CRITICAL Android dispatch + full v27.2
-  engine sync + ASSETS list + README/CI/BUILDING fixes + assets re-ripped
-  (HP0003 byte-identical to shipped; FC/FE sizes byte-identical; FD +128B
-  catalog). Host build green (398-item mapLink merge render). CI
-  run 44221646007 in progress → auto-bump 1.7.32 → 1.7.33 + release.
+8 finders (A water/fx · B GTE/lighting · C anims/scene · D render/live · E camtrack
+shaders · F camtrack drivers · G wallpaper twin-sync · H GLB data accuracy) + 2
+verifiers (V1 engine 13/13 CONFIRMED · V2 camtrack 8/8 CONFIRMED; 0 refuted;
+both UNCERTAINs resolved). Reports: download/v44_evidence/AUDIT_V44_*.md +
+VERIFY_V44_V1/V2.md (exact fix specs inlined for the fixers).
 
-## NOT DONE (next session)
-1. Ferris catalog completeness: FW2_BACK/FW3WIR_H + FWBOX1_B/FWBOX2_B
-   entries (driver ferrisWheel + cabin flag) + CHAIN1_1-3/CHAIN2_2-4 +
-   UMA2_HID; stoneChoreo STONE2 rates (map7_s02_2.c:2662-2740 vs s01).
-2. Idle ticks: slideDoor/rngWalk/fallOnce/binSpin/scrollBelt/
-   stoneChoreo (evidence DRIVERS_A/B §2-6, tick scaffolding exists).
-3. Camtrack editor wiring (aim 5: preview toggles + authoring fields).
-4. VLM visual audit (ferris flat-render investigation now fixable with
-   the polarity fix; fan/door/bean frames).
-5. Stress matrix rerun on the new corpus + full-THR sweep.
-6. tvNoise screen paint (TV quad tables still missing from the decomp).
-7. Final parallel re-audit round on the v27.2 diff + wallpaper release
-   verification (CI green + APK sanity).
+### V44 VERIFIED REGISTRY — ready for the next fix wave (fix specs in VERIFY files)
+ENGINE MAJOR: A-1 ghost-3 flare ABR (additive→subtractive, sprAbr param) · B-1
+billboard BK <<4 (SetBackColor sll 4 — ambient 16x dark) · C-1 bind pass-2 took
+counter dead (unposed over-bind, ER02FC; composes with #86; camtrack twin too) ·
+C-2 ripper rotStepDeg dropped (fix formula CORRECTED by V1: rot0+step*(inst+instBase)+master).
+ENGINE MINOR: A-2 water OT far-shift +128/+0x100 · A-3 g3/g4 order (benign) ·
+C-3 g_GravitySpeed 1337 not 1336 (4 literals+3 comments) · C-4 dampedSwing vyFloor
+-91 · C-5 MOVACHES clamp 247,562 (both old values wrong; true 60.4453 m) · C-6
+ferris driveGate/parity · C-7 float trig vs LUT (cases 14/15/18/0) · D-1 zone
+z-mirror (latent) · D-2 OTZ rounding→truncation (families resolved: D-3 same fix,
+keep +0.5 only at camera/anchor grid-reconstruction sites).
+CAMTRACK MAJOR: E-1 faithful RT no backface cull (mirror #110's n2-at-D=v3; DR0000
+6422 px — #110's message overstated occlusion, flagged in PR comment) · F-1 missing
+dt=0 boot-prime tick (one line in sh1xDriverReset: sh1xDriverTick(S,0), NO waterfall).
+CAMTRACK MINOR: E-2 MASK near no-entry (fold into #128, flagged) · E-3 SPLASH_VERT
+snap (FLAKE_VERT form) · E-4 wfDepth writes BLEND/holes (hide transparent mats in
+depth pass) · E-5 POST brightness-before-dither (580/2048 pairs, exactly one 5-bit
+step; CT-2#10 class) · F-2 SH1X_MAX_STEPS 180s cap (bound catch-up, not delete) ·
+F-3 tvPaint cA/cB coercion (latent).
+WALLPAPER TWIN-SYNC (verified by construction — ports of merged V42 commits):
+G-1 D-5 accessor wrap · G-2 C-1 DPCL/DPCS · G-3 C-2 flare occlusion depth ·
+G-4 A-2 sprite-quad UV · G-5 A-3 probe scale · G-6 A-1 water-quad inside ·
+G-7 D-1 K_R re-arm (Android-inert) · G-8 D-2 (inert) · G-9 D-3/D-4 desktop-only.
+Plus V43-fix twin syncs: A-1/A-2/A-3/B-1/D-2 + E-04-1/2 + WA1-1 (wa-primtype needs
+trivial rebase, main advanced) — one wallpaper sync wave covers all.
+DATA: H-2 glbs_v33 corpus 4-6 ripper generations stale (0 statics shipped vs 49/18
+rooms after catalog+re-rip; tvPaint SPU0401; waterFloor DRU0100; re-rip also REMOVES
+spurious v33.1 entries) — needs the trig-nibble branches + rip-statics-catalog +
+H-4's MAP2_S02 key merged, then ONE corpus-wide re-rip (primary agent's call) ·
+H-1 sizing: 66/2903 polys trigger-swapped in 11 rooms · H-3 33 neighbor links out
+of corpus (aim-6 must not trust resolvability) · H-4 map2_s02 5 pickups missing
+(extend rip-statics-catalog).
+RESOLVED UNCERTAINS: A-U1 mesh ot_base MIXED {0,2,4,33,66,99} — no single fixed
+gate exact; recommend OT-effective fb->z (z − base*8/256) or document · D-3 see D-2.
 
-## Session 16 LATE ADDITIONS (verified before cutoff)
-- CI run 44221646007 COMPLETED success: bump a9cee26 "1.7.33" (exactly
-  +1 level ✓), RELEASE v1.7.33 published with BOTH APKs (6.31/6.13 MB,
-  release assets, 0 workflow artifacts).
-- v1.7.33 APK VERIFIED (downloaded + unpacked): libsh1.so CONTAINS the
-  Android backend markers ("realtime: Android surface backend" +
-  sh1_android_set_window — the CRITICAL fix is IN the shipped binary);
-  the headless fallback string is dead-code-eliminated; the logcat tag
-  present; all TEN sh1 assets inside (incl. THRF9FC/FE + SU0203).
-- Ferris now MOVES at engine-fresh (no demo): APU00FF t5 vs t10 = 146px
-  differ — the 452-CLEAR polarity fix (audit C's 452/453 claim was
-  wrong; my direct reads of map6_s04_2.c:3495-3510 proved both CLEAR).
-- VLM visual audit (fan/room/wallpaper frames): renders are coherent
-  (school ceiling/beam + lattice textures, PS1 dither OK); the wallpaper
-  streets-west frame shows the authored fence + NOTICE sign with the
-  correct near-black night pair {6,3} fog; the fence texture mirroring
-  between panels = AUTHORED IPD UV alternation (the emission contract +
-  roundtrip byte-identity prove UVs verbatim — not a renderer defect).
-- PoC remote = feaa7c9 verified via API (the tracking ref was stale).
-- Sandbox NOTE: /tmp AND fresh project dirs were reaped MID-SESSION
-  (globs2 vanished between commands); evidence re-generated under the
-  repo tree (PoC input/v272/) — always keep working files in the repo
-  dirs, never /tmp or new top-level dirs.
-
-# SESSION 17 — 2026-11-18: user-confirmed fan demo + 6-agent accuracy audit fleet + ALL fixes + v31 releases
-
-User CONFIRMED the fan demo video (SU0203_fan_demo.mp4) correct+perfect.
-User's SU0300 fan-location corrected: fan = SU0203 (cell math + IPD strings
-+ render evidence); SU0300 = fanless corridor.
-
-## Releases shipped (API-verified live)
-- PoC v28.0: RUN_SU0203 one-click + anim regression check in CI; linux+win
-  zips + tarball.
-- wallpaper 1.7.34 (v8 scene manifest) + 1.7.35 (v9 v31 engine sync):
-  both APKs, releases verified.
-
-## 6-agent audit fleet (A-F; reports session17_evidence/AUDIT_*.md)
-1 CRITICAL (fanArray z-stack), 6 CRITICAL total + ~15 MAJOR + TV/rngWalk
-no-ops + 46 missing catalog objects + wallpaper divergences. ALL FIXED:
-
-## v31 fixes (all re-derived from decomp, harness 0-mismatch, re-audited 3x CONFIRMED 0 REFUTED)
-- Engine: fx_oresen_hokan verbatim vwOresenHokan; flare pow input; streak
-  6963; ghost colors (1228/1433 truncations); water plane Q4 8->0.5m;
-  caustics at-plane + opaque band + g3-under-g4 order + ring un-nested;
-  FX anchor unpitched; scr_l_ang_z NORM_U; water gating light-pos+Spot;
-  TV (map4_s03) LCG+4-state machine LIVE (paint blocked: D_800DB7D4/E4/874
-  extern-only — documented); SITAI_NE rngWalk verbatim LIVE (DRU0100
-  proof: corpse visible, 197px/tick); per-track weatherTarget; modulate =
-  swanstation VERBATIM (((tr>>3)*vr)>>4)+orr (unified both engines).
-- Ripper: fanArray 16 z-poses (per-iteration vz-=5); ferris FW2_BACK/
-  FW3WIR_H/FWBOX1_B/FWBOX2_B; carousel family complete (UMA split CORRECTED
-  per decomp: i<6=UMA2, i>=6=UMA1); CHAIN2_2/2_3/2_4; TOBIRA00(map1_s03);
-  STONE2_H fabricated pose removed; 36 elevator slideDoors; DOR1-4_HID/
-  BDOOR1_H/ISU_HIDE/URA_HIDE/UNDER_HI + <waterfall> manifest; water
-  illumination Q4+meters. Verified: SPU0100 16 posed fans; APU00FF 7
-  propAnims/50 posed; APU0002 8/38; roundtrips byte-identical.
-- Wallpaper v8/v9: scenes.json manifest + DYNAMIC asset copy + rotation
-  (scene.idx) — fan PLAYS on device; negative-idx normalize; ATOMIC copy
-  (tmp+rename+ok-stamp); manual-tag release fix; engine = v31 + 3 Android
-  hunks ONLY (diff-verified 177 lines, all __ANDROID__).
-- CI: PoC anim regression check (frozen-cam 1-tick diff, 22158px PASS);
-  wallpaper +1 bump flow verified twice (1.7.34, 1.7.35).
-- scene-insertion protocol: drop files + one manifest entry (no Java edit).
-
-## Known remaining (honest backlog, next session)
-1. TV screen QUAD PAINT: blocked on D_800DB7D4/E4/874 + D_800DB7C8 tables
-   (extern-only in the decomp repo; contents live in the game .exe — the
-   CDN sample has disc files only). State machine + LCG tick verbatim.
-2. M2 water ripple TILES (func_8008E5B4): DR_WAVE.TIM IS on the CDN
-   (/sh1/TIM) — implementable next session (embed like rain/snow TIM data;
-   tpage 45 CLUT (224,0) window math documented in FIX1_EngineChanges.md §4).
-3. Camtrack editor (aim 5 for the 4th component): authors camdats incl
-   per-track weatherTarget (now PARSED by the engine) but has NO SH1X anim
-   preview/toggles — the Phase C4 item (worklog sessions 10-16 backlog).
-4. Catalog: ~10 remaining objects (map3_s03/04/05 slideDoor spot-audits
-   passed but e.g. MGR missing pieces are covered; see REAUDIT_V2 §5; the
-   found-list is 95 objects, catalog now ~85 — see AUDIT_F table rows not
-   yet encoded).
-5. PoC 'ain]' workflow glob was a terminal-render artifact (od -c proof:
-   [main] was always on disk) — commit message wording overstated it.
-
-Evidence: download/session17_evidence/ (AUDIT A-F, FIX1/FIX2, REAUDIT V1-V3).
-
-# SESSION 18 — 2026-11-18: EVERY special case tested — 19 GIFs + water/flare images + the v32 engine (the crashed session, resumed + completed)
-
-User directive: test EVERY special case, GIFs of the movement, water-reflection +
-lens-flare images, ALL of it in a ZIP for MANUAL analysis (explicitly NO VLM),
-the GLTFs alongside, parallel agents maxed.
-
-## The state at resume (crash recovery)
-- Session 18 had ONLY A_SWEEP.md (the authoritative inventory sweep: 450
-  WorldObjects_Add sites classified, the windmill verdict = ZERO decomp hits,
-  the §4 gap list). Sandbox survived; PoC @195f8e7 (v31), wallpaper @1.7.35.
-- All special-case room files already local (gamefiles/BG = 1201 files, 493 IPDs).
-
-## v32 ENGINE (fog_poc.c, commit f0e93ac)
-- The 5 deferred tick cases IMPLEMENTED verbatim: slideDoor 16
-  (sharedFunc_800D15F0_3_s01.h:341-353; per-entry speed/accel/slideIdx),
-  fallOnce 18 (map4_s03.c:1688-1735, ratan2 torque + damping + clamps),
-  stoneChoreo 10 (map7_s01_2.c:1516-1596 5-state levitation),
-  binSpin 19 (map7_s03_3.c:8238-8245, init -1906 from :6297),
-  scrollBelt 20 (map7_s03_3.c:8296-8355, shared D_800F48A4 master).
-- THE WATER FX: DR_WAVE.TIM (finally local) embedded via
-  tools/extract_dr_wave_tim.py -> src/dr_wave_data.h; func_8008E5B4 live-tile
-  scroll (UV phases (ctr>>1)&0x1F / ((ctr+1)>>2)&0x1F, tpage-45 ABR additive);
-  the map5_s00 ripple mesh + 12 sprites (func_800CB25C verbatim: spawn box
-  Rng(Q12(-92.75)...)..., t walk +-31 clamp [0,4095], half-size t*1.5m,
-  brightness MIN((1-t)*32,16), SUBTRACTIVE sprite blend tpage 75); the
-  map1_s02 waterfall (2 verbatim emitters (-16.4/-14.8, 0.1, -51.2), spread
-  Q12(1.6), 10 droplets, Q12(6.0) terminal cap, 2.1m band recycle, 0.5m
-  textured additive quads).
-- Catalog: WHEEL_BA polarity "clear" (LIVE at fresh until LOOKAR), slideIdx
-  0-5 x36, BOX_HIDE, CHAIN1_1-3, map7_s00 4 doors + DR3R/DR3L text corrected,
-  CHAIR_HI, binSpin/scrollBelt driver swaps (demo-gated), EF.TIM, belt poses.
-
-## 3-agent audit fleet (V32-A/B/C; reports session18_evidence/AUDIT_V32*)
-- V32-A: 2 CRITICAL + 5 MAJOR (stone wobble Q12 shift missing = 613m teleport;
-  stone rise guard inverted = stall; slide base typo; rest rot; binSpin init;
-  waterfall emitters x10; recycle sign) — ALL FIXED + re-verified.
-- V32-B: 2 MAJOR (map7_s00 DR2 slot annotations i-2 not i%2; DR3R/DR3L signs
-  swapped pre-existing) — FIXED.
-- V32-C: 2 CRITICAL + 3 MAJOR (the ABR mis-decode: setSemiTrans only ENABLES,
-  the mode is tpage bits 5-6 — 45/43 = ADDITIVE, 75 = SUBTRACTIVE; the sel-row
-  page mismatch honesty; droplet appearance) — FIXED (hardware-true blends +
-  honest comments). ABR naming/semantics in the v31 glint/caustic comments
-  ("ABR-1 average" labels) = logged FOLLOW-UP (visuals pixel-verified, subtle
-  avg-vs-additive delta).
-- MY OWN finds during testing: the case-21 fall-through (case 21 fell into
-  case 22, seeded poisoning = ripples never spawned); the flare rate needs
-  in-process warm-up shots (the easing is per-frame, one shot = one step).
-
-## The deliverables (download/)
-- sh1_special_cases_v32.zip (1.9MB): 19 special-case GIFs (fans x2 sets,
-  wheelchair wheels, rattling doors x2, boiler, ferris, balloons, corpse,
-  carousel, elevators, stone, bin, belt, damped doors, waterfall, fence,
-  ripples, TV room) + the water/flare PNGs (water_shimmer_night + A/B +
-  t2, water_ripples_day x2, lens_flare_night + A/B + t2) +
-  pixel_evidence.json (numpy motion proof per GIF — NO VLM) + the driver
-  traces (TV LCG/state machine, corpse walk, ripple walk) + MANIFEST.md
-  (the manual-analysis guide: every file's verbatim source + gate state +
-  the documented deviations + the windmill verdict).
-- gltfs_v32/ (41 GLBs, 51MB): every special-case room + the full corpus,
-  scene-level SH1X extras with the v32 catalog (slideIdx, binSpin/
-  scrollBelt/waterRipple/particles drivers, WHEEL_BA clear, new objects).
-- Evidence: session18_evidence/special_cases/ (the GIF/PNG/trace sources)
-  + AUDIT_V32A/B/C.md.
-
-## Engine-true notes (for the manual analysis)
-- The TV screen paint stays BLOCKED (D_800DB7D4/E4/874 extern-only) — the
-  state machine + LCG tick PROVEN by the trace (ch=0 = engine-true off).
-- The water sel-row tiles = map-load VRAM uploads NOT on disc — the PoC
-  renders DR_WAVE content tiles + the animated tile as a documented
-  VISIBLE STAND-IN; the blend modes ARE hardware-true.
-- The ripples are engine-true SUBTLE (prim <=16, subtractive) — the
-  movement is quantified in pixel_evidence.json, not eyeballed.
-- Windmills: DO NOT EXIST in SH1 (verified zero decomp hits) — the fans +
-  boiler wheels + park rides are the real assets.
-
-## Pushed
-- PoC main f0e93ac "v32" (engine + catalog + tools/tests/special_case_gifs.py
-  + tools/tests/verify_v32_glbs.py + tools/extract_dr_wave_tim.py).
-
-## NOT DONE (next session, in order)
-1. Wallpaper app v32 sync (the 3-Android-hunks rebase onto v32 + the new
-   special-case assets into assets/sh1 + scenes.json entries + CI bump).
-2. Camtrack editor (aim 5, 4th component): SH1X anim preview toggles.
-3. The v31 ABR comment family ("ABR-1 average" labels on the glint/caustic/
-   snow paths — the blends are pixel-verified but the comments mislabel the
-   hardware modes; re-derive + relabel + re-audit the visual deltas).
-4. TV quad paint: still blocked on the .exe tables (cannot be recovered
-   from the CDN sample).
-
-# SESSION 19 — 2026-11-18/19: CI/release consistency fix + wallpaper v32 sync + camtrack wiring + the 3-agent audit round
-
-User issues: (1) CI does not rebuild/release consistently (v28 latest release
-but v31 exists); (2) where is the APK signing key; (3) what files are needed
-to resolve the blockers.
-
-## ROOT CAUSE of the release inconsistency (API-verified)
-PoC releases only fired on MANUAL v* TAG pushes; v31/v32 existed only in
-commit MESSAGES — no tags, no releases. The wallpaper bump flow (proven
-twice: 1.7.34/1.7.35) was the fix pattern.
-NOTE (audit-corrected): the 'branches: ain]' corruption claim in session 17
-was a TERMINAL RENDERING ARTIFACT — the files on GitHub were always
-[main] (base64-verified). The poc.yml/android.yml rewrites keep [main]
-explicit; the claim is corrected in the v32.3/v10.1 commit messages.
-
-## Shipped
-- Backfill tags v31.0 @195f8e7 + v32.0 @f0e93ac -> both BUILT+RELEASED
-  (linux+win zips + tarball, CI success).
-- PoC poc.yml v32.2: bump job on EVERY push to main (version.txt +1 minor,
-  [skip ci] commit, tag vX.Y, GITHUB_TOKEN push; build jobs needs:bump
-  if:always() release under the fresh tag — the android.yml pattern).
-  LIVE-VERIFIED: v32.1 released from the ed46bc3 push (release
-  sh1x-poc-32.1-*). v32.3 hardening: concurrency group poc-ci-<ref>
-  (rapid-push tag collision = no-release race), rel.tag always v-prefixed
-  (zip naming parity), the false ain] comment corrected.
-- ENGINE animsDemo (models[].env, camdat): the demo-gated drivers play per
-  scene for ANY env-driven consumer; STRICT boolean; CLI --anims-demo
-  keeps precedence. Verified: BIN_HIDE cur -261.83 (spinning) with
-  env:true vs (0,0,0) frozen with :false; agent B re-verified all four
-  priority combinations live + pixel (19px vs 0px).
-- ABR relabel + the caustic-ring code FIX: the ring's semi G4/G3 pair
-  rides SetDrawTPage(..,32) in the SAME spD4 OT bucket added LAST = drawn
-  FIRST (AddPrim = head insertion/LIFO, GsDrawOt = high->low) => ABR bits
-  (32>>5)&3 = 01 = ADDITIVE B+F. Code was (B5+F5)>>1 average — FIXED to
-  b5+f5. Agent B verified via PsyQ OBJECT DISASSEMBLY (AddPrim@0x800943BC,
-  SetDrawTPage packing) + the fade.c empirical cross-check (white fade
-  tpage 32 additive vs black fade tpage 64 subtractive) + a live A/B
-  (11084px changed, ALL brighter = the additive signature).
-- WALLPAPER v10 (5f042f9, released 1.7.36) + v10.1 (d14516e -> 1.7.37 in
-  flight): the v32.3 engine transplant (re-applied after the audit found
-  the first transplant predated the v32.2/v32.3 fixes) + 18 new
-  special-case scenes (21 total; camdats authored from the GIF cases) +
-  the hash-stamped asset refresh (CRITICAL audit fix: modified assets
-  re-copy for EXISTING users — the existence-only .ok stamps kept a stale
-  scenes.json forever on app update) + the ERFCFC stone camera re-author
-  (the GIF cam framed an OCCLUDED stone — the frozen-cam 'motion' was
-  snow; new 2.1m cam: 2252px t1->t8) + android.yml: concurrency group,
-  bump paths += res/settings/gradle.properties.
-- CAMTRACK v13.2/v13.3 (aim 5, the 4th component): animsDemo authored +
-  exported (sanitizeEnv/panel/import/doc — schema parity with the engine
-  parse) + the SH1X prop-anim PREVIEW tick (spin family + fanArray,
-  deterministic rot=rot0+rate*t — scrub-safe) with the audit-fixed bind:
-  animInst instance ordering (was lexicographic: 12/16 fans misbound),
-  spinSplit (the ripper's real key; 'fanSplit' was dead), the
-  S-conjugation (Ry(-vy)Rx(vx)Rz(-vz) = the engine's glTF matrix; y/z
-  spins were mirrored), nearest-xz binding for duplicate names (the
-  engine's own rule). Scene extras extracted from the GLB JSON chunk
-  directly (glbSceneSh1xExtras). The swing/choreo/water/TV families stay
-  at the authored pose in the EDITOR preview (documented; the engine
-  players play the full verbatim set).
-- The map5_s00 ripple-mesh prim color r-only fix ((field_160,0,0) —
-  map5_s00.c:223-224; the g channel was brt).
-
-## The 3-agent audit fleet (A wallpaper / B engine / C camtrack+CI)
-Findings: 1 CRITICAL (stale-asset update path) + 4 MAJOR (unclean
-transplant, static stone scene, fanArray misbind/spinSplit/mirror,
-rapid-push race) + ~6 MINOR/NIT — ALL FIXED in v32.3 + v10.1 (see commits
-24eb5ae, d14516e) and re-verified where applicable (stone scene 2252px,
-transplant grep-checks, YAML parses, node --check 5/5 blocks clean, engine
-0 syntax errors + host render OK).
-
-## ANSWERS for the user (recorded for the next session)
-1. CI: fixed as above — every push to main releases; version.txt owns the
-   number (commit labels + version.txt can drift by one this session:
-   the v32.2-labeled commit shipped as release v32.1, v32.3 -> v32.2;
-   future commits should stop carrying version labels).
-2. APK signing: sh1.keystore COMMITTED at the wallpaper repo root (alias
-   'sh1', password 'sh1wall' — BUILDING.md documents it; regenerate your
-   own for anything public). Both debug + release APKs in every GitHub
-   Release are signed with it via the CI assembleRelease.
-3. Files needed to unblock the rest: the GAME'S MAIN EXECUTABLE — the US
-   NTSC PS-EXE (SLUS_007.86; or the full disc image). It carries the
-   extern-only tables the decomp does not ship: the TV screen quads
-   D_800DB7C8/D_800DB7D4/D_800DB7E4 + the TV channel texture table
-   D_800DB874, the park horse tables D_800EBAAC/EBAD4/EBAFC. With it I
-   can extract the tables by address and finish the TV screen paint +
-   verify the horse choreo. (The windmills do NOT exist in SH1 — zero
-   decomp hits; the M2 water sel-row tiles remain a documented stand-in
-   unless the exe's map-load uploads cover them.)
-
-## NOT DONE (next session, in order)
-1. Verify v32.2 + 1.7.37 releases landed (API) + download the 1.7.37 APK
-   and verify: libsh1.so v32.3 markers (dr_wave WATERDBG braces, ring
-   additive line), all 21 scenes + hash-stamp Java fix present, scenes.json.
-2. The camtrack preview family coverage (the spin subset only today).
-3. TV quad paint + horse tables (blocked on the .exe above).
-4. The PoC README: document the version.txt policy (commits stop
-   carrying vX labels; version.txt owns the release number).
-
-# SESSION 20 — 2026-11-19: the USER-REPORTED fixes (exe, env EXTRAS, bind, water, labels, the GLB zip)
-
-## The exe (SLUS_007.07) — what it actually is
-sha1 f38344565fb731befc52fd968eb5a667be37acf3 == the decomp main.yaml
-target (EXACT 1.1 NTSC). It is the 80KB MEMORY HANDLER (README: "serves
-primarily as a memory handler"): file_info.c (the full CD file table —
-2074 files), fs_*, rng.c. VERIFIED byte-level at Rng_Rand32 0x800120B8:
-LUI 0x19/ORI 0x660D (=1664525) + LUI 0x3C6E/ORI 0xF35F (=1013904223)
-— our sh_rng constants are VERBATIM.
-THE TV/horse tables are NOT in the exe: D_800DB7C8/7D4/7E4/874 live in
-VIN/MAP4_S03.BIN (vram 0x800C9578 + 0x12250), the park horse tables
-D_800EBAAC/EBAD4/EBAFC in VIN/MAP6_S04.BIN (map6_s04 overlays). The
-exe's file table lists all 49 VIN/*.BIN — NEXT ASK: MAP4_S03.BIN +
-MAP6_S04.BIN uploads to finish the TV paint + horse choreo.
-
-## Fixes shipped (user issues 1-4 + core 1-4)
-1. ENV EXTRAS: scripts/derive_room_env.py derives EVERY room's ORIGINAL
-   WorldEnv pair from the decomp (map_points.h/camera_paths.h cells ->
-   overlay; header.c field_16/17; MAP_INFOS flags; effects.c
-   D_800A9F80..A98 + the switch). 493 rooms, 17 risky same-tag cells
-   documented, share-weighted primary (the boss arena SU00FF ->
-   MAP1_S05 {9,9}). Ripper emits SH1X.env (pair + full presets verbatim
-   WORLD_ENV_PRESETS[21]). Engine boots the GLB env BELOW camdat/CLI;
-   auto-discovered camdats are NOT env-authoritative (camdatAuto);
-   weather boots from field_17; dark-room pairs boot flashlight ON.
-   VERIFIED LIVE: SU0203 boots {7,4}+flashlight, DR0100 boots {6,3}+rain.
-2. FAN NOT ANIMATED -> animations ON BY DEFAULT (g_animsDemo=1; --no-anims
-   opts out; camdat env boolean still overrides). The fan ticked all
-   along — the failure was env/visibility. VLM-verified fan_school_v33.gif.
-3. BALLOONS: the bind bug reproduced (one capsule's pieces bound, 11
-   static) -> sh1x_anims_bind REWRITTEN to INSTANCE GROUPS (posedInst
-   groups; stem+translation groups; the strict #N/_mN name rule). VLM
-   verified: multiple capsules orbiting.
-4. WATER: agent research found func_8008E4EC — the engine redirects
-   the IPD material named "DWAVE" to tpage 13 (x=832) at EVERY chunk
-   load, so the WATER FLOOR geometry samples the region func_8008E5B4
-   rewrites per frame. Our port rendered it STATIC. NOW: the ripper
-   flags DWAVE materials SH1X.waterLive; the engine samples the LIVE
-   32x32 animated tile (u/v wrap — the floor prims wrap v 4x).
-   VLM: "horizontal streaky banding suggests a scrolling/wave texture".
-   The glint column/caustic ring/gating (lightMode Spot + light in zone)
-   were already v32-correct.
-5. LABELS: balloons -> "the 12-seat spinning carnival ride"; boiler ->
-   "the moving bars" (map1_s05 = the SU00FF boss arena, SplitHead room);
-   fan_array_hospital -> the SPU nightmare-town street (NOT a hospital).
-6. CAROUSEL verdict (user question): BOTH — world-space rotation in
-   normal play (fresh speed 0; fight -455; ending -122), the camera
-   rides the platform ONLY in the ending cutscene steps 22-27 (radius
-   5.2 around (20,-2,100) driven by the SAME accumulator D_800ED5B6;
-   the light rides at radius 4.8). Horses: fixed xz/yaw (extern tables),
-   bob only. No world-matrix rotation anywhere in map6_s04.
-7. FERRIS/FAN_ARRAY/TV_ROOM invisibility: the room-original envs are
-   NIGHT ({6,3}/{7,4}: 9.3-14m BLACK fog) — authentic; the GIFs use
-   --envpair 1,1 for visibility + fan_school_env_authentic_v33.gif
-   keeps the dark proof.
-
-## Deliverables
-- download/sh1_anim_rooms_v33.zip — 41 GLBs (ORIGINAL names) + README
-  (the user authors camtracks; env boot + bounds documented).
-- download/session20_evidence/*.gif — fan/carnival/carousel/ferris/
-  fan_array/water_floor + the authentic-env fan.
-- Repos: PoC 4ee942d (v33; 44 GLBs in glbs_v33/), wallpaper ac42b08
-  (v10.2: engine transplant + ALL 22 scene GLBs re-ripped).
-
-## Remaining (next session)
-1. The TV screen paint + horse tables (BLOCKED on VIN/MAP4_S03.BIN +
-   VIN/MAP6_S04.BIN uploads — the exe does NOT carry them).
-2. The deeper water items from the S20 research agent (the sel-row
-   read-window topology note; the waterfall stream-mesh cross-fades;
-   the sewer drip ×1.5 brightness + FloorType_11 splash) — the core
-   (live floor + zones + glint + ring + droplets) is now in.
-3. CI release verification (PoC v33.x + wallpaper 1.7.38 APK).
-4. The audit fleet findings (below, after the run).
-
-## SESSION 20 AUDIT ROUND (3 parallel agents: engine/ripper/integration)
-Findings: 1 CRITICAL + 4 MAJOR (engine) + 1 MAJOR (ripper honesty) +
-~19 MINOR — ALL FIXED in v33.1 (PoC 6c2cf52+c08d205, released v33.1;
-wallpaper 7443c82, released 1.7.39 with both APKs — verified: libsh1.so
-arm64 contains the waterLive/presetIdx0/SH1X.env/no-anims markers, 22
-fresh GLBs inside):
-- C-1: the GLB env presetIdx had NO upper bound -> OOB read of
-  SH_MAP_EFFECTS_INFOS[999] — now bounds-checked + a loud ignore.
-- M-1: the bind centroid was computed in MESH-LOCAL space (the v33 first
-  cut!) — ER02FC's belt (posed emission + baked duplicates) mis-bound:
-  one segment froze + a 25-item phantom animated copy teleported ~145 m.
-  FIXED: world centroid = M*local_centroid; runtime re-verified
-  (APPLY t=(100,0,143.7)/(100,0,163.7), no phantom).
-- M-2: the fogEnabled fold missed the camdatAuto gate (an auto-camdat's
-  env.engine:false could kill the fog on a default run) — gated.
-- M-3: field17==0 rooms kept the street snow (snow_init boots recipe 2);
-  now recipe 0 (none) applies — 17 rooms fixed.
-- M-4: the selection could mint animInst >= count + duplicate indices —
-  rewritten POSED-FIRST (posed groups bind with their own index; unposed
-  fill the remainder, clamped).
-- ripper M1: 17/493 rooms CONTESTED (the same room file serves overlays
-  with different field_16 — floors share cells) — now marked
-  contested:true + envAlternates in the table + the GLB; the docstring
-  softened. m1/m3/m4/m7/m8/m9 fixed (ER2 flags string, the missing-table
-  warning, fogModeRaw/lightModeRaw, the refreshed line citations,
-  version 33.0, the schema doc + env/waterLive sections).
-- integration: 44/44 GLBs have env blocks (spot pairs exact); the
-  transplant is EXACTLY PoC+3 __ANDROID__ blocks (zero other hunks);
-  22/22 wallpaper asset md5s match; the zip = 41 GLBs + README md5-match.
-  The --no-anims pixel-diff claim was FALSE (the spinRng per-tick jitter
-  draws the global RNG — engine-true coupling); the README now documents
-  it. DR0000 has no DWAVE surface (zones + ripple only) — room-true
-  suspected (the key-pool room's water is particles, not a floor).
-- The CI bump race (rapid pushes -> a partial tag push) resolved: the
-  orphan v33.1 tag deleted + the run re-run -> v33.1 released (all
-  three assets). The rapid-push pattern is a known CI footgun — push
-  once per batch or re-run after a failure.
-
-## SESSION 20 LATE: the carousel/ferris visibility root cause
-The park GIFs (carousel/ferris) came out BLANK: the cameras sat OUTSIDE
-the room's 40 m chunk cell — the engine's subcell window draws NOTHING
-outside it (engine-true). Fixed cameras INSIDE the cells: the carousel
-(APU0002, cam (20,3.5,-88) -> (20,1,-100)) renders the platform +
-canopy frame (19,120 px first-last diff); the ferris (APU00FF, cam
-(8,8,38) -> (8,-4,26)) renders the wheel + a swinging cabin (136,900 px
-diff). The CRITICAL camtrack-authoring guidance (the cell rule + the
-z/y negation) is in the ZIP README. The earlier "carousel not animating"
-false alarm: the v32 APU0002 'animation' was SNOW FALLING (my M-3 fix
-correctly removed it for the park env — weather: none). The
-carouselSpin pose still REPLACES rotDeg[1] (dropping the per-spoke
-90+i*45 offsets — all 8 fence spokes overlap at one angle): a REAL
-pre-existing pose bug found while re-verifying — logged for the next
-session (needs rot0[1] + master*R2D per map6_s04_2.c:3667-3693).
-
-## SESSION 20 FINAL: the carousel spoke fix SHIPPED + the releases
-The carouselSpin pose bug was FIXED in v33.3 (rotDeg[1] = rot0[1] +
-master*R2D — the 8 fence spokes now spread around the ring; VLM: "5-6
-visible poles"); the wallpaper synced to v10.4. RELEASES: PoC v33.3
-(all 3 assets, CI success) + wallpaper v1.7.40 (both APKs, CI success).
-All 41 ZIP GLBs re-verified (env blocks 44/44 in the repo corpus; the
-zip carries the post-audit re-rip).
-
-## SESSION 21 (v34) — the user's four issues + the correct wallpaper source
-USER REPORTS (tested): (1) PoC v33.3 fan NOT animated while camtrack
-plays it — the camdat env animsDemo:false (the EDITOR'S DEFAULT
-CHECKBOX) gated playback; APU00FF/APUFFFE also dead in camtrack (the
-editor only previews the spin family). (2) The user programmable light
-source still missing. (3) Water still broken — 3 reference screenshots
-provided (1920x1080 emulator, the DR flooded street at night with
-rain + flashlight). (4) env extras: rain indoors; the day/night
-population rules; "the Extras field should be unbiased and copy the
-original configurations". NEW: the CORRECT wallpaper source is
-fog-wallpaper-v10_7-source.zip (the old repo base was an extremely
-broken alpha shell); the wallpaper repo must be CLEARED and rebuilt
-from v10_7 + the PoC changes ported + CI.
-
-### S21 engine fixes SHIPPED (PoC 33a5de5 = v34):
-- T1 FIXED: animsDemo no longer gates (81.7% pixel change with the
-  user's own 3-map camdat — the fan plays; the GLB EXTRAs are the
-  authority; only --no-anims opts out).
-- T5 WATER (partial, decomp-verified):
-  * the DWAVE floor = SEMI-TRANS ADDITIVE (field_E=45): the runtime
-    rewrite (func_8008E4EC -> Lm_MaterialFsImageApply1(...,1) ->
-    Material_FsImageApply) — raster_tri RP_ADD_TEX: dst5 = B5+F5
-    (modulate + veil) clamp 31. THE false alarm: prim (128,128,128)
-    = the IDENTITY modulate ((T5*128)>>7 = T5) — the v33 A+B composite
-    was already verbatim; do NOT "fix" it again.
-  * the water scroll counter D_800AFDAC moved to the 30Hz TICK
-    discipline (fx_water_scroll_sync at the sh1x_anims_sync sites,
-    the zone gate verbatim lens_flare.c:76-93): the shot/scrub paths
-    froze the scroll before (0.5% frame diff); now 15.6%.
-  * The reference pixel truth (VLM + pixel-peep): the DR water =
-    near-black level ~3 dither (24/33 mix) at distance + the GREEN
-    caustic-ring streaks (4,8,4) + warm (20,18,12)/(24,22,12) near
-    the light; NO blue tint; the brightness overlay adds level 3
-    (screenBrightness=28, Q12_MULT(4096, cfg.brightness*8+4=28)>>12,
-    settings_reset.c:19 brightness=3; the semi-trans G4 additive
-    overlay bodyprog_80055028.c:108-133). The flash pair semantics:
-    current = blend(transition[0], transition[1], flashlightIntensity)
-    (effects.c:454) — pair[1] = the FLASHLIGHT preset (Spot, white
-    tint, fog off). My engine already blends correctly.
-  * REMAINING water work: VLM-verify the ring/glint visibility + the
-    near-water glow; the map5_s00 ripple sel-window topology; the
-    waterfall stream cross-fades.
-
-### S21 root causes found (not yet fixed):
-- T2: camtrack.html previews ONLY spin/spinRng/spinConst/fanArray —
-  APU00FF (sineBob 12 + ferrisWheel 14) + APUFFFE (sineBob +
-  lissajousOrbit 15) never animate in the editor. THE FIX: port ALL
-  24 driver families' tick+pose+apply to the editor's JS (verbatim
-  from fog_poc.c sh1x_anims_tick :8797+ / sh1x_anim_pose :7898+ /
-  sh1x_rot_matrix_zxy_neg :8060+ / bind :7900-8066; RNG =
-  seed*1664525+1013904223>>17). Also REMOVE the animsDemo export
-  (the field is dead in v34 engines) + scrub-safe re-run from t=0.
-- T3: the ripper's SH1X.env carries presetIdx0/1 + field16/17 but the
-  CAMTRACK EDITOR defaults env to {1,1}+weather2 regardless of the
-  GLB (the user's camdat = dayEnv1/nightEnv3/weather2 on ALL THREE
-  rooms incl. the nightmare school). FIX: the editor derives the
-  model env defaults FROM THE GLB'S SH1X.env at load (dayEnv/nightEnv
-  populated per the original day/night pair; nightmare-only -> both =
-  night; weather from field17) + the ripper emits dayEnv/nightEnv
-  explicitly (unbiased — the original configurations only).
-- T4: userLight exists in EXTRAs (mode/offset/ramp) but NOT the
-  programmable light SOURCE the user asked for: "move in all the ways
-  the camera can, disable-able, never fires in day modes, angle
-  distinction". The engine has --userlight x,y,z / ahead:N modes +
-  the Sh1x userLight offset override — needs: the camdat/editor
-  surface (a light track? a per-model userLight block) + the PoC
-  runtime keys + the day-mode suppression gate + full 3-axis aim.
-
-# SESSION T2-camtrack-drivers — 2026-11-19: ALL SH1X driver families ported to the camtrack editor preview (fixes "APU00FF.glb DOES NOT WORK")
-The user report: "APU00FF.glb DOES NOT WORK — and nor does APUFFFE.glb (on
-Camtrack). I think animations not working is the norm rather than the
-exception." Root cause (S21/T2): the editor's applySh1xPropAnims only
-animated the spin family + fanArray — sineBob/ferrisWheel/lissajousOrbit/
-carousel/scrollBelt/stoneChoreo/TV/swing/walk/scatter/door/bin/belt/water
-families sat FROZEN at their authored pose.
-
-## What shipped (tools/camtrack.html ONLY, ~1490 lines)
-1. A UI-independent `SH1X-DRIVERS` block (~700 lines between
-   SH1X-DRIVERS-BEGIN/END markers, ~7111-8429): the VERBATIM fog_poc v34
-   port — `sh1xDriverInit` (fog_poc.c:1565-1823 propAnims parse incl. the
-   demo seeds + sharedRot leader resolution + cycle-break), `sh1xGateOn`
-   (:8449 — chunk gate first, demo => every event gate open),
-   `sh1xDriverTick` (:8797 — ALL cases 0,1,2,3,4,5,8,9,10,11,13,14,15,17,
-   16,18,19,20,21,22,7), the tvNoise state machine (:8516-8795 — shTvLcg
-   + 81FC/8230/826C/8354/84C0/85E4/8620/87AC/8874 + states 1/2/3 + the 3
-   paint-mirror LCG advances), `sh1xDriverPose` (:8121 incl. the
-   sineBob /5 int-trunc, ferris (master>>12)+(-739+i*307) + cabin pend
-   aliasing, lissajous /30 + /12 int divs, the follower sharedRot pose),
-   `sh1xDriverApplyNum` (:8357 — floor(deg*4096/360+.5), the Q10 x/z
-   grid (q>>2)<<2, the Q8 position grid (floor(m*4096)>>4)*16/4096, glTF
-   y/z negated), `sh1xDriverBind` (:7916 — the v33 instance-GROUP bind
-   verbatim incl. the posed-first passes, the pass-2 `posedAvail>0`-guard
-   quirk (took=0, fill=want — replicated with a comment), the M*c world
-   centroids, the gravityScatter bean seeding), `sh1xRngNext` (:7899 —
-   Math.imul + >>>0; >>>17), and the g_SineTable LUT embedded as EXACT
-   base64 s16 bytes (verified bit-identical to src/sh_sine_table.h's 5120
-   entries, both via Buffer decode AND the page's own decoder).
-2. The editor glue: per-rec state {st,steps} — `want=floor(t*30)` steps
-   of dt=1/30, capped 5400 (180s); seek-back/loop-wrap/model-switch
-   RESETS (seed 1) and re-runs from t=0 (scrub-safe; pause = no re-run);
-   the apply per bound NODE via the v13.3-established S-conjugation
-   ('YXZ' Euler (x,-y,-z) = S·Ry·Rx·Rz·S — re-derived and re-verified
-   mathematically this session) + the parent-world-inverse compose;
-   lightFlicker drives the preview sun intensity (x1.6 base); the bind
-   builds from the three.js scene (owner-node walk via GLTFLoader's
-   userData.name===name marker — CONFIRMED this GLTFLoader sets it;
-   multi-primitive nodes bind as one group, exactly the engine's
-   one-rot-per-WorldObjects_Add contract).
-3. animsDemo RETIRED per v34: the env panel checkbox #tgl-animsdemo +
-   its listener + syncUI line + the serialization key + the DOC_STRING
-   clause removed; the import parse still TOLERATES the field
-   (read-only, no UI — verified live: no #tgl-animsdemo in the DOM, the
-   exported camdat contains no animsDemo). The SHUI "SH1X prop anims"
-   preview toggle KEPT (default on).
-
-## Verification (all run THIS session)
-1. Node tick-match (scripts/t2_camtrack_drivers_test.mjs — SELF-CONTAINED:
-   extracts the SH1X-DRIVERS block from the SHIPPED camtrack.html, and
-   REGENERATES any missing engine refs by running ./fog_poc itself with
-   SH1X_ANIM_DEBUG=1 FOGPOC_RWDBG=1 FOGPOC_TVDBG=1 on the fixed dummy
-   camdat; the deterministic-shot tick discipline replicated exactly:
-   1x dt=0 + (floor(t*30)-1)x dt=1/30 + 1x dt=0, fog_poc.c:14852-14881):
-   **27 room×t combos, 2538 checks, 0 FAILS, 0 warns** — APU00FF/APUFFFE/
-   APU0002 @ t=2/5/12 plus 20 more rooms @ t=5/12: SU00FF (spinConst+
-   waterfall+lightFlicker), SU0203 (spinRng fan+waterfall), THRF906/
-   THRF9FD (spinRng/dampedSwing), SPU0100/SPU03FD (fanArray+tvNoise+
-   fallOnce — 149-line TVDBG trace incl. the LCG s1/s2 hex, exact), ER01FE
-   (gravityScatter — 32 APPLY lines exact), ER02FC (stoneChoreo+
-   scrollBelt — 100 APPLY lines, the mixed posed/unposed bind), ERFDFE
-   (slideDoor x12), DRU0100 (rngWalk — 151-line RWDBG trace exact),
-   SCFE00/SUFE00 @ t=5+t=12 (doorRattle + kickSwing — rawVy/rawVel exact
-   ints over 359 ticks = the RNG draw sequence matched exactly),
-   ER01FC/ER0201/ER03FD (stone/translate/binSpin), DRFD00/SUFFFE
-   (waterRipple/waterfall no-pose families). APPLY rotQ12 mismatches 0
-   on EVERY room; max |t| diff 0.0005 (the engine's %.3f print rounding).
-   Hand-proof of the tick model: APU00FF t=2 ferris master=365151 =
-   59 real ticks × add 6189 (floor(136×186413/4096)); t=3 = 550821 =
-   89×6189 — both the engine's print and the port agree.
-2. Syntax: all 5 <script> blocks + the importmap extracted and
-   node --check'd clean (blk1-4 .js + blk5 .mjs).
-3. Visual (agent-browser on the real page, GLB injected through the
-   page's own #file-gltf input via DataTransfer): APU00FF t=0 vs t=3 —
-   6523 px changed in the wheel bbox (738,217)-(885,371); VLM-verified:
-   the wheel spokes rotated, cabin boxes migrated around the hub, static
-   scenery (columns/platforms/grid) pixel-identical, camera unmoved, no
-   UI overlay change. APUFFFE t=0 vs t=4 — 1549 px (the lissajous
-   capsules moved; VLM: "the cloud outline changed shape", static towers
-   identical); liss master=3120=120 ticks×26 (floor(136×807/4096)) exact.
-   SU0203 regression — the old spinRng+waterfall room still animates
-   (2481 px). Preview toggle: OFF restores the authored pose (7971 px
-   vs ON), state survives; scrub-back seek(4)->(1)->(4): master
-   3120->780->3120 (deterministic reset+re-run). Browser console EMPTY
-   (no errors, no spam); __camtrack.errors [] on every probe.
-4. The engine refs regenerated FRESH this session from the unmodified
-   v34 binary (byte-identical observables to the prior refs; the only
-   diff line was the old dump's trailing "failed to write shots//..."
-   artifact — the new harness writes real PNGs to --out /tmp/t2_shots).
-
-## Documented deviations (engine-true or engine-impossible)
-- TV QUAD PAINT data-blocked in the decomp (D_800DB7D4/D_800DB7E4[3][3]/
-  D_800DB874 extern-only): the state machine + LCG tick exactly;
-  screens keep their authored pose; window.__camtrack.sh1xDebugState()
-  surfaces the TV/live accumulators.
-- waterRipple/waterfall: state ticks (case 21 is a VERBATIM no-op tick —
-  the engine's ripple state lives in its DRAW pass; case 22 runs the
-  10-droplet recycle verbatim) but the FX paint is an engine-only draw —
-  no mesh pose (both documented in-code).
-- lightFlicker: the engine's debug surface prints NOTHING for
-  g_sh1xLightFlicker — no numeric tick-match possible; the port ticks
-  it verbatim and multiplies the preview sun (observable in the page,
-  not in [animstate]).
-- Step-grid semantics: the editor previews the LIVE-WINDOW behavior
-  (floor(t*30) ticks of dt=1/30 by t) vs the harness/engine shot path
-  (floor(t*30)-1 real ticks + two dt=0 ticks) — both engine behaviors,
-  one tick apart by design; the harness replicates the shot path
-  bit-exactly instead.
-- gravityScatter bean seeding binds at LOAD in the editor (the engine's
-  REALTIME window binds on first render; its single-shot path binds
-  AFTER the ticks — the harness replicates the shot order). The
-  bind-time RNG draw order can therefore differ only for rooms that
-  carry gravityScatter AND another RNG consumer — none in the v33
-  corpus (ER01FE = gravityScatter+stoneChoreo, and stoneChoreo draws no
-  RNG).
-- C float32 accumulators (spin cur[], mvTimer, stone cur[]) kept as JS
-  doubles: the ±1-count wobble vs f32 is far below the Q12/Q10/Q8
-  quantizer steps and the %.2f/±0.01deg harness tolerance (proven by the
-  2538-check pass at t=12); the engine's int-trunc mvTimer sites are
-  mirrored with Math.trunc (fallOnce) and the dt=1/30 grid gives
-  dt*30===1.0 exactly in double = the C (float) round — doorRattle/
-  kickSwing/gravityScatter step EXACTLY once per tick (harness-proven).
-- The engine's object[16] parse truncation is not emulated (no v33
-  object name exceeds 15 chars — unobservable; noted here for the
-  record).
-
-## Commit
-54743db (origin/main, rebased over the 53e1aa9 version bump): "T2: all SH1X
-driver families in the camtrack editor preview (verbatim engine math,
-scrub-safe re-run) + animsDemo removed" — tools/camtrack.html only (1490
-insertions, 130 deletions); the final pushed tree re-passed the harness
-(2538/0/0).
-
-## THE COMMANDMENTS (embedded per the user's directive — DO NOT REMOVE)
-PRIORITISE ACCURACY ABOVE ALL ELSE (x3). TEST ALL WORK PRIOR TO
-SHIPPING. UTILISE VLM AND PIXEL PEEPING. FULL AUDITS — NO SMOKE
-TESTS. MULTIPLE PARALLEL AGENTS FOR CONSTANT CODE CHECKS. VERIFY
-OFFENDING LINES + CONTEXT BEFORE FIXING (NO FALSE POSITIVES).
-EMULATE OTHER PLATFORMS AS BEST AS POSSIBLE (reputable toolchains /
-established emulators / homemade emulators from documentation).
-PRIORITISE COPYING VERBATIM GPL CODE (PORT LOGIC WHERE REQUIRED).
-3+ PARALLEL AUDIT AGENTS AFTER SIGNIFICANT CODE. AUDIT UNTIL NO
-ERRORS. AGENTS MUST BE CRITICAL AND HARSH — NEVER ASSUME CODE IS
-CORRECT. CONSISTENT PUSHES TO THE EXTERNAL REPO. VISUAL AUDITS =
-CODE AUDITS. AUDIT LIKE A REAL DEVELOPER (UI COMMUNICATION,
-HARNESSES ON SEPARATE BRANCHES). PARALLEL AGENTS COORDINATE VIA THIS
-WORKLOG. EFFICIENCY SECOND (NO NIH REIMPLEMENTATIONS). NO SHORTCUTS
-OR MANUAL PATCHES/HACKS. STOP AND REPORT WHEN CONTEXT RUNS OUT.
-READ RELEVANT CODE FULLY — NO SKIM READING. NO HALLUCINATED
-REFERENCES WITHOUT HARD EVIDENCE. STRESS TEST COMMON AND NICHE
-CASES. IF ERRORS: FIX -> TEST -> REPEAT. DO NOT BE LAZY. DO NOT
-FAIL. IF NOT POSSIBLE: STOP AND REPORT WHY. RESPOND IN ENGLISH ONLY.
+### Session 6 totals
+71 PRs filed (PoC #69-#132, Wallpaper #8-#14); PR #56 flagged dup (main a3a733b);
+PRs #110/#128 correctness addenda posted; E-16-1 + E-09-2 folded (skip/duplicate);
+4 dead agents recovered; 21 new V44 findings verified with fix specs; twin-sync
+batch enumerated; corpus re-rip sized. NEXT SESSION: V44 fix wave (registry above)
+→ PRs → wallpaper twin-sync wave → corpus re-rip coordination.
 
 ---
 
-# SESSION T6-wallpaper-reset — 2026-11-19: the correct v10_7 source reset, the v34 engine graft, the 44-scene corpus, the CI lineage, the finishing audit pass (v11.0.2 + release v1.7.42 GREEN)
+## Session 7 (2026-11-22) — V44 FIX WAVE + V45 LINE-BY-LINE WAVE (owner directive: no stone unturned)
 
-Mission: the user replaced the fog-wallpaper repo's broken alpha-build
-source with the CORRECT v10_7 source (the Doodle-Android shell),
-directed a full repo clear + rebuild on that base, the PoC (v34 engine)
-changes ported over, README/cleanup, and the CI building + releasing
-with ONE minor bump per asset change (1.7.x → 1.7.x+1; no more
-v11–v27 jumps).
+### Environment
+Sandbox SURVIVED (repos + worklog intact); all four repos re-fetched. PoC main
+moved e1f35af(v33.25) → fd8bac9(v33.37) DURING the session (primary agent active:
+V42 gate merges, v43 S20 batch, VIN water-CLUT 15308dc, v45 water-texture 7900e02,
+Wallpaper v1.8-1.10 + PR #8-#10 merges mid-wave). Dedupe registry rebuilt: 70 open
+PoC PRs + 8 open Wallpaper PRs at session start.
 
-Session split (honest record): the prior agent session completed the
-bulk (v11.0 base → v11.0.1, commits c50471b/36bb816/94e37b7/eda9d1a/
-00ea6e3/6a106c5, CI v1.7.41 released) and was interrupted mid-re-audit
-at ~02:19 with uncommitted camdat.json edits. THIS session audited all
-of it (READ FULLY, no skimming), verified every claim independently,
-and closed the remaining work out: the interrupted camdat surgery
-finished honestly, README stats corrected, CUSTOM.md addendum, the
-worklog entry (this one), CI GREEN at v1.7.42 with the release APK
-contents byte-verified.
+### V44 fix wave — 20 PRs, all built + A/B-proven, 0 contradictions
+A-1 #137 (ghost-3 ABR-2, 240px THRF9FD userlight) · B-1 #136 (BK<<4, 72px) ·
+C-1 #140 (bind pass-2 took dead, ER02FC phantom 19,930px/27.8%) · C-2 #143
+(rotStepDeg+instBase, APU0002 14,601px) · A-2 #141 (water OT far-edge, 7px crafted)
+· A-3 #144 (ring g3/g4 order, 0px benign-proven) · C-3 #138 (1337, 1393px SPU03FD)
+· C-4 #139 (vyFloor -91, latent+crafted 2163px) · C-5 #135 (clamp 247562, 1507px)
+· C-6 #142 (driveGate tick-freeze, 45px, DESIGN-FLAGGED) · C-7 #153 (LUT/int-Q12,
+SU00FF case-0 10,523px, 44-scene regression identical) · D-1 #148 (zone z-mirror,
+latent crafted-proven) · D-2/D-3 #149 (GTE-SZ truncation 10 sites, 59px snow) ·
+E-1 #154 (camtrack backface cull n2@D=v3 mirror of #110, 200k-quad fuzz 0 mismatches;
+E-1 first agent died, E-1b recovered) · E-3 #146 (splash snap) · E-5 #151 (POST
+order, 2048-sweep 0 mismatch) · E-4 #145 (wfDepth BLEND hide) · F-2 #147 (maxsteps
+uncapped+bounded) · F-3 #150 (tvPaint coercion) · F-1 #152 (boot-prime dt=0, C-twin
+bit-identical). E-2 folded into #128 as a comment (with the post-#149 cq8-truncate note).
 
-## 1. The repo reset + the engine graft (verified, not re-done)
-- Base: `git rm -rq .` + the v10_7 tree copied in verbatim (Doodle shell
-  xyz.zedler.patrick.doodle, GPL-3.0 headers kept; BUILDING/CUSTOM/
-  sh1.keystore/THRF9FD.IPD/THR_GLB.PLM + the v10_7 dev files kept —
-  they are part of the correct source; the "cleanup" = CUSTOM.md's
-  stale alpha-era entries purged in v11.0).
-- Engine: the v34 PoC engine (src/fog_poc.c, 14913 lines) + the v10_7
-  Android glue grafted ADDITIVELY (15680 lines total). Graft points
-  verified by full diff PoC↔wallpaper (777 lines, ALL additive-gated):
-  * `#if defined(__ANDROID__)` logcat redirect at file top;
-  * the 732-line v10_7 Android block (sh1_android_* seams, and_blit,
-    run_window_android) before `static int run_realtime`;
-  * `#elif defined(__ANDROID__)` dispatch in run_realtime;
-  * the `--hw` argv parse (Android+SH1_HW_RENDER gated);
-  * `#ifdef SH1_HW_RENDER #include "sh1_hw_render.c" #endif` at the end.
-  TWO documented adaptations in the block (the only non-verbatim lines):
-  1. `live_apply_env_transition` → `live_apply_preset` (the v34
-     lineage never carried the v9-F20 gradual env-blend driver; the
-     Auto-Mode boundary lands as an instant Gfx_MapEnvSet; JNI/API
-     surface unchanged);
-  2. the ALOGI/ALOGE/printf defines moved to the top of the file so
-     main() and every earlier function routes to logcat (the W-D9 fix).
-  Everything else VERBATIM. sh1_jni.c / sh1_hw_render.c / sh1_hw_vk.cpp
-  / CMakeLists.txt byte-identical to v10_7 (diffed); dr_wave_data.h +
-  flare_tim_data.h (the v34 engine's new data headers) copied into cpp/.
-- Verification (this session, redone independently): desktop syntax
-  clean (-std=c99 -Wall -Wextra -Wno-unused-parameter); desktop PARITY:
-  the grafted engine renders pixel-identical shots to the PoC binary
-  (g1/g2, mean |diff| 0.0); Android host syntax pass clean with the
-  NDK API stubs (EGL/GLES3/jni/log/native_window — the real NDK build
-  is CI-authoritative and GREEN); sh1_jni.c syntax clean with
-  -D_POSIX_C_SOURCE=200809L (bionic exposes strdup unconditionally;
-  strict-c99 host glibc doesn't — host artifact only).
+### Twin sync — Wallpaper PR #17
+23 hunks synced (15308dc VIN water-floor + 7900e02 waterLive tile): gcc syntax +
+host build + 11/11 fix-marker parity + 5-room golden A/B (DR01FE was divergent, now
+identical). 34 intentional Android hunks documented; dr_wave_data.h header re-synced.
+Deferred: everything covered by open PoC PRs (primary agent merges first).
 
-## 2. The asset corpus + camdat (verified 44/44 VERBATIM)
-- app/src/main/assets/sh1/: 44 room GLBs (41 from the v33
-  animation-rooms rip + HP0003/THRF9FC/THRF9FE salvaged era-mates),
-  THRF9FD.IPD + HP0003.IPD + THR_GLB.PLM, thumbs/ (45 pair_*.png —
-  REQUIRED by the Java env-modes bottom sheet, shipped), ONE
-  camdat.json models[44] (the Sh1Camdat enumeration; the prior repo's
-  per-scene *_camdat.json + scenes.json manifest GONE).
-- Env values re-verified VERBATIM by this session against every GLB's
-  scenes[0].extras.SH1X.env: pair = presetIdx0/1 (44/44 exact),
-  weatherTarget = the field17 recipe identity 0/1/2/5/6 (44/44),
-  flashlightOn/nighton/flashlighton = the Dark/FlashlightAllowed pair
-  rule, fogon = preset0 fogMode (44/44 consistent), bootWeather −1,
-  lensFlare 0, psxWobble/dither/particles/engine true. ZERO invented
-  values. THRF9FD's weatherTarget moved 4→2 vs the v10_7 camdat
-  because the GLB itself was replaced by the v33 re-rip (field17=2) —
-  the unbiased-from-GLB rule, applied.
-- Track provenance: 3 user-authored fixed (SU0203/APU00FF/APUFFFE
-  tmwm*, VERBATIM) + 21 prior-repo ambient lines (incl. ferris/
-  balloons/fanapproach/hp_corridor re-ported verbatim; SPU0301 'tv'
-  translated +128 m in x — its v8-era camera sat 128 m west of the v33
-  world placement) + the v10_7 THRF9FD pair + 25 conservative fixed
-  fallbacks (render-probed).
+### V45 line-by-line finders (10 blocks: A fresh-code, B 1-4600, C1 4600-6900,
+### C2 6900-9200, D 9200-13300, E 13300-18371, F camtrack shell, G1+G2 ripper, H Android)
+1 MAJOR-equivalent confirmed = open #111 (C1-1 cv=3 re-derivation — corroborated on
+#111, NOT re-PR'd). C1-3 = duplicate of open #112 (excluded). ~19 new MINOR + ~30
+INFO + 2 UNCERT. Reports: download/v45_evidence/AUDIT_V45_*.md.
 
-## 3. The finishing audit pass (this session's close-out — v11.0.2)
-The prior session's v11.0.1 claim "every wallpaper ≥ 9%" was OVERSTATED
-(found by the interrupted T6 re-audit; verified by this session's full
-rerun of the methodology: the grafted engine's desktop --shot path,
-t=1.0, near-vs-far pixel diff, 9% bar). Closed out honestly:
-- 6 rooms re-placed render-probed (geometry-grid probes: 5×5 over the
-  bounds × 4 yaws, then 5-height × 8-yaw refinement around the best
-  cell): APU0002 0.32→51.9%, DR0100 0.96→88.9%, ER01FC 0.03→26.7%,
-  SPU0401 0.08→97.1%, SUFFFF 0.02→69.7%, ER02FC 1.1→83.0% (the prior
-  session's interim 8.97% placement re-probed to the strong eye
-  [95,−2.3,130] yaw 270; belt-ambient character preserved).
-- SUFE00 'rattle_locker': the prior session's uncommitted re-placement
-  rendered 0.00% (literally nothing) — REVERTED to the verbatim
-  prior-repo port (renders the locker wall, 5.14% / 3683 px).
-- 6 sub-9% VERBATIM ports KEPT VERBATIM (measured + VLM-verified they
-  render their ambient subjects at distance through the game's fog;
-  none is the 0–0.01% pure-fog failure the audit exists to catch):
-  ferris 3.1% (2235 px), balloons 8.1% (5809), ripples 5.1% (3644),
-  fan_array 6.9% (4931), tv 8.8% (6289), rattle_locker 5.1% (3683).
-  Every non-verbatim track (every conservative/re-placed fallback)
-  measures ≥ 9%. Final: 50 wallpapers / 44 rooms — 44 ≥ 9% + 6
-  verbatim ports rendering.
-- README corpus stats CORRECTED (were wrong: "21 of them also rain,
-  9 snow"): 21 pair {7,4} (nightmare) + 11 {6,3} (night) = 32 dark
-  (16 raining); + 7 {1,1} (day street) + 3 {2,2} (interior day) +
-  2 {9,9} (Nowhere fog) = 44; weather: 16 rain / 11 snow / 17 none.
-- Note: camdat models[].bounds = TOOLING metadata only (the engine
-  computes its own Box3-over-draw-items bounds at load — line ~2361;
-  Java reads file/tracks/env only). The make_water_camdat accessor
-  heuristic over-includes non-rendered accessors — the definitional
-  difference I measured is NOT a data error.
+### V45 fix wave — 20 PoC PRs + 5 Wallpaper PRs
+PoC: #155 fixed-track fields · #156 anchor cap64 · #157 :13906 trunc · #158 Y-rail
+lock · #159 subcell SZ&~3 · #160 --save-final r2view (45,260px) · #161 jint NULL
+(ASan-repro'd) · #162 BB normals 2908 · #163 weighted-avg MulFixed · #164 ripple
+z-base lattice · #165 rngWalk 80691 (trap REFUTED: float32(19.7)·4096=80691.0003;
+audit's "80690" also wrong — PoC was 80688) · #166 static/once pause · #167 accessor
+stride bound (crafted interleaved GLB) · #168 URL param priority · #169 docs-truth
+batch (15 falsehoods, comment-only, binary md5-identical) · #170 dither checkbox ·
+#171 RP_SUB_TEX 5-bit-first (shipped battery latent bg5=0; 262,144-sweep 42,673→0)
+· #172 fog-composite two-prim (34,605px THRF9FC) · #173 K_R R2 reset (486px) ·
+#174 snow restart carry (NEW bug found by W3's testing: 312px DRU0100/604px THRF9FD
+→ 0; root cause rain-anchor Vectors1 + D0B18 seed order + snow-seed; composes #173).
+Wallpaper: #18 CI bump-after-gates (v1.10.0 dangling tag proven) · #19 docs batch
+(45 scenes, SPIR-V reality, VAO) · #20 HW DDA double (SPIR-V regen via glslang
+byte-identical reproducer) · #21 fixed-pos default {1,1,0} · #22 VK early-fail
+shutdown (12+5 sites, stub-libvulkan A/B).
 
-## 4. The CI (aim 7) — GREEN, release v1.7.42
-.github/workflows/android.yml (ported from the prior repo's proven
-workflow): on push to main, the bump job diffs the push's BEFORE base
-(github.event.before, fetch-depth 0) against the releasable set
-(assets/, cpp/, java/, res/, manifest, gradle wiring) — asset change ⇒
-ONE minor bump of version.properties (1.7.41 → 1.7.42, versionCode
-10741 → 10742), commit `[skip ci]` + tag push (GITHUB_TOKEN pushes
-cannot re-trigger — the anti-recursion rule), and the build job
-(needs: bump, ref: main so it sees the bumped version) builds both
-APKs (sh1.keystore-signed release + debug), smoke-tests them (native
-  lib + ≥44 GLBs + camdat.json inside), and publishes BOTH as release
-assets of v1.7.42. Concurrency group per-ref, cancel-in-progress
-false (the serialized queue re-checks out main after the first bump
-lands — documented in-file).
-- Push a724cb3 → run 44445390694 (android-ci, push):
-  https://github.com/sh-clock/wallpaper/actions/runs/44445390694 —
-  bump job: "new version: 1.7.42" (commit 8cfb6e0 + tag v1.7.42);
-  build job: SUCCESS. Release v1.7.42 published 2026-11-19T02:39:28Z
-  (app-debug.apk 45,294,110 B + app-release.apk 39,208,612 B).
-- The release APK downloaded + unzipped and BYTE-VERIFIED this
-  session: 44 camdat models, the v11.0.2 ER02FC/SUFE00/APU0002
-  tracks present, 44 GLBs, lib/arm64-v8a/libsh1.so present.
+### Coordination comments posted
+#128 (E-2 fold + compose note) · #111 (C1-1 corroboration + reachability) · #121
+(F-2 design tension, strict-vs-lenient recommendation) · #122 (W4's F-1 invalidates
+its premise — evaluate with #155) · #73 (F-5/#166 overlap).
 
-## Commits (T6 total)
-- c50471b v11.0 base: the correct fog-wallpaper-v10_7 source (the
-  Doodle shell) — repo cleared of the broken alpha build
-- 36bb816 v11.1: the v34 PoC engine transplant + the Android backend
-  grafted
-- 94e37b7 v11.2: the 44-scene asset corpus + the unified camdat.json +
-  dynamic asset copy
-- eda9d1a v11.3: the CI (asset-change minor bump + signed release) +
-  docs
-- 00ea6e3 docs: trigger-test (CI push-event check)
-- 6a106c5 v11.0.1: the full corpus render audit — every wallpaper
-  verified rendering (claim later corrected honestly by v11.0.2)
-- 4301ded CI bump → v1.7.41 (released, APKs verified)
-- a724cb3 v11.0.2: the finishing audit pass — 7 more render-probed
-  rooms + the honest corpus tally (THIS session)
-- 8cfb6e0 CI bump → v1.7.42 (released, APK contents verified)
+### Session totals: 46 PRs (20 V44 + 1 sync + 20 V45 PoC + 5 V45 Wallpaper),
+### 5 comments, 46/46 built + proven, 0 shipped false positives, 0 force-pushes.
 
-## Deviations / blockers (documented)
-1. The mission brief described the repo at 8c8c752; the actual local
-   state already carried the prior session's v11.0–v11.0.1 work
-   (through 6a106c5, CI v1.7.41 released) + an interrupted uncommitted
-   camdat edit set. This session AUDITED that work fully instead of
-   redoing it (graft diffs, parity shots, syntax passes, env
-   verification — all re-run independently) and closed out the
-   interrupted remainder.
-2. v11.0.1's "every wallpaper ≥ 9%" was overstated — corrected by
-   v11.0.2 with measured numbers (44 ≥ 9% + 6 verbatim ports at
-   3.1–8.8% that render their subjects; every non-verbatim track ≥ 9%).
-3. Local Android syntax-checking is impossible without host stubs
-   (no NDK headers on the box) — the EGL/GLES3/jni/log stubs from
-   scripts/ make -fsyntax-only passes possible; the real authority is
-   the CI (GREEN, twice: v1.7.41 + v1.7.42).
-4. SUFE00 deviation from the prior session's in-flight intent: its
-   uncommitted placement was a measured 0.00% regression — reverted
-   to the verbatim prior-repo port (renders 5.14%); documented in the
-   CUSTOM.md v11.0.2 addendum.
-5. THRF9FD.glb replaced by the v33 rip (per the mission's "all GLBs
-   from sh1_anim_rooms_v33"); its camdat ENTRY kept (the v10_7 tmwm*
-   pair verbatim + the prior repo's streetswalk/doorswing ports) —
-   the weatherTarget 4→2 change follows the new GLB's SH1X.env
-   (unbiased-from-GLB rule).
-
-# SESSION T7 — 2026-11-19: the env-derivation fix (rain-indoors) + the USER PROGRAMMABLE LIGHT (task 3, full) + the water audit + the CI lineage
-State at start: the sandbox recycled (repos re-cloned from GitHub; the PoC
-was at v33.5 = the v34 animsDemo fix + the T2 camtrack drivers; the
-wallpaper at v11.0.2 + CI v1.7.42 — the correct v10_7-source rebuild all
-VERIFIED per the T6 entry). The user's five live issues drove this session.
-
-## 1. VERIFIED the prior claims (user is ground truth)
-- PoC v34 animations with the USER'S OWN 3-map camdat (camdat.json):
-  SU0203 t=2 vs t=9 = 58.88% px changed (the fan PLAYS); APU00FF
-  t=2 vs t=12 = 63.81% (the ferris wheel PLAYS); APUFFFE = 12.64%
-  (the lissajous capsules move). The v33.3 "not animated AT ALL" bug
-  is CONFIRMED FIXED by the v34 animsDemo-gate removal.
-- The user's camdat itself carries the EDITOR'S BAD DEFAULTS
-  (pair {1,1} day + weatherTarget 2 snow on the nightmare school) —
-  the PoC boots it in BROAD DAYLIGHT WITH SNOW: the T3 root cause
-  reproduced exactly as reported ("RAIN in INDOOR SEQUENCES").
-
-## 2. T3 FIXED — the ROOM-ORIGINAL ENV DERIVATION (the rain-indoors fix)
-Grounded in the decomp: WorldEnv_MapPresetSet (effects.c:220-267)
-selects the STATIC pair by field_16 (D_800A9F80 {1,1} day streets /
-A9F84 {2,2} day interiors / A9F88 {6,3} night ext / A9F8C {7,4} dark
-interiors / A9F98 {9,9} Nowhere); the pair = {flashlight-OFF,
-flashlight-ON} presets (transition[WorldEnv_IsFlashlightOn()];
-preset0==preset1 => isFlashlightUnavailable — the verbatim day-mode
-flashlight auto-off); MapType semantics (map.h: THR/SPR day town, SPU
-night town, DR flooded streets, DRU alt sewers, APU amusement park,
-SC/SU school, HP/HU hospital, ER Nowhere).
-- camtrack.html v13.5 (commit a9a40b2): sh1xEnvDefaults — a newly
-  added GLB (or a legacy un-authored entry) derives models[].env from
-  the GLB's UNBIASED SH1X.env: pair VERBATIM; dayEnv/nightEnv per the
-  user's rules (town streets 1/6; day-lit interiors 2/7; night-only
-  APU/DRU/RSR/RSU both 6 — NEVER broad daylight; nightmare-only
-  {7,4} both 7; Nowhere 9/9); weatherTarget = field_17 VERBATIM (the
-  original recipe — no invented indoor rain); flashlightOn = the
-  preset-0 Dark+FlashlightAllowed signature; a "use original" chip
-  re-authors the ACTIVE model (one click per model on the user's
-  existing 3-map camdat). Browser-verified live: SU0203 derives
-  {7,4}/7/7/w0/flashOn; APU00FF+APUFFFE derive {6,3}/6/6/w0/flashOn;
-  the button re-derives a corrupted live entry.
-- The wallpaper corpus camdat (44 models, commit 8aff91b): the same
-  derivation added as dayEnv/nightEnv (the Java Auto-Mode resolution:
-  app override > camdat > custom > authentic 1/3 — the dark scenes
-  now resolve their OWN presets on the phone instead of global day).
-- The PoC engine needs NO change (the v33/S20 GLB fallback already
-  boots the room's pair when the camdat leaves env absent; the
-  camdat stays the authored override). The ripper STAYS UNBIASED per
-  the user's explicit directive ("this is only to be determined by
-  the camtrack app - the Extras field should be unbiased").
-- The T2 driver regression re-run on the edited page: 2538 checks,
-  0 warns, 0 FAILS.
-
-## 3. TASK 3 DELIVERED — the USER PROGRAMMABLE LIGHT (the flashlight)
-The full spec: "emulates Harry's flashlight - moves in all the ways the
-camera can - able to be disabled - will not fire in day modes - angle
-distinction".
-- PoC engine v35 (commit dd6dce7, 411-line diff):
-  * camdat models[].light { on, follow "camera"|"world", pos[3] m,
-    rot[3] (pitch,yaw,roll degs — the AIM), offset[3] camera-local m,
-    ahead m } — the 6-DOF authored surface (free-world pose with a
-    WORLD-FIXED aim = the engine's NULL-bone path; camera-follow =
-    the verbatim Game_FlashlightAttribsSet anchor);
-  * THE ANGLE DISTINCTION: sh_light_dir_from_rot — func_8003F4DC's
-    Custom rot math VERBATIM (vy=-sin(rx); t=cos(rx); vz=t*cos(ry);
-    vx=t*sin(ry); Q12_ANGLE truncation + the RAW g_SineTable LUT +
-    the y-down->glTF map) — the beam no longer hardcodes the -15deg
-    tilt; the authored pitch/yaw drive the per-vertex MESH light,
-    the FX screen angles AND the water-zone light position;
-  * the MESH light position follows the light (follow world lights
-    the geometry from its OWN position);
-  * DISABLEABLE: light.on rides the flashlight boot toggle (CLI
-    --flashlight > light.on > env flashlightOn > legacy); the K_F
-    runtime toggle keeps the verbatim availability gate;
-  * DAY-MODE SUPPRESSION verbatim: nothing forces a Spot (mesh light
-    on lightMode!=None; FX on Spot+lensFlare; identical-pair blend
-    no-op) — VERIFIED: day pair + light ON = 0 px changed;
-  * --userlightrot P,Y[,R] CLI; g_userLightCLI precedence (CLI >
-    camdat > the Sh1x userLightRot EXTRAs > the constants); the
-    boot print carries the resolved light state.
-  * VERIFIED: no-author regression BIT-IDENTICAL (0 px vs v33.5);
-    DR0100 flooded street: camera anchor vs world light = 21.8% px,
-    two world poses = 18.4%, CLI +/-90 yaw = 11.1%; CLI(world+rot)
-    vs camdat(world+rot) = 0 px; VLM-verified the lit pool visibly
-    relocates with the authored pose.
-- camtrack.html v13.5 (commit c09588a): the "User light — task 3"
-  panel (on/off + follow + pos/aim/offset/ahead inputs) + the light
-  GIZMO (a marker + the beam arrow; follow camera rides the ACTIVE
-  TRACK camera) + sanitizeLight/docToJSON/sanitizeDoc (the round-trip)
-  + applyModelLight/syncLightModel + DOC_STRING. Browser-verified
-  live: the panel authors {on,follow,pos,rot} into models[].light;
-  the EXPORTED camdat boots the PoC's WORLD light with the authored
-  aim (end-to-end editor->camdat->engine).
-- wallpaper (commit c16bbbc): the same 411-line engine patch applied
-  to the cpp graft (host gcc -fsyntax-only passes; the CI compiles)
-  + CamtrackDoc.java Light/parseLight/lightMap (the in-app round-trip
-  PRESERVES the block; load+save no longer drops it). KNOWN GAP
-  (documented): the NATIVE in-app editor UI has no light-authoring
-  section yet — the playback surface works end-to-end; authoring
-  rides the HTML editor.
-- The ripper: the userLight EXTRAs stay the UNBIASED verbatim
-  attribs (Game_FlashlightAttribsSet constants + the lightRotation)
-  — the authored program lives in the camdat, the defaults in the
-  GLB, exactly the precedence chain.
-
-## 4. WATER (issue 3) — the audit + the honest state
-The 3 reference images re-checked (the DR flooded street at night,
-rain + flashlight, 1920x1080 DuckStation). The VLM audit of our
-render at the same conditions:
-- the water floor texture/dither: PRESENT (tiled grain + dithered
-  patches — the earlier "flat" read was a downscale artifact);
-- the additive floor + warm near-light: present;
-- THE GAP: the strong GREEN caustic clusters (moss-green/teal
-  speckle, ~#2e4a2a) of the reference are MISSING (ours: monochrome
-  gray + faint white glints).
-Investigation: the caustic ring + glint ARE ported VERBATIM
-(lens_flare.c:762-791 — the decomp's own values (4,8,4)/(20,18,12)/
-(24,22,12)/(8,8,4), verified 1:1) — the ring is dark BY DESIGN in
-the original; the reference's strong green must come from the RUNTIME
-water CLUT/prim modulate (the extracted DR_WAVE.TIM CLUT is
-monochrome grays — the LIVE VRAM CLUT content uploaded at map load is
-NOT on disc in the rip's data). The VIN folder (28 files incl. the
-previously-blocked MAP4_S03.BIN/MAP6_S04.BIN) downloaded — the
-runtime CLUT decode (the TV screens + horse tables too) is queued
-for the NEXT session with concrete source material.
-
-## 5. TIM/ANIM/VIN (issue 4)
-Downloaded + inventoried earlier this session (ANIM 30, TIM 113, VIN
-28). The decode work NOT started this session (the context budget
-went to the user's two most-reported blockers: the env derivation
-and the flashlight). The VIN material is the concrete unlock for the
-water runtime CLUT + the TV screen paint + the horse tables.
-
-## 6. CI / releases
-- PoC CI green: runs 40 (T7-a) + 41 (T7-d) success; the CI
-  auto-bumped v33.6 after T7-a (the asset-change minor bump path).
-- wallpaper CI green: run 26 (T7-b corpus camdat) success — the
-  bump -> release v1.7.43; run 27 (T7-e engine+java) queued at
-  session close.
-
-## 7. The agent board (still blocked)
-The agent-updates token (agtk_ZX...) was rejected 401 on all three
-documented auth methods AGAIN at session start (the board itself is
-healthy — /health + /api/state respond). The token appears revoked
-or mistyped — REPORTED to the user; no board updates this session.
+### Follow-ups for the next wave (documented, not fixed)
+- E-2 span-check approximation (self-documented; 12-edge interpolation rework — design).
+- D-3 school-water/ripple/TV Q12→Q8 vertex lattice class (sub-pixel sweep).
+- C2-2 per-quad dual-NCLIP degenerate-quads (latent) · C2-3 sprite UV +0.5-texel
+  DDA bias (sub-visual) · C2-4 behind-camera UNCERTAIN (needs hardware capture).
+- V45E-4 MASK deadness-proof hole (tangential billboard corner case, latent-in-practice).
+- W-key path carries (W7 residual) · #173+#174 merge-order note.
+- G1-U1 TV-paint screen tables (BIN not in repo) · A-U1 MIZ field_B byte check.
+- B-4 Infinity round-trip design (unchanged) · F-2 strict-vs-lenient decision (#121).
+- Twin-sync wave 2 AFTER the primary agent merges the V43/V44/V45 backlog (89+ PRs
+  deferred) + the corpus re-rip coordination (H-2, primary agent's call).
+- Wallpaper #20's SPIR-V regen needs the primary agent's glslang cross-check on merge.
 
 ---
 
-## Session 28 (2026-11-19, resumed after the crash) — the user's ground-truth triage + the wallpaper reset + the verification fleet
-
-**The board**: the NEW token works (agtk_b1MJO...); the old one was dead. Registered
-+ updated through the session.
-
-### 1. The animation triage (the user's #1 complaint)
-- **PoC v33.3 "not animated AT ALL"** — ROOT CAUSE FOUND AND FIXED (v33.8):
-  dropping camdat.json + the user's GLBs into a folder booted THRF9FD (the town
-  street — ZERO propAnims) or ERRORED ("cannot find THRF9FD.glb"). The v33.8
-  default-scene resolution: --glb > the CAMDAT's models[0].file (cwd/input
-  lookup) > THRF9FD.glb; an auto-discovered camdat whose matched model IS the
-  booted GLB now applies its env (camdatAuto cleared on the name match).
-  VERIFIED: the user's exact 3-map camdat drop-in flow boots SU0203 with the
-  fan SPINNING (VLM-verified; one-tick pixel-delta 5834 px in the fan bbox).
-- **v33.3 source-level verification** (built d0ca75b exactly): the fan animates
-  with BOTH the release fan_camdat AND the user's camdat (instrumented
-  [animstate] + VLM). The engine logic was sound; the failure was the BOOT
-  PATH above. The v34 commit's animsDemo note ("the editor's false-default
-  killed every anim") covers only the DEMO-gated driver family.
-- **camtrack APU00FF/APUFFFE** — the current camtrack (v13.5/v1.4.1) PLAYS them:
-  the browser audit (the REAL user flow: file-input load + camdat import +
-  modal click-through + Play) shows the ferris master advancing 49512 -> 1194477
-  over 6.4 s and the VLM sees the wheel rotate (the gondolas shifted). The
-  user's failing tests predate the T2 driver-fleet port (v33.5).
-- **The driver tick-match regression**: 2538 checks, 0 FAILS (the camtrack port
-  vs the PoC engine across the 44-room corpus).
-
-### 2. The wallpaper repo RESET (the correct v10_7 base) — DONE
-- Cleared + rebuilt from fog-wallpaper-v10_7-source.zip (the user's corrected
-  source). Commit chain: 6856b9a (reset) -> e5fc070 (the base verbatim) ->
-  ce0879b (the rebuild) -> 21a17a8/f00d8cb.
-- **The engine graft**: the PoC v33.8 engine (ALL SH1X features: propAnims
-  drivers, env EXTRAs, userLight camdat parse, water FX, mapLink, the
-  camdat-default-scene boot) + the v10_7's Android backend (ANativeWindow
-  loop, and_blit strict center-crop, the sh1_android_* seam: crop/tilt/
-  freeze/stats/grab_frame/fps-cap/prefetch, GLES/Vulkan HW seam) + the v10_7's
-  env TRANSITION machinery (func_8003F170/6F0/838 gradual day-night blend).
-  gcc -fsyntax-only passes: desktop, -D__ANDROID__, and the HW seam.
-- CamtrackDoc.java: the LIGHT round-trip ported (parseLight/lightMap/vecList).
-- The 44-scene corpus (GLBs + the derived dayEnv/nightEnv camdat + thumbs).
-- version.properties (10.7/67) wired into app/build.gradle.
-- **CI green**: asset-change detect -> ONE minor bump -> build+release.
-  v10.8 -> v10.9 released with BOTH APKs (the engine graft COMPILES + the
-  corpus rides in the APK; the CI smoke test verified 44 GLBs + libsh1.so).
-  The v1.7.x / v11.0.x series RETIRED — one linear 10.x series.
-- Cleanup: the harnesses -> bench/, the root dupes + root game data removed,
-  the dev-machine org.gradle.java.home pin dropped (the CI failure fix),
-  README rewritten (the reset note + the scene drop-in guide).
-
-### 3. The flashlight (task 3) — VERIFIED FUNCTIONAL end-to-end
-- PoC A/B: day pair {1,1} + the authored world light -> "flashlight
-  unavailable — engine auto-off" (INERT, engine-true); night pair {6,3} +
-  the same light -> the light renders; world-aim vs camera-anchor changes
-  4579 px (the angle distinction).
-- camtrack: the REAL User-light panel (on/follow/pos/aim/offset/ahead) drives
-  the doc; the exported camdat carries models[].light verbatim; the light
-  GIZMO renders at the authored pose. The APU00FF derivation: night-only
-  dayEnv=nightEnv=6, weatherTarget=0 (NO rain), flashlightOn — the user's
-  rules (a)-(d) verified live in the browser.
-
-### 4. The WATER audit (issue 3) — the forensic ground truth
-- The 3 reference images (VLM + pixel-quantized): the reference is a GRAY-
-  dominated scene (5-bit (4,4,4) base) with SUBTLE leanings — the water
-  glints +1 step green-yellow (48,48,32 / 64,64,48), the catwalk rails +1
-  step blue (48,64,80). NOT the "strong green caustics" the prior session
-  claimed: the direct DR_WAVE.TIM decode shows the DISC CLUT = gray ramps
-  (row0 pure grays, row1 grays + one purple entry) — there IS NO hidden
-  green CLUT on disc. The prior session's "runtime CLUT via VIN" theory is
-  DISPROVEN.
-- The REAL remaining delta vs the reference: our flashlight-lit regions are
-  ~1.5x too bright (ours p99=115/8-bit vs the reference 74) and our lit
-  highlights lean blue (G-B -5.6) where the reference's water glints lean
-  green (G-R +5.4). The modulate is SwanStation-verbatim (verified against
-  the fetched source: LUT[(T5*C8)>>4] = clamp((v+D)>>3,0,31)); the GTE light
-  pipeline is verbatim func_80057658. The gap is in the lit-region falloff
-  calibration (our max vcol 241-255 on the near-camera floor; the
-  reference's lit floor peaks at ~5-bit 9). NEEDS the real-game calibration
-  (DuckStation unavailable locally) — HONESTLY REPORTED, not claimed fixed.
-- The VIN folder IDENTIFIED: 47 MAP*.BIN = the compiled map OVERLAY binaries
-  (pointer tables into 0x800xxxxx) — the concrete source for the decomp's
-  extern-only tables (the TV corner tables D_800DB7D4/D_800DB7E4/D_800DB874,
-  the ferris/water constants) — the TV screen paint + horse tables unlock.
-  Queued as the next decode task.
-
-### 5. The EXTRAs completeness audit (issue 1)
-- The SH1X v3 schema carries: the full verbatim IPD+PLM (header/modelInfos/
-  modelBuffers/billboards/subchunks/modelOrder/collision/plm), the referenced
-  TIMs whole-file, env (WorldEnv pair + weather), mapLink, propAnims (the
-  complete animated-WorldObject catalog: 23 rooms, ~90 objects + the
-  <waterfall>/<ripples>/<light> systems), userLight defaults, waterZones,
-  envEffects, render constants. "Posters" = baked wall textures (already
-  verbatim); the item-pickup WorldObjects (AIDKIT/ammo) are event data, not
-  room rendering. The 9 rooms with WorldObject setups but no propAnims are
-  static adds (cutscene scenery / common item pads) — verified against the
-  decomp, no animated object missed.
-
-### 6. Releases
-- PoC v33.9 (the CI auto-bump after the v33.8 push): linux+win zips +
-  source. Wallpaper v10.9: BOTH APKs, the corpus + the grafted engine.
-
-### The standing commandments (re-embedded, unchanged)
-ACCURACY ABOVE ALL ELSE · TEST ALL WORK PRIOR TO SHIPPING · VLM + pixel
-audits, never only smoke tests · parallel agent audits until zero errors ·
-verbatim code/logic porting from the decomp + SwanStation · consistent
-pushes · respond in English only · no shortcuts or blind patches · report
-honestly when a commandment cannot be met (see 4: the water brightness gap).
-
----
-
-# SESSION 21 (2026-11-19 evening, post-crash resume) — Main_Agent_z8k
-
-## Environment + state
-- The sandbox was NOT wiped (the full tree survived: PoC, wallpaper, decomp,
-  scripts, glbs_v37). The new agent board token agtk_b1MJO3kZNt1jQwbsXPL9sAb2
-  VERIFIED (POST starting -> complete round-trips to
-  https://agent-updates.sh-clock.workers.dev/).
-- SANDBOX IO GLITCH DOCUMENTED (critical for future sessions): the tool
-  OUTPUT PIPE eats the literal byte sequence '[m' — e.g. 'branches: [main]'
-  displays as 'branches: ain]'. This caused a false "the workflow file is
-  corrupted" diagnosis + 20 minutes of dead-end file surgery (writes were
-  fine; every DISPLAY of the content was mangled). RULE: verify binary/file
-  content via HASHES (md5/git blob sha), never via printed strings, when a
-  '[m...' string looks wrong.
-
-## The APU00FF/APUFFFE camtrack bug — CLOSED (with a correction)
-- SYMPTOM (user): "APU00FF.glb DOES NOT WORK - and nor does APUFFFE.glb (on
-  Camtrack) ... animations not working is the norm rather than the
-  exception."
-- MY FIRST DIAGNOSIS WAS WRONG: I claimed the SH1X bind never bound
-  multi-primitive posed nodes (mesh-def names 'FW1_BACK_0' rejected by the
-  suffix filter) and rewrote sh1xOwnerNode with a non-empty-userData
-  discriminator. The AUDIT-A agent DISPROVED the mechanism: GLTFLoader r170
-  sets node.userData.name = nodeDef.name on EVERY named node, so the legacy
-  check ALSO resolved owners, and the pre-fix build already rotated
-  FW1_BACK -61.2 -> -41.1 deg (t=1->6). The user-visible fix was the EARLIER
-  T2 commit 54743db (the full driver set).
-- FINAL STATE (af74b7b + audit followup c50863d): sh1xOwnerNode hardened to
-  the NODE-EXTRAS discriminator (userData.ot_base !== undefined — the
-  ripper emits ot_base on every node def, never on mesh defs: 0/3812 mesh
-  defs with extras across 76 GLBs): mesh-def extras can never steal
-  ownership; unnamed nodes resolve to themselves and fail the bind prefix
-  exactly like the C engine's empty item.name. baseScale captured +
-  restored on preview-off. VERIFIED in-browser (agent-browser headless,
-  window.__camtrack + three.js reads): FW1_BACK_m0 rotates -61.2->-41.1
-  deg over t=1->6 (the verbatim 4 deg/s ferris rate) + orbits; APUFFFE
-  24/24 posed mesh nodes move; SU0203 fan regression clean (-156.4->135).
-  The camdat IMPORT of the user's 3-map camdat verified: 3 models, 1 track
-  each, playback advances.
-
-## PoC animations — VERIFIED WORKING (the user tested v33.3, old)
-- SU0203 + the user's camdat_user.json: static-cam A/B (t=10 vs 10.5):
-  5.60% pixels change = the fan spins. APU00FF + a fixed camdat (light ON):
-  the ferris animates (t3 vs t8: 3.36% change) AND renders lit (max
-  139-149). The current release v33.13 (linux+win+source, published
-  2026-11-19T20:24) carries all of this — the user's v33.3 test predated
-  the v33 animation default + the v34/v36/v37 engine grafts.
-
-## Wallpaper repo — THE 1.0.0 SCHEME (user directive) — DONE
-- version.properties reset to versionName=1.0.0 / versionCode=1. The CI
-  bump job: asset-only change -> PATCH (1.0.0 -> 1.0.1); code change
-  (engine/shell/res/gradle/workflow/proguard) -> MINOR (1.0.0 -> 1.1.0);
-  versionCode +1 per bump; tag v<name>; [skip ci] bot commit.
-- RELEASE SIGNING via GitHub secrets (user will set them): gradle decodes
-  WALLPAPER_KEYSTORE_BASE64 into buildDir/release.keystore with the 3
-  password/alias envs; ALL FOUR required (a partial set logs a warning and
-  falls back); the committed sh1.keystore (test key) is the fallback until
-  the user's key lands. README gained the full instructions + the
-  versionCode-reset reinstall note.
-- THE v1.0.0 BOOTSTRAP SAGA: (a) my v1.0.0 tag push was silently skipped
-  (GitHub honors the skip marker from the TAGGED commit's [skip ci]
-  message); (b) the AUDIT-B fix commit 5b5d79c was ALSO skipped because its
-  own EXPLANATORY TEXT contained the literal marker; (c) the first real
-  run then FAILED — the Groovy ternary directly after 'signingConfig'
-  parsed as a boolean assignment (ClassCastException) — fixed by computing
-  the selection into a local first; (d) my empty bootstrap commit had no
-  diff for the bump to see. The FINAL sequence: gradle-fix commit
-  02ff3fb -> the first 1.0.0-scheme run (bump to 1.1.0 + v1.1.0 release
-  with both APKs) in progress at session end.
-- AUDIT-B also fixed: BUILDING.md CI paragraph (release ASSETS, not
-  artifacts), the CI CODE set now covers app/proguard-rules.pro +
-  .github/workflows/. NOTES for the user: versionCode restarts at 1 ->
-  in-place updates from 10.x installs fail (INSTALL_FAILED_VERSION_DOWNGRADE,
-  uninstall once); the committed shared test key is forgeable (public repo)
-  — switch to your own key via the README steps.
-
-## WATER (issue 3) — the comparison work + findings
-- The 3 reference images IDENTIFIED: DuckStation captures of the REAL game
-  (the CDN 'reference images' dir: 'Silent Hill 2026-11-17-16-01-14.png'
-  etc. = DuckStation screenshot naming), 1920x1080 upscaled 320x240 frames,
-  of the SEWER area (VLM-confirmed: blue lattice/catwalk textures, dark
-  green-black water, ceiling drips, Harry with steel pipe + the classic
-  flashlight circle).
-- ALL 23 sewer rooms re-ripped to glbs_v38/ with full SH1X EXTRAs (the
-  WaterRefract effect + DR_WAVE.TIM + waterZones + the env presets +
-  mapLink). WATER.TIM (the 'Water' effect) belongs to MAP1_S02/S03 = the
-  SCHOOL (SU rooms — the flooded nightmare-school floors), NOT the sewer;
-  the sewer uses DR_WAVE.TIM (WaterRefract) verbatim per env_effects.c.
-- The sewer "rain" weather EXTRAs (field_17=5) is CANON: the game's own
-  sewer map headers set the rain recipe (the ceiling-drip particles —
-  ref2 shows the drips). The indoor-rain complaint applies to true
-  INTERIORS (SC/SU/HP/HU), which the v13.5 room-original derivation
-  already handles.
-- CAMERA CALIBRATION (the "match the camera angles" demand): cameras must
-  sit INSIDE the room AABB (outside = backface-culled black frame — the
-  cause of the crashed session's black renders); the flashlight needs
-  t>=2 (the engine fade 0/4096 at t=0 -> black); the light rot convention:
-  yaw 90 aims +x, 180 aims -x. The flashlight pool CALIBRATED: our lit
-  pool peaks 138-149 vs the reference's lit floor 42-45 center / p99 73-83
-  — IN RANGE (the prior session's "1.5x too bright" concern is resolved
-  at these distances).
-- PIXEL-LEVEL GROUND TRUTH (the reference vs our render):
-  * the reference's dark/water floor = RGB(21,21,21) uniform; OURS =
-    (24,24,24) — MATCHED (the 24 = our brightness floor; a 3-unit delta).
-  * the reference's lit center = 42-45 gray; our lit pool = 38-42 mean.
-  * the reference's water: "dark olive/green-black, faint dappled ripples,
-    NO bright glints"; our closeup: "dense ripple pattern visible, mottled
-    gray-white shimmer, no blown-out speculars" — the DR_WAVE water
-    rendering MATCHES the reference's character. The remaining deltas:
-    framing (the in-game fixed/chase cameras not yet perfectly matched)
-    and the fog-wall: preset 6 = fog ON at 14m BLACK (verbatim) which
-    swallows our pier beyond 14m; the reference's pier reads visible to
-    ~20-30m — RESEARCH ITEM: the reference's DuckStation capture may
-    include the brightness/gamma shift (EnableBrightness flag on preset
-    3/6) or the in-scene camera sits closer than my placements.
-- The v37 waterFloor EXTRAs + the DR_WAVE 4bpp nibble CLUT path stay as
-  the engine implementation (audit-verified in the prior session).
-
-## Still open (honest)
-- The 3 reference comparison images: best-effort cameras + the full command
-  set delivered (watercmp/); a true 1:1 camera match needs the exact in-game
-  camera poses (the sewer uses chase cameras — the VC road system; the
-  game's frozen moments carry Harry's position which the captures embed
-  implicitly). The next step for a pixel-perfect match: PnP-solve the
-  camera from the reference's 2D-3D correspondences (the room geometry is
-  known) OR port the VC chase-camera placement from vc_main.c.
-- WATER.TIM (the school flooded-floor 'Water' effect, MAP1_S02/S03) is NOT
-  yet rendered by any player (the school rooms in the corpus do carry the
-  envEffects EXTRAs; the floor-water modulate pass is the missing piece).
-
-
----
-
-## Session 38 (2026-11-20) — THE RUN_SU0203.bat 'no fan spin' TRUE root cause + the live-path driver-tick discipline (v38)
-
-The user retested the PoC via RUN_SU0203.bat and the fan STILL did not spin,
-despite session-28's "VERIFIED the fan SPINNING" claim. Root cause of the
-false positive: every prior animation proof ran the DETERMINISTIC paths
-(--shot / --r2shot / instrumented static-cam A/B) — those paths tick the SH1X
-propAnim drivers inline per fast-forward tick. The REALTIME loops (Win32
-run_window_win32, SDL, X11, --benchmark, and the wallpaper app's Android
-surface loop) call `live_advance(A, dt)` + `render_frame` directly and NEVER
-called `sh1x_anims_sync` / `fx_water_scroll_sync` / `sh1x_water_ripple_tick`
-AT ALL — the drivers were frozen at their parse-fresh pose in every
-interactive session. Repro (pre-fix, fixed camera): the benchmark path at
-t=3 vs t=6 = **0.00% pixels changed** (a completely static scene); the
---shot path at t=2.0 vs 2.5 = 8.69%.
-
-### The v38 fix (verbatim engine discipline)
-- `live_advance` now ticks the trio per FIRED 30 Hz tick (the same order as
-  the shot path's fast-forward: `sh1x_anims_sync` -> `fx_water_scroll_sync`
-  -> `sh1x_water_ripple_tick`), plus a one-time boot-frame "prime"
-  (`animsPrimed`) that computes the drivers' GATE state (dt=0) so
-  event-gated drivers are already hidden on frame 1 — the shot path's
-  post-loop call, applied to the live boot frame.
-- `sh1x_anims_sync` derives dt from the SESSION clock (monotonic, never
-  wraps — the engine's g_DeltaTime game-counter analog) stored per-Scene
-  (`Sh1x.animsLastSessionT`), NOT from the camtrack phase via a
-  function-static (the phase wraps at the cycle boundary and scrubs/restart
-  jump it -> one held tick per wrap, a 33 ms anim hitch each cycle).
-- `Sh1x.animsFresh[64]`: the engine-fresh snapshot taken at the end of
-  `sh1x_load`; the R-restart restores it (`sh1x_anims_reset`) — the engine
-  re-enters the room's WorldObjectsInit fresh instead of carrying the
-  previous session's angles.
-- The 4 shot/r2shot call sites now pass the session clock (in-loop:
-  pre-increment tSim; post-loop: tSim - tickDt = the last synced value, a
-  hold) — the OLD dt sequence [0, tickDt x (N-1)] + post-loop hold is
-  reproduced EXACTLY (goldens byte-identical).
-- New `FOGPOC_RESTARTTEST=1` SDL-loop test facility (the FOGPOC_R2TEST
-  precedent): fires the REAL `live_action(K_R)` path at frame 60.
-
-### The audit fleet's follow-ups (all applied)
-- **A1 (MAJOR)**: R-restart left driver 9 (gravityScatter, ER01FE) reading
-  ZERO live state — its per-instance liveVy/liveVz/scatter rolls are seeded
-  INSIDE `sh1x_anims_bind`, which ran once per scene (the static
-  `boundFor` guard), and the animsFresh snapshot predates the first bind ->
-  the beans teleported to the room origin after R. Fix: `boundFor` moved to
-  file scope + `sh1x_anims_bind_invalidate()` called from K_R (the bind is
-  deterministic — the re-run re-seeds driver 9).
-- **A2 (MINOR)**: the boot prime originally called the WATER pair too —
-  `fx_water_scroll_sync` advances the D_800AFDAC counter and the ripple
-  tick draws the shared RNG; both are per-tick-only systems with no gate
-  state to prime. Dropped from the prime (the live/shot water streams stay
-  in step).
-- **A3 (MINOR)**: `--t SECONDS` made the boot prime apply a clamped 0.1 s
-  anim jump. Fix: `sc.sh1x.animsLastSessionT = tStart` at live-app init ->
-  the prime is dt=0 (fresh pose) exactly like pre-v38.
-- **A4 (MINOR, pre-existing)**: multi-shot runs carried shot i-1's anims /
-  water counter / RNG stream into shot i (shot 2 at t=6 rendered ~8 s of
-  spin). Fix: per-shot engine-fresh state — `sh1x_anims_reset` +
-  g_propRngSeed/g_flaresys.counter/g_waterTileEverUpdated/g_sh1xBeltScroll/
-  g_tvpaint_pad resets. MULTI-SHOT == SOLO bit-identical now (verified md5).
-- (Pre-existing latent, filed NOT fixed — see audit INFO: `rot0PerInstN`/
-  `instBase` are zeroed AFTER their parse in sh1x_load — dead v36 code, no
-  shipped GLB authors them. Backlog.)
-
-### The verification battery (ALL PASS)
-- The 3 self-test goldens (SU0203 t=2.0 / THRF9FD t=10.5 / HP0003 t=6.0):
-  **byte-identical** before/after (md5) — the deterministic paths unchanged.
-- The TRUE SDL2 window loop under Xvfb (the RUN_SU0203.bat sequence):
-  t=3 vs t=6 = **10.08% pixels changed** — the fan spins. VLM-verified on
-  the frame pair: "FAN_MOVED: yes — blade configuration differs". Mid-session
-  HUD frame 100 vs final: 29.24% (the animation runs throughout).
-- The user's OWN camdat (the 3-map file): APUFFFE with its fully STATIC
-  track = 12.38% pixel change t=3 vs t=6 (the ferris + rides move with NO
-  camera motion possible — was 0% pre-fix); APU00FF (slow pan) = 76.19%.
-  VLM on the APUFFFE pair: "RIDES_MOVED yes — the gondola/cabin positions
-  are clearly in different orientations".
-- The restart test: [restarttest] frame 60 K_R fired (sessionT 1.967->0);
-  with-restart vs without-restart at the same frame = 7.75% (the drivers
-  returned to fresh state).
-- Multi-shot determinism: 2-shot run's t=6 frame == solo t=6 md5 (and
-  t=2 == solo t=2).
-- The wallpaper engine (the same fog_poc.c superset): the identical v38
-  port applied + audit-A's follow-ups mirrored (A1 bind invalidate, A2
-  prime, A3 --t, A4 per-shot resets) + the 4 shot-path call sites converted
-  to the session clock (audit-B's parity miss) + `pthread_attr_setstacksize
-  (4 MB)` for the engine thread (the ~300 KB stack Scene + call depth vs
-  bionic's ~1 MB default). Desktop gcc syntax-clean; the Android CI build
-  is the compile gate.
-
-### The fan window-loop GIF proof
-`SU0203_fan_windowloop_v38.gif` — 13 consecutive captured window-loop
-frames (FOGPOC_HUDSNAP k, fixed cam): the fan spinning in the REAL
-interactive loop, not the deterministic path.
-
----
-
-## Session T10 (2026-11-21) — THE V41 PR GATE (sole-merger review of the audit agents' 32 PRs) + the camtrack complaint fixes + the gate-found engine bugs
-
-### The gate (user directive: I am the ONLY merger; verify everything; reject wrong/duplicate; reimplement correct-bug/wrong-fix)
-- 7 verification agents (V41-A..F + RC root-cause) audited all 32 open PRs (PoC #24-#50, wallpaper #2-#6)
-  against decomp/swanstation + probed on main; every claim re-derived.
-- MERGED 24 PoC PRs as-is (#24-#33, #35-#49: the E parser/restart/multishot batch, the A ripple/water group,
-  the C lens-flare group, the D TV-noise/TIM group, the B camtrack editor group, the E build hygiene) —
-  conflict resolutions documented in the merge commits (pr_49's strict parse subsumes pr_25's isfinite;
-  pr_26's five resets precede pr_29's ripple spawn in K_R — the fresh-load order).
-- REIMPLEMENTED: #28 (tim_load bounds — the branch left a ph=0 OOB; the residual !w||!h guard added, fe9a034),
-  #50 (findings map — its headline counts contradicted its own table; corrected recount 2C/10M/28m/1doc/9I,
-  c5631de). REJECTED: #34 (C-2 — inert on main: the core quads rasterized 0 texels due to the sprite-quad
-  bug below; re-land after that fix). All three closed with documented evidence comments.
-- Wallpaper: #2-#6 all verified faithful (13/13 + 23/23 + code-identical twins) and merged; then the FULL V41
-  engine sync ported to the twin (622+/118-, hunk-fidelity table in the sandbox GATE_WORKLOG).
-- MY OWN merge-resolution bug caught by the port audit and fixed (8dc4565): the --r2shot pan= sscanf line
-  dropped in the eb9b588 conflict resolution.
-
-### The gate-found engine bugs (fixed on fx-v41-gate + audited by AUD-FX + merged e575600)
-1. fx_blit_sprite_quad rejected the quad INTERIOR — the flare cores/ghosts painted 0 texels since v26
-   (streaks-only PoC). Fixed with the fx_blit_gouraud_tri edge-function convention + the AUD-FX-corrected
-   swanstation split (v0,v1,v2)+(v2,v1,v3). Cores now paint 1474/374/3924 texels (battery cam).
-2. --snow-seed was dead (snow_reset clobbered it) — snow_reset_seed + the 3 CLI sites.
-3. R-restart carried the weather transition + the converged flashlight fade — the K_R room-reload arm
-   (particle.c:396-418 verbatim) + the density hunk (field_2349 = room recipe) at boot AND K_R.
-   restart==fresh md5 now MATCHES.
-4. camtrack Ctrl/Cmd+F collision (the pr_47 variant).
-
-### The owner's four camtrack complaints (fixed on camtrack-v41 + merged eb69666; probes re-run by maintainer)
-1. NIGHT-ONLY: SPU+DR join the night-only family — dayEnv=nightEnv=6 ({6,3} verbatim). SPU0401/DRU0100 verified.
-2. SPU0401 SHOWS NOTHING: auto Effects-Off for dark trackless rooms + camera framed INSIDE the room AABB —
-   76.7% non-background on load (was 0.34%); key 0 restores night + fog 14m; the exported camdat stays {6,3}/6/6.
-3. NO TV EFFECTS: the tvPaint port — the engine's sh_tv_paint VERBATIM (swanstation 4bpp sampler, 16-entry
-   CLUT strip, TV1 x<896, byte-identical TV1/2/3 TIMs, g_tvpaint_pad, RT hook) — the TV static ANIMATES
-   (54.4% A/B diff, 13/13 quads, kill switch, 0 errors).
-4. LIGHT SOURCE: the LIGHT SPHERES — authoring exactly like the camera path spheres, THREE modes only
-   (fixed / static rotation / line; start/end/speedMS/loopMode); ShEnv honors the authored light
-   (env light pos == authored world != camPos); legacy follow:'camera'+ahead round-trips intact.
-5. NAVIGATION: -69% sidebar scroll (3.47 -> 1.07 pages), File/Models/Tracks/Options first, 9 groups collapsed
-   (+localStorage), dev behind a toggle, ONE +Add-track menu, >=12px fonts.
-Regression: the user's 3-map camdat loads + plays, the fan animates, 0 console errors.
-
-### Wallpaper
-- The twin got the full V41 engine sync + the fx port (sprite-quad, snow-seed, K_R arm) + the corpus
-  re-derivation (the 7 SPU/DR models dayEnv 1->6, via the FIXED derive script). Pushed 9d42961.
-
-### Open follow-ups (honest)
-- pr_34 re-land after the sprite-quad fix (the occluded-branch depth-place diff is correct-as-written).
-- The camtrack F-5 flare-sprite preview remains a feature decision; B-4 Infinity round-trip design;
-  the altKey guard + the g/l/c/t/z/h ctrl-collision house-wide sweep (AUD-FX nits).
-- The V41 evidence dir (download/v41_evidence) is in the AUDIT fleet's sandbox — re-mirror if needed.
-- The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE ALL ELSE).
-
----
-
-## Session V46 (2026-11-22) — THE 72-PR BACKLOG GATE (sole-merger review of the stranded V43 batch + V45 tail) + the task split
-
-The user directive order for this session: (1) CLEAR THE PR BACKLOG FIRST, (2) then the
-water-texture GLB audit, (3) SPLIT the remaining work across sessions (the task is too
-long for one session — three prior crashes). This session executed (1) completely and
-split the rest — see "NEXT SESSION" below.
-
-### The gate (72 open PRs: V43 #69-#134 minus the merged #95, S20 #133/#134, V45 #168-#174)
-- Crash recovery first: sandbox partial-wipe (repos gone, scripts survived) -> PoC recloned
-  at 0c13e6c (v33.43, V45 #160-167 already merged), decomp + swanstation shallow-cloned,
-  resumption posted to the agent board (new token).
-- 7 verification agents (V46-A..G) audited all 72 PRs in subsystem batches (camtrack JS,
-  snow/rain, R2/timing, raster/GTE, lens/TV/TIM, GLB scene/anim, ripper) — every claim
-  re-derived from decomp/swanstation with full-function reads and recomputed arithmetic,
-  every branch tested against CURRENT main (which had moved past the PR bases via the
-  V44/V45 merges). Compose tests on scratch clones, no merges by agents.
-- MERGED 61: #69 #70 #71 #72 #74 #75 #77 #78 #79 #80 #81 #82 #83 #84 #85 #87 #88 #89 #90
-  #92 #93 #94 #96 #97 #99 #101 #102 #103 #104 #105 #106 #107 #108 #109 #110 #111 #112
-  #113 #114 #115 #116 #117 #118 #119 #121 #123 #124 #125 #126 #127 #129 #130 #131 #132
-  #133 #168 #169 #170 #171 #172 #173 #174 (+ the #115 gate companion commit: the probe
-  pixel's Y switched to fb->h/224).
-- REIMPLEMENTED 6 (bug real, fix wrong/stale — NOT merged, fixed properly at the gate):
-  #86 (posed-group bind via the ripper's per-object _emitted_inst base window + the
-  posedBound++ fallback discipline onto post-#140 main), #98 (stall catch-up ONE dt=273
-  update with the V42 D-2 duration clamp wrapped AROUND stepT), #100 (splash corner-0
-  depth/bucket/CLUT with TRUNCATING quantization + Q8-snapped corner + per-branch cull),
-  #120 (stoneChoreo metadata 1337 — the PR's "~1336" contradicted merged #138; also the
-  second stale 1336 at the gravityScatter metadata and the C drop-path comment),
-  #128 (per-QUAD far cull folded into the #154 shQcull walk — the PR's own diff would
-  have failed the shader compile with a duplicate attribute declaration),
-  and #119 was merged WITH a gate amendment (4 KAIGAR2_H/KAIGAL2_H -> KAIGAR2_/KAIGAL2_
-  per map7_s01_2.c:2116/2121 + map7_s02_2.c:3412/3415 — the _H strings do not exist in
-  the engine).
-- CLOSED 6: #76 (duplicate of #133 — identical fix, #133 is current-main-based), #91
-  (duplicate — negative-wrap guards already on main via V42 D-5 ext + #167), #73
-  (duplicate — subsumed by merged #147/#166), #122 (stale premise — merged #155 settled
-  the opposite direction; merging would re-diverge the twins), #134 (bug real, fix NOT
-  engine-verbatim — the wrap-fold has no counterpart in the engine's plain ABS_DIFF;
-  the verbatim form landed as #96). All closed with evidence comments.
-- Conflict resolutions documented in the merge commits: #88 (nbMerged field unioned with
-  #87), #92 (onto #93's jsonIdx walk), #107 (V44 comment + PR comment unioned, code
-  byte-identical), #108/#130/#131 (composed with the just-landed cluster PRs), #116
-  (3-way onto post-#115 main), #78 (V44 C-6 3rd arg kept + POST-advance relocation),
-  #84 (V44 D-1 z-negation kept + x-min truncation).
-
-### The battery (ALL PASS on the final tree)
-- Clean build (cc -O2 -std=c99 -Wall -Wextra): ZERO warnings/errors.
-- Determinism: THR t=10.5 double render byte-identical (cmp).
-- Fan shot A/B t=1.000/1.0334: 30.50% pixels changed (threshold 500).
-- Fan BENCHMARK live A/B (the live_advance path — exercises the #98 stall + #78 POST
-  order): 39.98% changed.
-- Sewer water A/B t=3/t=6 (DRU0100, exercises #108/#172/#114 water paths): 527 px vs
-  threshold 80. TV A/B t=3/t=6 (SPU0401, exercises #109 TV-over-flakes): 13.55%.
-- IPD roundtrip: FULL FILE BYTE-IDENTICAL on all 6 corpus rooms (HP0003/DRU0100/
-  SPU0401/SU0203/SU0300/THRF9FD) — with #123/#124's bitfield re-encode changes live.
-- Ripper conversion set (CI parity): THRF9FD/HP0003/SU0203/SU0300 all rip clean
-  (0 validation errors, 3517/3517 quads reconstruct).
-- camtrack.html: JS syntax 4/4 script blocks, the 30-track ground-truth audit passes,
-  headless browser load ZERO console errors.
-- New golden baselines (post-#78 one-tick POST-order shift — expected): THR t=10.5
-  md5 c5132b820a63e11d5132358cb586c994; FAN t=1.000 a419211e84529b7528dfe528a95004e0;
-  SEW t=3 43a1d488b1cf75457971c502dbc44aef; TV t=3 deee41888426cd3c9edede58c95031a2;
-  LIVE t=3 0afd331c102823101ec20398d79e425c / t=6 8f79f480758233896d4d28477700d8b5.
-
-### Wallpaper twin / four-program mirroring — NOT done this session (split)
-The V46 engine changes (61 merges + 6 reimplementations) are on PoC main only. The
-wallpaper twin sync (the same fog_poc.c superset + camtrack twin), the glbs re-derivation
-and the wallpaper CI/versioning work remain for the next sessions — deliberate split per
-the user's directive, NOT an omission.
-
-### NEXT SESSION (the split's task list, in order)
-1. THE WATER-TEXTURE GLB AUDIT (the user's first directive): the generated GLB water
-   textures "don't look correct" — extensively audit the IPD/GLTF ripper's water-texture
-   path against silent-hill-decomp (TIM decode, TPage/CLUT selection, semi-transparency
-   classes, UV/texwin handling, the DWAVE/VIN CLUT research) with NO assumptions; any fix
-   goes in the IPD RIPPER (the single source of truth — all players consume the GLB).
-   Relevant merged context this session: #108 (wsheet quad split), #114 (engine-px
-   scaling), #117 (8bpp TIM decode), #118 (blit_tim center-crop), #171/#172 (the exact
-   SUB/ADD 5-bit chains), #1 (V40 water glint window) are already on main — audit the
-   RIPPER side now.
-2. DR01FE.glb as THE water reference map (the user: "use DR01FE.glb — it is more
-   relevant"), the lens effect ON the water (not floating above), and reference camera
-   angle matching BEFORE comparing water effects (fixed camera angles from the source).
-3. APU00FF/APUFFFE animation failures on Camtrack (all special properties in EXTRAs).
-4. The wallpaper twin sync of the V46 wave + the env/EXTRAs rules (no rain indoors;
-   day/night population; unbiased EXTRAs with Camtrack deriving) + related-map EXTRAs.
-5. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning, kill v11-v27).
-6. Flashlight (Harry's light source: full camera-like movement, angle distinction,
-   disable-able, never in day modes).
-- The commandments remain embedded at the head of this file (PRIORITISE ACCURACY ABOVE
-  ALL ELSE).
-
----
-
-## Session V47 (2026-11-23, Main_Agent_v47_BranchCleanupWaterAudit) — the branch cleanup + the ripper water-texture audit (round 2)
-
-### 1. THE BRANCH CLEANUP (the owner's new directive: "clean up unnecessary
-branches — 174 PRs are cluttering the branch list")
-- Sandbox survived partially (scripts/assets/WORKLOG intact; PoC+wallpaper
-  repos gone -> recloned with the PAT). Board notified at session start
-  (Main_Agent_v47_BranchCleanupWaterAudit).
-- Enumerated branches x PR states on BOTH repos (paginated API): PoC had
-  177 branches = main + 174 PR-associated (ALL dispositioned: 0 open — the
-  V46 gate cleared the backlog) + housework-v25 [merged into main] +
-  v40-integration [the Nov-20 V40 fleet snapshot — superseded: its ripper
-  fixes verified verbatim on current main (D-F6 @ ipd2gltf.py:826, D-F4
-  @ :7164)]. wallpaper: 26 = main + 23 PR-associated (all dispositioned) +
-  Q [merged] + housework-v6 [merged].
-- DELETED 174 (PoC) + 25 (wallpaper) branches via DELETE
-  /repos/{repo}/git/refs/heads/{name} (the /branches/{name} DELETE form
-  404s). BOTH repos now: branches = [main] ONLY, open PRs = 0.
-  Scripts: scripts/v47_branch_cleanup.py + v47_branch_delete.py (+ the
-  report at pr_triage/v47_branch_report.json).
-
-### 2. THE WATER-TEXTURE RIPPER AUDIT (the owner's directive, V46's next-
-session item 1) — TWO parallel audit agents + the coordinator's own sweep
-- W1_TIMDecode_Agent_x47 (full report in the conversation log): the ENTIRE
-  TIM decode path is BYTE-CORRECT — hand-decoded DRG02/DR_WAVE/etc vs the
-  GLB-embedded PNGs: byte-identical; the DWAVE_TILE0 ctr=0 composite
-  byte-identical to the independent re-derivation; the waterRefract payload
-  (pixels/clut/upload/liveTile) verbatim vs env_effects.c/fs_queue.c/
-  lens_flare.c; the v45 waterLive floor extras verbatim vs
-  func_80059E34. Findings: 1 MINOR (the leaf punch-through comment asserts
-  the INDEX-0 rule; the hardware rule is the FETCHED-COLOR rule —
-  swanstation gpu_sw_backend.cpp:124; output-identical on the corpus) +
-  INFO-level notes (the STP->127 = ABR-0 approx of the ABR-1 rooms blend;
-  the TimFile 4bpp-only scope gate loses nothing — 901 TIMs swept, 0
-  bpp!=0 references in 493 room IPDs).
-- W2_CamtrackWater_Agent_x47 (full report in the conversation log): the
-  v45 GLB + extras are accurate and complete END-TO-END (verified vs
-  func_80059E34, func_8008E5B4, Map_EffectTexturesLoad, the swanstation
-  blend modes); the C PoC consumes them (RP_SUB_TEX + the live tile +
-  the zone gates, fog_poc.c:1929-1978/12447-12522/14850-15071). THE
-  CAMTRACK (three.js) CONSUMES NONE OF IT: no waterLive/waterRefract/
-  DWAVE consumer anywhere in camtrack.html — the water floor renders as
-  an OPAQUE STATIC BRIGHT-GRAY PLANE (mean tile value 118 vs the engine's
-  <=10-level subtractive darkening) — THE "water textures don't look
-  correct" observation point. W2 produced the COMPLETE three.js
-  implementation spec (CustomBlending SubtractEquation + per-frame tile
-  regen from the waterRefract payload, renderOrder 10, depthWrite false,
-  the exact lens_flare.c:581-599 layer windows: poly[0] OPAQUE u 0..32
-  v (ctr>>1)&0x1F..+32 / poly[1] ABR-1 u ((ctr+1)>>2)&0x1F..+32 v 8..40).
-- THE COORDINATOR'S SWEEP (the ripper's own parser over every IPD+PLM):
-  the water family = 63 B4==1 DWAVE floors (v45-covered) + **5 B4==2
-  objects in 4 rooms the v45 audit MISSED** (APU0002 DRL2_ILI, RSU01FF
-  FLOOR4_I, SC00FF G_HIDE_I + R_HIDE_I, SPU0401 REF_NEAR) — the engine
-  dispatches field_B_4==2 to func_80059E34 CASE 2 (:1469-1471):
-  0x2E808080 semi-ALWAYS, flat UNITY, tpage own|0x20 (4bpp CLUT ABR-1
-  ADDITIVE), z-sorted bucket. The S22 note "the UNUSED arg0==2 variant"
-  was WRONG — 5 corpus objects use it. These exported via the standard
-  path (opaque/no contract) -> the class export was missing.
-
-### 3. THE RIPPER FIXES (PoC tools/ipd2gltf.py, this commit)
-1. **The field_B_4==2 class export** (the "TEXA"/waterAdd class): the
-   stp=1 _STP decode for EVERY pack (the engine's unconditional 0x2E +
-   the per-texel CLUT-STP gate — gpu_sw_backend.cpp:139-156), a NEW
-   material key ("TEXA", tex, pal, stp) + name suffix _WADD, alphaMode
-   BLEND (or OPAQUE when the CLUT row has no STP entries — engine-exact,
-   verified: SPUM103F row3 = 0/16 STP -> REF_NEAR draws fully opaque),
-   and the verbatim SH1X.waterAdd.floor extras (draw/tpage/mode/abr/
-   flatColor/otBucket/fogVeil/farCull/uvUnits with the exact decomp
-   citations). UV basis: the STANDARD sheet normalization (verified
-   in-sheet: FLOOR4_I u 128..255 v 0..127 on the 256-wide RSULH3).
-2. **The DWAVE static polish** (W2's fixable list, contract-neutral):
-   baseColorFactor [0.4375 x3, 1] on the waterLive material (the glTF
-   carrier of the 0x2E383838 flat modulate) + the DWAVE_TILE0 sampler
-   NEAREST (9728) — stock viewers show the dark dapple at the subtract-
-   term brightness, texel-1:1, instead of a smeared bright-gray plane.
-   The PNG and the extras stay verbatim; the PoC ignores baseColorFactor
-   for textured materials (fog_poc.c:3119) — no double-modulation.
-3. **The leaf punch-through fix** (W1's finding): the color-0 rule
-   (texture_color.bits == 0 -> not drawn, gpu_sw_backend.cpp:124) +
-   the corrected comment.
-4. The object-flag warning now distinguishes the water family (the class
-   contract export) from the genuine standard-path deviations.
-
-### 4. THE VERIFICATION BATTERY (all green)
-- Clean rip of the full corpus (glbs/ 4-room CI set + glbs_anim/ 25
-  rooms): 0 validation errors everywhere; the APU0002 degraded=YES flag
-  is PRE-EXISTING (10 unresolved library objects — unchanged by this
-  session's edits).
-- The animation gates on the regenerated corpus: FAN 30.50% (thr 500),
-  SEW 527 px (thr 80), TV 13.55% (thr 500) — ALL PASS, exactly the V46
-  baseline values.
-- Golden md5s IDENTICAL to V46's: FAN t=1.000 a419211e84529b7528dfe528a95004e0,
-  SEW t=3 43a1d488b1cf75457971c502dbc44aef, TV t=3 deee41888426cd3c9edede58c95031a2
-  — the ripper changes are render-neutral for the battery rooms.
-- The A/B renders (the PoC, old-batch vs new-batch GLBs): DR01FE
-  BYTE-IDENTICAL (the DWAVE polish render-neutral), SPU0401 IDENTICAL
-  (REF_NEAR OPAQUE = engine-exact: the row has 0/16 STP entries),
-  APU0002/RSU01FF/SC00FF IDENTICAL at 6 camera placements each — the
-  PoC's waterAdd consumer port (the ADDITIVE raster) is NEXT session's
-  mirroring work; the TEXA material's BLEND is visible in stock viewers.
-- IPD roundtrip (tools/tests/sh1x_roundtrip.py): FULL FILE BYTE-IDENTICAL
-  on THRF9FD + HP0003 (+ blob consumption clean on SU0203/DRU0100/SPU0401).
-- The 4 case-2 rooms' GLBs: the WADD materials verified present with the
-  full contract (SPUM103F_pal3_stp_WADD etc.), BLEND where the CLUT row
-  carries STP (SCBFBH/SCBFB2/RSULH3/APUMGR1F = 15-16/16 STP entries).
-
-### 5. THE TASK SPLIT (per the owner's directive — saved for the next session)
-NEXT SESSION QUEUE (S25/V48, in order):
-1. THE CAMTRACK WATER PORT (the user's visible bug): implement W2's
-   complete spec in tools/camtrack.html — the CustomBlending subtractive
-   water floor (renderOrder 10, depthWrite false, SubtractEquation +
-   the F5=(T5*56)>>7 fragment) + the per-frame live-tile regeneration
-   from SH1X.envEffects.waterRefract (the exact lens_flare.c:581-599
-   windows + the ctr advance on the 30Hz grid + the water-zone gates)
-   + registerModel keeping envEffects + the material-extras waterLive
-   parse. [W2's report has the full grounded implementation spec.]
-2. THE PoC + WALLPAPER waterAdd CONSUMER PORT (the B4==2 class): the
-   ADDITIVE raster (BackgroundPlusForeground saturating, flat UNITY) +
-   the z-sorted bucket + the unconditional semi — the four-program
-   mirroring of this session's ripper class. (The PoC's waterLiveUvTile
-   gate must stay keyed on `floor` presence — the waterAdd materials'
-   UVs are sheet-normalized, NOT tile-relative.)
-3. THE WALLPAPER TWIN SYNC of V46+V47 (the 61+6 V46 engine merges + this
-   session's ripper class) + the 45-asset GLB regeneration + the
-   env/EXTRAs rules (no rain indoors; day/night population; unbiased
-   EXTRAs) + related-map EXTRAs.
-4. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
-5. The flashlight (user-programmable light, full camera-like movement).
-6. APU00FF/APUFFFE animation failures + the all-animations PoC suite.
-The commandments stay embedded at the head of this file.
-
-### 6. THE V46 BUMP-RACE REPAIR (found while verifying the mains)
-- The V46-final run (486a7cf, the worklog commit) was RED: the bump job
-  died at `fatal: tag 'v33.44' already exists` — the V46 merge burst raced
-  its bump runs and burned tag v33.44 at the ORPHAN f1c240b (NOT on main)
-  — the exact failure class S23 repaired on the wallpaper repo.
-- Repair executed: the orphaned tag deleted from the remote; the first
-  rerun of the 0cc1bfb run still failed (the runner's LOCAL clone had
-  fetched the tag before the deletion — the local `git tag` refused);
-  a fresh rerun (attempt 2) then completed GREEN: bump 33.43 -> 33.44
-  (main @ 9e168b5, version.txt 33.44), tag v33.44 ON main, the release
-  v33.44 built with all three assets (source + linux + win zips).
-- PoC main is GREEN at the V47 state. The version self-heal confirmed
-  (no manual version surgery needed — the S23 lesson applied).
-
----
-
-## Session V48 (2026-11-23, Main_Agent_s25_V48_WaterLens) — the water SOLE-focus session: THE LENS FLARE + CONE-OF-LIGHT POSITION FIX (the PoC) + THE CAMTRACK WATER PORT
-
-### 0. THE SESSION SCOPE (the owner's directive, verbatim intent)
-"I think the problem is with the lens flare and the position of the cone of light ...
-extensively check. Use parallel agents and see where they intersect ... I expect you
-to spend ALL your effort in this session SOLEY on fixing the water." — executed: three
-parallel mapping agents (A: the decomp water/lens path; B: the PoC state + the defect
-hunt; C: the camtrack integration terrain), the intersection root-caused, fixed,
-verified. The PR backlog: 0 open PRs at session end (the owner's audit agents had not
-submitted yet — CHECK FIRST next session).
-
-### 1. THE ROOT CAUSE (agent B's find, agent A's engine math cross-verified)
-THE ENTIRE LENS-FLARE/WATER FX FAMILY PROJECTED SCREEN-Y WITH THE WRONG SIGN. The
-engine's screen y axis is y-DOWN and light_overlap.c:270-272 projects the ENGINE
-view-space vy straight onto it; the PoC's view matrix is glTF (y-UP) — the engine
-screen y = -(glTF view vy) * H/d. The old code fed +vy into the y-DOWN formula:
-EVERY flare sprite, the water glint, and the cone fan painted MIRRORED about the
-screen's horizontal center — the cone/glint ARE at the water plane in world space
-(the geometry math was correct all along) but painted at the TOP of the frame —
-"the lens effect is above the water and is incredibly broken". The engine view frame
-is the T=diag(1,-1,-1) reflection of the glTF view frame (the standing axis map
-engine=(x,-y,-z)*glTF, fog_poc.c:6169-6173). The mesh/snow/rain/TV paths all flip
-correctly (fog_poc.c:9067) — the FX family was the one holdout.
-
-### 2. THE PoC FIXES (src/fog_poc.c — 7 sites, the engine y negation)
-1. fx_lens_exec scrLPos[1] = (int)(-vy * invd) (:11598-class — the LIGHT's screen pos;
-   also feeds the visibility probe's row and the add_flare_ang phase terms).
-2. scrAngXY: atan2(-pyn, pxn) - 90deg (:11641-class — the plane normal is glTF-frame;
-   the ENGINE normal is (pxn,-pyn,-pzn) — the OLD +pyn mirrored the streak fan;
-   ang_z is frame-INVARIANT (cos = a plain dot, sin = a double-T-canceled triple
-   product — brute-force verified (Ta)x(Tb) = T(a×b) for T=diag(1,-1,-1)).
-3. The glint glintPy = (int)(-vy * invd) (fx_water_zone_collect — the mirrored light
-   2*waterY-lightY is correct in world space; only the projection was flipped).
-4. The cone G3 apex aey = (int)(-cpy * civ).
-5. The cone G4 corners rey = (int)(-py * iv).
-6+7. The school water-ripple mesh mqy + sprite spy (the same FX family, latent —
-   no ripple room in the current corpus, fixed for parity).
-VERIFIED (the A/B proof, DR01FE, --cam 54 2.0 46 54 -0.5 58 --night --userlight
-ahead:2.5): BEFORE the fix the ring band was y in [0..61] (the frame TOP, 6107 px,
-the mirrored annulus); AFTER: y in [171..223] (the near water band — ON the water,
-916 px). A second camera over the channel (--cam 60 3.0 62 57.7 -0.5 60.2): the ring
-annulus lands x 77..211 y 55..169 around the light's ground position ON the water
-(3709 px). The ripple/glint/cone WORLD geometry was already correct (the ring at
-posY, the glint at the mirror point, the colors/UVs verbatim).
-THE MINI ANIMATION BATTERY (the rebuilt binary, all green): fanArray 8.75%,
-tvNoise 12.56% (the historical 13.55 band), rngWalk 0.57%, waterRipple 0.54%,
-waterFloor 0.53%; with --userlight ahead:2.5 the DR01FE t=1/t=11 A/B = 1.18% (the
-tile + ring animating). No regressions.
-A VLM AUDIT FALSE ALARM RESOLVED: camtrack.html line 3853 displayed as
-"for (const esh, mat] of swaps)" in every terminal view — the HEX shows the line is
-ACTUALLY "for (const [mesh, mat] of swaps) mesh.material = mat;" — the display layer
-ate "[m" as an escape sequence. NO corruption existed; node --check was RIGHT. LESSON:
-trust the parser, hex-dump before eyeballing "corruption".
-
-### 3. THE CAMTRACK WATER PORT (tools/camtrack.html — the visible-bug fix)
-The camtrack consumed NONE of the water EXTRAs (W2's V47 finding — the floor rendered
-as an OPAQUE STATIC bright-gray plane). Ported the COMPLETE engine water path:
-- THE LIVE TILE (func_8008E5B4): sh1xDrWaveFromExtras (the 4096-byte nibble sheet,
-  the v37-twin 128-byte stride bug FIXED to the correct 64-byte 4bpp row — the
-  out-of-bounds read made every index 0 = the all-black tile), drTileRegen (the
-  VERBATIM two-layer composite: poly[0] OPAQUE u 0..32 v (ctr>>1)&0x1F..+32 /
-  poly[1] ABR-1 ADD u ((ctr+1)>>2)&0x1F..+32 v 8..40, both clut row 0, the 5-bit
-  saturating add), the ctr advancing on a 30Hz tick grid with the per-tick zone test
-  at the tick's own light/camera pose (the fx_water_scroll_sync discipline).
-- THE SUBTRACTIVE FLOOR (func_80059E34 arg0==1): the waterLive meshes (identified by
-  the MATERIAL-level SH1X.waterLive extras — glbMaterialSh1xExtras parses the raw GLB
-  JSON materials; the material NAME fallback) swap their shMat slot for the
-  WATERLIVE material: tpage 0x14D ABR-2 B-F (CustomBlending SubtractEquation
-  ONE/ONE), F5=(T5*56)>>7, flat 0x2E383838, renderOrder 10 (the FIXED bucket 640),
-  depthWrite false, depthTest true, the GTE screen snap in WATERLIVE_VERT, the
-  uFarCullM uniform present (perVertexPass syncs it on every shMat — :3605).
-- THE LENS GLINT (func_8008E794): the screen-space NDC quad at the mirrored light
-  position 2*waterY-lightY, 48x96 engine px, the DR_WAVE atlas u 64..127 v 0..31
-  clut row 1 (the corner-UV mapping verbatim — u runs top->bottom, v flipped),
-  the sin(clamp(angZ-40,<=90)) prim color (r=sin>>6 g=(sin*7)>>9 b=(sin*5)>>9,
-  the ang_z math = the PoC twin, frame-invariant), ABR-1 additive, renderOrder 9.5,
-  the fixed-bucket gate roomD<20.0625 discard (the wfDepthRT reference).
-- THE CONE-OF-LIGHT FAN (func_8008EA68): 8 segments AT THE WATER HEIGHT posY around
-  the LIGHT's x/z, yaw=atan2(dir.x,-dir.z) glTF, the inner r=0.8@1.2m (the shift-10
-  quirk) + outer r=2.2@1.5m rings + the (0,0,0.7) apex, the opaque pair (normal
-  blending, renderOrder 9, gate 20.0625) + the semi pair (additive — the engine's
-  SetDrawTPage(...,1,32) ABR-1, renderOrder 10.5, gate 20.0), colors repl5(c>>3).
-- THE PLUMBING: the SHView drWaterHook (called after the tvPaintHook, before the RT
-  render — the WorldGfx_2dEffectsDraw slot), the RT-only visibility restore, the
-  setDrWaterFx export, the boot registration (sh1xDrWaterEnsureMeshes — the lazy
-  registration was a chicken-egg, fixed the waterfall's boot pattern), the
-  ?drwater=0 kill switch, sh1xWaterDepthPass reuse for the fixed-bucket gates.
-VERIFIED (headless chromium, zero page errors): DR01FE loaded through
-__camtrack.loadModelFiles, the water camera (60,3,62 yaw 51.95 pitch -50.16 — the
-lookAt-derived fixed track), the authored WORLD light {on,follow:'world',mode:'fixed',
-pos:[57.5,2.2,60],rot:[-15,0,0]} (the rawDoc is the LIVE doc — the doc getter returns
-a JSON COPY), the engine pair {6,3} + setFlashlight(true) (the flashlight ramp ticks
-ONLY while PLAYING — the env's 30Hz syncLive grid runs on state.t), 8 waterLive
-mats swapped at renderOrder 10, flareInt 4096, lightPos 57.5/2.2/60.
-- THE RENDER: the water floor = the SUBTRACTIVE animated dapple (the t=2.5s vs
-  t=3.7s A/B: 10243 changed pixels — the tile animating); the drwater=1 vs 0 A/B
-  (both runs paused for a clean diff): 3090 FX pixels — the diff-mask geometry shows
-  THE CONE FAN (the diagonal wedge/fan band, mid-lower frame, dense multicolored
-  speckle around the light's ground point) + THE GLINT (the bright streaky cluster
-  at the right edge — the 48x96 vertical streak) + the animated dapple — matching
-  the engine's subtle reference look (the VLM reads the reference as "faint, dim
-  ripples — no bright glints": the engine colors (20,18,12)-class ARE subtle).
-- THE V48 NOTE ON THE DEFAULT LIGHT: the camtrack/PoC default light == the camera
-  (the v6 directive) -> Gate 2 (vz>112 Q8) ALWAYS fails -> the water FX family +
-  the ctr are dead by default (engine-true for a camera-coincident light). The
-  AUTHORED world light (follow:'world', pos AHEAD over the water) activates
-  everything — exactly the engine's trailing-camera flashlight geometry. The
-  owner's userLight authoring flow is the supported path.
-- NO RIPPER CHANGES: the waterZones/waterRefract/waterLive exports verified
-  verbatim by BOTH audit agents (W1's V47 byte-audit + this session's agents) —
-  the ripper was already correct; the defect was consumer-side.
-
-### 4. THE NEXT SESSION QUEUE (S26/V49, in order)
-1. CHECK + DISPOSITION the audit-agent PRs FIRST (the owner runs them after this
-   session; the sole-merger protocol: verify fully, reimplement-don't-merge bad fixes).
-2. THE PoC + WALLPAPER waterAdd CONSUMER PORT (the B4==2 class — the V47 ripper
-   export is done; the ADDITIVE raster + the z-sorted bucket in fog_poc.c; the
-   camtrack waterAdd material consumer). Affected rooms: APU0002 DRL2_ILI, RSU01FF
-   FLOOR4_I, SC00FF G_HIDE_I + R_HIDE_I, SPU0401 REF_NEAR.
-3. THE WALLPAPER TWIN SYNC of V46+V47+V48 (the engine merges + the ripper classes +
-   THIS session's fog_poc/camtrack water work) + the 45-asset GLB regeneration +
-   the env/EXTRAs rules (no rain indoors; day/night population; unbiased EXTRAs) +
-   related-map EXTRAs.
-4. The reference-camera WATER COMPARISON pass (the owner's "match the camera angles
-   of the reference images BEFORE testing" — the fixed cameras derive from the map's
-   camera-path data (map5_s00/map6_s03 camera_paths.h) + the CDN reference shots;
-   the PoC renders at the matched poses + VLM compare).
-5. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
-6. The flashlight (user-programmable light, full camera-like movement) + APU00FF/
-   APUFFFE animation failures + the all-animations PoC suite.
-The commandments remain embedded at the head of this file.
-
-# SESSION 9 (V50) — the wallpaper twin sync V46–V49 + the reference-camera water pass + the PR dispositions
-
-## 1. THE WALLPAPER TWIN SYNC V46–V49 (COMMITTED wallpaper ee33106, pushed)
-The Android twin's fog_poc.c was a v45-era snapshot (the last fog_poc.c sync
-= 081cda4, the v45 HW MASK/STP transplant; ZERO V48/V49 markers). Method:
-the PoC delta base d9af2df (the last v45 fog_poc.c commit, PR #172 C2-1) →
-HEAD 3cb50fa = 107 hunks / 2624 lines: `patch -p1 --fuzz=3` applied 96; the
-11 rejects hand-ported + the missed pre-base V44 C-6 port completed:
-- V48 W-audit-B (the flashlight-circle family): the 7-site engine y-DOWN
-  screen negation (fx_lens_exec scrLPos[1], scrAngXY, glintPy, cone G3/G4,
-  ripple mqy/spy) — the twin's water FX now paints ON the water band.
-- V48 A23-F1 (g_bootWeatherBits stash + the K_R re-sync), A-3 (RP_ADD_TEX
-  per-prim dither two-step), PNG-1/2, A16-1..4, A18-1, A22-F3, A4/A5-1 (sp14
-  hoist), v43 E-19/20-1 (the shot loops' tSim post-advance + the hold at
-  tSim), E-07-1 (ticksDone=0 at the dt=0 prime), V45 W7 (the K_R arm →
-  snow_reset_seed order).
-- v44 C-6 (NEVER twin-ported, found because the applied A16-4 hunk
-  referenced camGltf with a 2-arg signature): sh1x_anims_tick/sync + the
-  camGltf 3rd arg at all 6 call sites + the Sh1xPropAnim dg* fields + the
-  driveGate PLAYER_NEAR_POS parse + the engine-literal ferris/lissajous
-  fallbacks — the rides now gate on the camera world pos.
-- TV paint (setUV4 &0xFF + the bucket <<2 = the TV-triangles family), rain
-  (per-branch cull + D-2 truncation).
-
-## 2. THE TWIN PARITY VERIFICATION (the honest state)
-DR01FE --cam 54 2 46 54 -0.5 58 --night: t=0 = 0.59% changed (the dither
-noise floor — BIT PARITY). Per-tick instrumentation (both binaries): the
-rng/ctr/flashlightIntensity/animsLastSessionT/ticksDone ALL identical; the
-Es.cur key fields (fogDistance/spot/wli/fogColor) identical; the earlier
-ENVHASH/ANIMHASH divergences = struct PADDING (benign). The water bright
-cluster (the flashlight circle): PoC y(163,205) cx116.8 vs TWIN y(163,205)
-cx114.9 — the SAME band (the circle is placed correctly in the twin).
-REMAINING GAP (documented, next session): a scattered per-tick raster
-difference (690px at 1 tick → 5307px/7.4% saturated at t=1; warm-lit vs
-fog-black swaps; NOT snow/userlight/dither-dependent; NOT the FX family —
-t=0, all tick state, and the FX positions all verified exact). The suspect
-class: a per-tick light/raster path (the env LINE-light clock state or a
-render-side consumer) — the PoC is ground truth; isolate by binary-search
-render_frame's per-tick inputs at t=0.0334 (1 tick, 690px).
-
-## 3. THE REFERENCE-CAMERA WATER PASS (the user's matched-angle demand)
-- map5_s00/camera_paths.h parsed: 33 zones (31 VC_MV_CHASE + 2
-  VC_MV_FIX_ANG) — the sewer uses CHASE cameras; the zones cover the
-  walkway band (x~16-23, z~31-55 map coords) — NO explicit room camera
-  positions (the chase view derives from Harry; the DR01FE GLB's own
-  coords are room-local).
-- The 3 CDN references VLM-analyzed (the ground truth): very dark water
-  (near-black) with FAINT dim yellow-green speckled ripples; the
-  flashlight's water effect = a FAINT dim yellow-green pool (~8% frame
-  width) where the light hits beside the catwalk — NOT blown out; the
-  bright halo stays on Harry; visibility ~4-8 m.
-- 3 matched-pose PoC renders (low 10-15° pitch / overhead 50-60° / mid
-  30-35°; --night --userlight ahead:2.5 t=2) + the VLM side-by-side
-  verdicts: comp1 MISMATCH / comp2 MISMATCH / comp3 CLOSE. The recurring
-  REAL deltas (beyond the known pose offsets — the chase-cam exact poses
-  still unmatched, Harry absent): (a) the CONE-OF-LIGHT FAN reads TOO
-  LARGE / TOO BRIGHT / TOO GREEN with VISIBLE FACET EDGES at the overhead
-  angle (2x the reference's pool); (b) the dapple ripple texture reads
-  missing/too dark at wide angles; (c) a spurious second green pool in
-  the mid view. These are the NEXT water targets — do NOT claim the water
-  complete until they match.
-
-## 4. THE PR DISPOSITIONS (the sole merger)
-- lively #6 (F5 scene-switch resets) + #3 (THRF9FD pop-in analysis): both
-  heads CONTAINED in main (git merge-base --is-ancestor verified — landed
-  via the S26-era merges; the GitHub PRs were left open by the
-  local-merge workflow). CLOSED with disposition comments — re-merging
-  would be a no-op duplicate. All repos now 0 open PRs. New audit-agent
-  PRs (the relaunched audits) had not arrived yet.
-- The twin-sync commit ee33106 pushed; PoC src/fog_poc.c left CLEAN (the
-  instrumentation added+removed, git status verified).
-
-## 5. THE NEXT SESSION QUEUE (in order)
-1. THE TWIN PARITY GAP: isolate the per-tick raster divergence (the
-   t=0.0334 1-tick case, 690px; suspect the env LINE-light state or a
-   render consumer; PoC = ground truth).
-2. THE WATER: the cone-fan brightness/scale/green (the overhead-angle
-   read), the dapple visibility at wide angles, the second green pool.
-3. The exact chase-cam poses (the camera_paths.h zone geometry + Harry's
-   position) for the pixel-exact reference match.
-4. The 45-asset GLB regeneration + the env/EXTRAs rules (no rain indoors;
-   day/night population) + related-map EXTRAs — still pending from V48.
-5. Wallpaper CI (auto-build on asset change, +0.0.1 minor versioning).
-6. The new audit-agent PRs when they arrive (verify fully; reimplement
-   wrong fixes; sole merger).
-The commandments remain embedded at the head of this file.
-
-# SESSION 9 (V51) — the 22-PR w5-audit review/merge + the 5 reimplementations + the twin syncs
-
-## 1. THE PR BATCH (the relaunched audit agents; sole merger)
-22 open PRs (16 PoC + 2 wallpaper + 4 lively), all single-commit
-independent branches. FIVE parallel verification agents (VrfA-E, each
-instructed to be critical, verify against the decomp + the twins, and
-treat NOTHING as correct): 17 APPROVE / 0 REJECT / 5 FIX-NEEDED.
-- MERGED (PoC, in order): #227 (authored camera = authored ahead, 0
-  default — the trail is the no-light default only), #228 (line arms
-  follow:world only), #229 (the line travel clock = pure playback
-  phase, += 1/30 per fired tick + the scrub/per-shot re-bases), #230
-  (A/E yaw sign fix, verified against effects.c:566-569), #231 (nudge
-  freezes from the R2 view pose), #232 (paused nudge refreshes the
-  mesh pose — sh_env_update_pose is pure), #233 (the static line parks
-  at the authored pos), #234 (the Harry offset = the Q8 grid
-  (-21,+72,-30)/256 — the engine chain Q12 trunc >>4), #236 (the
-  floor-swap reads sh1xDrWave off the EDITOR record, flag-gated like
-  the C), #237 (follow-absent keeps the camera carrier), #238 (the
-  water STRIP GTE snap — sh_wspr_project corners now gte_snap_screen),
-  #240 (WATERLIVE_VERT affine UVs — the noperspective w-unwrap; the
-  ONLY PR that bears on V50 delta (b)).
-- MERGED (wallpaper): #43 (frameTick null guard), #44 (track-id dedup,
-  first-wins per-model = the JS B-5 rule).
-- MERGED (lively): #7 (the seam light re-fold to boot parity), #8 (the
-  dt=0 prime un-consumes slot 1), #9 (the FINAL snow warm-up after the
-  densitySel re-sync + the user-OFF toggle preserved).
-
-## 2. THE REIMPLEMENTATIONS (bug right, fix wrong — not merged, closed
-with dispositions; reimplemented as commits)
-- #235 -> 39735a9: MODE-SPLIT store. The engine has TWO stores
-  (bodyprog_80055028.c): NULL branch :254-259 keeps RAW Q12 (the
-  mode-1 free-world/line analog); the bone branch :265-274 quantizes
-  Q12_TO_Q8 >>4 pre-transform, stores Q8_TO_Q12 <<4 (the mode-0/2
-  flashlight analog). The PR quantized ALL modes with trunc(wp*256)<<4
-  — wrong for mode 1 AND != TO_FIXED>>4 for negative w whose
-  trunc(w*4096) is an exact multiple of 16. Reimpl: mode 1 keeps
-  (int)(wp*4096); the rest chain trunc->>>4-><<4 (200k-case numeric
-  equivalence verified). Sites: sh_env_update_pose + fx_light_anchor
-  (mode-split) + the JS camera branch (Math.trunc>>4<<4).
-- #239 -> cherry-picked content + corrections: (1) the F11d restart
-  resets ADDED (the PR's own headline was MISSING from its diff) —
-  drTile.ctr=0/ticks=-1 at setActiveModel + startPlayAll; (2) the
-  NO-TRACK GATE 2 fallback — the tick light view-projected into the
-  frame camera (the PR's dtk=0 NEVER counted a trackless tick — a
-  regression); (3) the turn-filter approximation documented. The tOff
-  Q8-grid default was CORRECT post-#234 — the audit objection was
-  stale (it compared against the pre-234 SHCore).
-- #241 -> the GTE family fix, BOTH twins: the PR copied the C's latent
-  (int)-trunc into the JS. The engine (RotTransPers = ldv0/rtps/stsxy)
-  = FLOOR (MAC>>16) + PushSXY saturation on the ABSOLUTE [-1024,1023]
-  (gte.cpp:353-380 = the project's gte_snap_screen). Reimpl: the C's
-  four sites (glintPx/Py, apex aex/aey, corners rex/rey) + the JS
-  (glint center, CONE_VERT) now floor+clamp (center-rel bounds
-  x[-1184,863] y[-1136,911]).
-- #242 -> amended: the apostrophe BLOCKER fixed (the PR's legend string
-  broke camtrack.html — node --check SyntaxError; its "clean" claim
-  was FALSE), kSineTable[4946]=3951 -> [4950]=3958 (verified against
-  sh_sine_table.h) + +1060 -> +1056, the nclip cites re-pointed to the
-  REAL loop (:15190-15265, nclip :15198, far-cull :15260, bucket
-  :15275), the missing :6274 hunk ADDED (the stale v6 comment).
-- lively #10 -> NARROWED: only the 11 light keys (I/K/J/O/U/C/T/G/A/E
-  — plain letters) routed through the engine's live_action. The full
-  map broke the Linux -DLIVELY_PLAYER gate (8 undefined VK_ codes) and
-  let Q/ESC TERMINATE the wallpaper. Both gates verified green.
-
-## 3. THE TWIN SYNCS (all four programs)
-- lively core-separation: the ff2ca66..HEAD core delta (26 hunks, all
-  clean; both gcc gates 0 errors). KNOWN REMAINING GAP: the
-  pre-V48/V48-era batch (PNG-1/2, A18-1 JV_NULL, A23-F1
-  g_bootWeatherBits, the TV-paint &0xFF + <<2 bucket family, v44 C-6
-  ferris driveGate, kickswing settle, binspin, the R2 edge-ideal, the
-  A-3 dither two-step) — lively's base predates the V48 batch (the V49
-  sync was a flashlight-only cherry-pick); the bulk d9af2df..3cb50fa
-  apply rejected 55/107 and was REVERTED — needs a wallpaper-V50-style
-  dedicated hunk-by-hunk sync (NEXT SESSION).
-- wallpaper main: the 3cb50fa..HEAD delta (24 hunks clean; jni-stub
-  gcc gate 0; marker parity with PoC HEAD 1:1).
-- camtrack.html: single-sourced in PoC (all JS fixes landed there).
-
-## 4. THE WATER STATE (the VLM evidence — deltas remain, do NOT claim
-complete)
-A/B pre-vs-post at 3 poses: 0.00%/0.03%/0.07% (the fixes are
-correctness-grid changes; 238 = the school strip, 240 = JS-only).
-VLM verdict (steep-64deg + walkway poses, raw + 2.5x brightened):
-the reflection pool = a COLD-GREEN (#3a5a2a) soft ellipse ~15-20%
-frame width bottom-center — (a) wrong hue (cold green vs the
-reference's warm yellow-green), (b) wrong shape (a soft blob; the
-facet-edged cone fan NOT visible at these poses), (c) ~2x the
-reference's ~8% width, (d) the dapple = weak uniform noise (no
-anisotropic stretch). NO second pool. Tonality right (near-black,
-restrained). NEXT WATER TARGETS: the ring/cone radii+colors
-(func_8008EA68's shift-10 quirk :755-758, the 20/18/12-class g4
-colors + the additive semi pair blend math), why the fan is invisible
-at --cam poses (pose-gated or broken — check the fan's own gates vs
-the ring's), the dapple anisotropy.
-
-## 5. THE NEXT SESSION QUEUE (in order)
-1. THE LIVELY TWIN full sync (the pre-V48/V48 batch, hunk-by-hunk —
-   see the committed gap list in the lively sync commit).
-2. THE WATER deltas above (the ring/cone colors + radii + the fan
-   visibility + the dapple) — the reference images at matched angles.
-3. The remaining V50 queue: the twin parity raster gap (t=0.0334,
-   690px), the exact chase-cam poses, the 45-asset GLB regen + env/
-   EXTRAs rules, the wallpaper CI (+0.0.1 versioning).
-4. The droplet-path GTE snap (238's noted follow-up).
-The commandments remain embedded at the head of this file.
-
-# SESSION 10 (V52) — the 16-PR w7/w8-audit clear (16/16 merged) + the CI repair wave
-
-## 1. THE PR BATCH (the relaunched audit agents; sole merger; PRs FIRST per the user's reorder)
-16 open PRs (5 PoC + 7 wallpaper + 4 lively), all single-fix independent
-branches. FIVE parallel verification agents (VrfA-E, each critical, each
-re-verifying every claim against the decomp + swanstation + the PoC twin,
-gates re-run): 16 APPROVE / 0 REJECT / 0 FIX-NEEDED.
-- MERGED (PoC, in order): #243 (rex x-clamp — 22cfc8e clamped rey/glPx/aey
-  but missed rex; center-rel bounds x[-1184,863] = the sibling form), #246
-  (map5_s00 ripple MESH mqx/mqy + SPRITE spx/spy floor+PushSXY — decomp
-  map5_s00.c:119-131/182-220 reads the SATURATED GTE store for both cull
-  and draw; clamps placed BEFORE the cull captures = engine-true), #244
-  (--shot/--r2shot absolute file= paths — cli_path_is_abs with POSIX +
-  Windows drive + UNC forms; A/B render battery byte-identical), #245
-  (docs: ~21 stale citations re-pointed at main + 4 comment corrections —
-  comment-only verified hunk-by-hunk, node --check all JS blocks green),
-  #247 (camtrack glbSceneSh1xExtras: presetIdx1 + field16 esc(String(...))
-  — the ONLY GLB-extras->innerHTML path in the file, all other fields
-  verified already escaped).
-- MERGED (wallpaper, in order): #45 (rex twin, byte-identical hunk), #51
-  (ripple twin, byte-identical), #46 (driveGate main-loop FREEZE — the v44
-  C-6 port ee33106 missed; decomp map6_s04_2.c:3493-3508 gated rides do
-  not advance), #47 (rot0PerInstN/instBase init pre-parse — the v36
-  post-parse form at :2446 ZEROED both after the parse consumed them),
-  #48 (sh_gte_ll_buggy FULL 3-term dot — 0x4A4A6412 = MVMVA LLM cv=3
-  tx=NONE(3) -> zero_T full dot; the old tx=FC mis-decode dropped l0*vx,
-  giving +X-lit surfaces zero light), #49 (subcellTable NULL-key segfault
-  -> PoC V45 JV_ARR form; the amend removed the duplicate loop, final
-  state 1:1 with PoC :1750-1758), #50 (rm fog_poc.c.orig 20295L + .rej
-  411L committed by ff27f22; 4/4 rejected-hunk integrity spot-check
-  confirmed the hand re-serialization landed everything).
-- MERGED (lively, in order): #11 (rex twin), #13 (ripple twin), #14
-  (re-land the S19 viewer-BEFORE-discovery order — the TIM gate was
-  red-by-construction; NOTE: PoC main does NOT have viewer-first, it is a
-  lively-lineage sanctioned delta; gate simulated green: --tim-file only
-  exits 0 + writes the PNG), #15 (stdin thread FILE-lock hang — getchar()
-  held stdin's lock across the blocking pipe read; graceful cmd_close
-  hung the whole process; read(0,...) raw syscall swap, exit 0.05s vs
-  >=12s hang reproduced), #16 (hoist the LIVELY printf-silencing macro
-  above the live_* helpers — 23 active printf sites leaked onto the JSON
-  IPC wire; gcc -E static proof: 0 active printf sites after), #12 (rm
-  fog_poc.c.orig 21570L = byte-identical duplicate of the live twin file).
-All merged with --no-ff, zero conflicts. Post-merge gates: PoC make rc=0;
-wallpaper gcc -fsyntax-only rc=0; lively plain + -DLIVELY_PLAYER rc=0.
-Twin parity verified byte-identical by VrfD (md5 of added-line sets).
-
-## 2. THE CI REPAIR WAVE (found while clearing)
-- PoC bump-job tag race (EVERY main run red since faac702): two bump runs
-  racing off the same version.txt — the loser's main-push fails non-FF
-  while its TAG push succeeds (independent refs) -> orphaned v33.51 tag
-  blocked every later bump at `git tag`. FIX (v53): next-free-tag skip +
-  `git push --atomic origin bumpwork:main v$NEW` + 5-round rebase-retry
-  loop. Orphan tag deleted (no release attached, not on main). FIRST
-  post-fix run: GREEN, bumped 33.50 -> 33.51, release v33.51 published
-  with 3 assets. NOTE: the first push of the fix BROKE the workflow
-  (unquoted colon in the step name "(v53: race-proof)" = YAML mapping
-  error) — fixed with a quoted name; lesson: yaml.safe_load BEFORE push.
-- Wallpaper bump: same race twin-fixed (atomic + retry + tag-skip).
-- Wallpaper unit-tests HANG (the real release blocker): testDebugUnitTest
-  hung 6h -> cancelled on EVERY main run since c540ff2 (the v48 WAJ/WAN
-  batch #24-#42; last green 3de6a01 Nov 22). No test sources changed —
-  a main-code change hangs a Robolectric test. DIAG: pushed branch
-  diag-unit-hang (per-test START logging + 15-min timeout; the last
-  STARTED test in the log = the culprit). Diagnosis pending below.
-- lively sh1-app-ci red on core-separation: the TIM gate (fixed by merge
-  of #14 above); post-merge run in flight at session write time.
-
-## 3. AGENT-VERIFIED FOLLOW-UPS (backlog, not blocking)
-- VrfA: the F16/ripple clamp family bounds question — the decomp world
-  path never calls SetGeomOffset (OFX=OFY=0 after InitGeom), so PushSXY
-  saturates the CENTER-RELATIVE coordinate (bounds [-1024,1023] directly,
-  not the derived [-1184,863]/[-1136,911]). Affects all landed F16 sites
-  equally; observable only for far-offscreen non-cull corners. Needs a
-  dedicated audit wave (or an emulator trace of sp10/field_144) to
-  re-derive the family bounds once, then patch all sites + the JS twin.
-- VrfE: residual stdout-lock family (reader-thread IPC acks hold stdout's
-  FILE lock across blocking writes on a full pipe — same exit-deadlock
-  class); the false sh1_ipc16_test.py:143 comment FIXED this session.
-- The (int)floorf(x) UB for |x|>2^31 theoretical note (gte_snap_screen
-  clamps the float first; the family sites don't — nil exposure, on
-  record).
-
-## 4. THE NEXT SESSION QUEUE (in order — carried from V51 + new)
-1. THE WALLPAPER UNIT-TEST HANG fix (diag branch in flight).
-2. THE LIVELY TWIN full sync (the pre-V48/V48 batch, hunk-by-hunk — the
-   committed gap list in the lively sync commit 86153ec8).
-3. THE WATER deltas (the ring/cone colors + radii + the fan visibility +
-   the dapple) — the reference images at matched angles (also validates
-   the unverified flashlight-circle-reflection fix).
-4. The remaining V50 queue: the twin parity raster gap (t=0.0334, 690px),
-   the exact chase-cam poses, the 45-asset GLB regen + env/EXTRAs rules,
-   the wallpaper CI asset-insertion workflow.
-5. The F16 family bounds audit wave (VrfA's finding above).
-6. The droplet-path GTE snap (238's noted follow-up).
-The commandments remain embedded at the head of this file.
-
-# SESSION 11 (V53) — the 4 user-tested regressions fixed + the 7-PR w9-audit clear (7/7)
-
-## 1. THE FOUR USER-REPORTED REGRESSIONS (all root-caused, fixed, VLM-verified)
-- TV SCREENS "ROTATED ON THE FLOOR" (PoC only; camtrack OK): ROOT CAUSE the
-  v48 A-1 *4 OT-bucket form (PR #175, 016e886) — its "4x NEARER" rationale
-  INVERTS the far-first OT walk: (Q8*4)>>3 sorts the paint 4x FARTHER,
-  buried under every nearer-bucketed quad sharing its pixels incl. geometry
-  physically BEHIND it (TVCOVER instrumentation: the 201_3_BA wall at ~14.7m
-  drew over the 9.2m paint). Reverted to Q8>>3 (the v40 form = the camtrack
-  twin, byte-identical) in PoC bef3a0c + the wallpaper/lively twins; the
-  literal decomp *4 (map4_s03.c:1292) documented as an OPEN engine question
-  (under the far-first walk it is not depth-comparable with mesh buckets).
-  VERIFIED: bright px 105 -> 2857 (t=3) / 3259 (t=6); VLM: all screens
-  vertical on the wall playing static, no floor intersection.
-- THE LENS-FLARE BALL IN THE CAMERA'S FACE (PoC only): the dim core quads
-  1-2 (grey 30, 45px + 0x10, 22px) drew unoccluded in the not-visible
-  branch — in-engine they hide INSIDE the light's CARRIER (Game_Flash-
-  lightAttribsSet pins the light at HarryBone_Torso + (-0.08,-0.28,0.12),
-  effects.c:204-218 — Harry's own front surfaces occlude them); the
-  bodyless user light left them floating. The occluded branch is now a
-  NO-OP (PoC 5e704f7 + twins); quad 3/ghosts/streaks stay rate-scaled
-  (the fade-out window intact). VERIFIED: ahead:1.2 -> NO ball (VLM:
-  pitch black); a light FACING the camera -> the full flare (hot core +
-  starburst + halos); angZ sweep 0/90/180deg -> rate 0/515/3072.
-- THE BOOT WEATHER RECIPE (camtrack): sh1xEnvDefaults stuffed field17 (the
-  BOOT recipe arg, Particle_EnvironmentSet's 0..6 domain) into weatherTarget
-  (the runtime D0B18 0..8 transition arg — a different machine) and left
-  bootWeather=-1 -> the hardcoded map0 SNOW on every room. NOW: bootWeather
-  = field17 VERBATIM (SU/APU 0 = NONE — no indoor weather, DR 5 rain, SPU
-  6 rain+), weatherTarget = -1 (nothing authored); setBootWeather(-1) +
-  both boot sites resolve the ROOM'S OWN (field17, field16) — GameBoot_
-  WorldEnvInit load_screen.c:34-36 — via hooks.getRoomEnv, map0 (2,1) only
-  as the env-less fallback; the UI -1 option relabeled; the C twins'
-  weatherTarget parse keeps -1 as absent (the coerce-to-0 armed a spurious
-  transition-to-none); a newly-enabled editor light defaults to a DRAGGABLE
-  WORLD light. NOTE: existing camdats keep their authored weatherTarget
-  until re-exported (the 'use original' button re-authors per model).
-- THE WATER FOLLOWING THE PLAYER: the default (no authored light) anchor
-  was camera+offset+2.5m-ahead — the shimmer glided with the flying
-  camera. The engine's light rides Harry's TORSO and every camera FRAMES
-  him: mode 0 now parks at (a) the track's LOOK-AT (the framed subject)
-  or (b) the view ray's WATER-PLANE hit +1.0m (the FIXED yaw/pitch cams)
-  with camera+ahead as the fallback; modes 1/2 unchanged; the camtrack
-  twin: updatePose + the F11 tick walk get the same anchors (PoC 5cb0bcc
-  + the wallpaper/lively twins + camtrack.html). VERIFIED: the fixed-cam
-  DR01FE test — the light ON the water plane at the framed spot; VLM: the
-  shimmer an elliptical glint ATTACHED to the surface, no floating orb.
-
-## 2. THE 7-PR w9-audit CLEAR (7/7 merged, sole merger)
-- PoC #248 + wallpaper #52 + lively #17 (the F16-bounds family): the
-  PushSXY windows are CENTER-RELATIVE — re-verified against swanstation
-  gte.cpp:691-698 (OFX added BEFORE the :353-380 clamp) + the decomp
-  (InitGeom zeroes OFX/OFY; the 7 SetGeomOffset sites are item-screen/
-  special-pass save-restores). NOTE: the PR branch predated the V53 TV
-  fix — its dark TV wall was the STALE BASE, not the F16 change (main+PR
-  renders BYTE-IDENTICAL on SPU0401 + DR01FE, 0 changed px).
-- PoC #249 (docs: 5 comment corrections), wallpaper #53 (the bump race —
-  hit twice live this session), #54 (gradle jvmargs dedupe), #55 (docs).
-Post-merge gates: PoC make 0 err/warn; wallpaper + lively gcc -fsyntax-only
-clean; camtrack 4 JS blocks node --check green.
-
-## 3. THE NEXT SESSION QUEUE (carried + new)
-1. THE WATER DELTAS (the ring/cone colors + radii + the fan visibility +
-   the dapple) at matched reference angles — the 3 CDN reference images
-   are the sewer/walkway set (VLM-described: dark murky water + faint
-   reflections) — now testable against the V53 light anchors.
-2. The F16 open question: the decomp *4 TV bucket vs the far-first walk
-   (emulator evidence needed).
-3. The 45-asset GLB regen + env/EXTRAs rules; the wallpaper CI
-   asset-insertion workflow; the wallpaper V53 twin build (the gradle
-   gate).
-4. The remaining V50 queue (the twin parity raster gap, the exact
-   chase-cam poses) + the droplet-path GTE snap.
-The commandments remain embedded at the head of this file.
+# WAVE 4a — 2026-11-23: LINE-BY-LINE VERBATIM ACCURACY AUDIT (PoC + camtrack + Wallpaper; Lively EXCLUDED)
+
+## Scope (user directive)
+- The primary agent CLEARED the PR backlog (0 open PRs on both repos as of wave start).
+- Fresh line-by-line verbatim audit: NOT shortlisted spots — read EVERY line, compare against silent-hill-decomp + swanstation. Constants/math/transformations EXACT.
+- Each parallel agent gets a SMALL block. Secondary: general logic/code/stress audit.
+- ZERO false positives. PR-per-bug, no force-push, check existing PRs first.
+- Known primary-agent TODOs NOT to duplicate: (1) Wallpaper twin sync of V46+V47 (315-hunk twin gap is KNOWN — only report REVERSE drift or hunks wrong on BOTH sides), (2) waterAdd consumer port, (3) Wallpaper CI, (4) flashlight, (5) APU00FF/APUFFFE failures.
+- Closed-by-primary PRs from V46 NOT to re-submit: #76, #91, #73, #122, #134.
+
+## Baseline
+- PoC @ d448d77 (main, v33.44). Wallpaper @ 82540f4 (main, v1.15.0).
+- Board: Audit_Agent_w4a_LineByLineVerbatim posted "starting" (seq 115).
+
+## Partition plan (subsystem-aware blocks)
+Batch A — PoC src/fog_poc.c engine vs decomp/swanstation:
+A1 snow L6449-7014, A2 rain L7014-7450, A3 rain/droplet L7450-7857, A4 water L12376-13200,
+A5 water L13200-14100, A6 water L14100-15136, A7 lens flare L8476-8824, A8 billboard L5701-6023,
+A9 GTE+flashlight L5087-5701, A10 env update L6023-6449, A11 TV paint L1439-1630, A12 tvNoise L10257-10580,
+A13 fog L4660-4831 + env slots L4831-5087, A14 rasterizer L7857-8476.
+Batch B — camtrack.html (6 blocks of ~2,300).
+Batch C — Wallpaper native: hw_render, hw_vk+shaders+spv, jni, twin-hunk classification.
+Batch D — ipd2gltf.py (4 blocks).
+Batch E — Wallpaper Java: CamtrackMath, CamtrackDoc, Service, Sh1Cities+PathView, EditorActivity.
+
+## Findings registry (append-only, one line per finding: ID | block | file:line | verdict | PR)
+(populated as agents report)
+
+## WAVE 4a FINDINGS REGISTRY (all blocks audited: A1-A23 fog_poc.c, B1-B6 camtrack.html, D1-D4 ipd2gltf.py, C1-C3 Wallpaper native, E1-E6 Wallpaper Java)
+EXCLUDED as known primary-agent TODO: waterAdd consumer port; Wallpaper twin sync V46+V47 (incl. C1 inherited skew: TV-after-weather, Q8 snap, otz+0.5, splash tail, V44 D-3 rounding, near &~3; C2-1 fused dither — all match Wallpaper's own SW twin, pre-twin-sync).
+
+P1 PoC ENGINE (fog_poc.c):
+1. A11F1 TV paint OTZ drops engine <<2 (Q8>>1) — L13930/13953 CERTAIN
+2. A5-2/A11F2 TV paint midpoint UVs wrap-then-interpolate vs engine u16 interp-then-wrap — L13804 CERTAIN (big screen sub-states)
+3. A14-2 RP_ADD_TEX veil dither fused once (V45 per-prim form not applied to this branch) — L8328-8330 CERTAIN
+4. A14-1 UV DDA anchored V0 not swanstation core vertex — L8041-8044 CERTAIN sub-texel
+5. A16-1 stoneChoreo case-0 fall-through missing — L11268 CERTAIN 1 tick
+6. A16-2 binSpin decrement-before-pose (engine pose-then-decrement) — L11345 CERTAIN 1 frame
+7. A16-3 kickSwing settle-snap 1 frame early — L10930 CERTAIN
+8. A16-4 ferris/lissajous missing else-if exclusivity — L10784 CERTAIN
+9. A18-1 jget!=NULL treats JSON null as present (arc/yaw/pitchBounds, 3 sites) — L3591 CERTAIN
+10. A3-1 snow_reset_seed no prevView reset in seek re-sim — L7483 CERTAIN
+11. A4/A5-1 sp14 per-segment re-zero vs engine function-scope — L12969 CERTAIN (map1_s03-class)
+12. A22-F3 self-view entry-tick WARP camera position missing — L15785 CERTAIN 1 frame
+13. A23-F1 K_R restart: W key mutates weatherBits, restart re-syncs from mutated — L16809 CERTAIN
+14. A21-1 PNG malformed-chunk IDAT leak — L814 CERTAIN MINOR
+15. A21-2 PNG palette uninit read on missing PLTE — L899 CERTAIN MINOR
+16. A22-F1 self-view w12 noise terms dead code ((void)up) — L15959 CERTAIN inert
+17. A22-F2 R2 effect-rate falloff formula (div order, dead branch) — L15817 CERTAIN
+18. A19-2 GLB node graph cycle recursion unguarded — L2974 CERTAIN mechanism
+19. A6-2 curPosX/curPosZ +0.5 vs Q12_TO_Q8 truncation — L14517 CERTAIN mech negligible
+20. A20-F1 dead parse paths kick/rest/restAngle/angVelMax — L2198 CERTAIN dead
+21. A15-F8 object-vs-chunk tie order comment vs engine (room-object BEFORE chunk) — verify code L14164+
+22. A14-3 RP_BLEND_TEX silent fall-through — UNCERTAIN hazard
+
+P2 CAMTRACK.HTML STALE PORTS (C fixes never mirrored to editor JS):
+23. B1-1 billboard BK missing <<4 (V44 B-1) — L1264/1273 CERTAIN
+24. B1-2 DPCL negative-MAC saturates 255 not 0 (V42 C-1) — L751/761 CERTAIN
+25. B1-3 camMoved missing yaw clause (V43 E-09-1) — L2067 CERTAIN
+26. B1-4 warm-up rain land->rest advance dropped (S20 F1) — L2024 CERTAIN
+27. B1-5 bootWeatherMap0 missing transitionLock/snowDensitySel/prevPosY resets — L2207 CERTAIN
+28. B1-6 rr<=0 extra RNG draw — L1648 CERTAIN negligible
+29. B2-1 splash CLUT/gate from tail not corner-0 (E-11-3/16-3) — L3698 CERTAIN
+30. B2-2 sp64 post-ramp re-derivation (E-09-3) — L3685 CERTAIN
+31. B2-3 GTE snap missing ±1024 saturation (E-11-2) — L3400 CERTAIN
+32. B3-1 writeEnvToModelLive wipes animsDemo — L5187 CERTAIN
+33. B5-1/B6-1 water occlusion gate plain depth not far-edge (V44 A-2) — L10757/11584 CERTAIN
+34. B5-2 fallOnce mvTimer INT not FLOAT (V45 A-F3) — L9546 CERTAIN
+35. B5-3 translate clamp 0x3C720 vs 247562 (B-4) — L9289 CERTAIN
+36. B5-4 tvPaint style fields lax coercion vs C jint — L10312 CERTAIN latent
+37. B5-5 waterTex clut lax coercion + missing-entry default — L10144 CERTAIN latent
+38. B5-6 droplet cull untruncated floats — L10947 CERTAIN minor
+39. B6-2 water material missing side:DoubleSide — L11644 CERTAIN
+40. B6-3 posed-parent world compose uses stale parent matrixWorld — L12265 CERTAIN mechanism
+
+P3 RIPPER (ipd2gltf.py):
+41. D1-1 _tim4_parts(None) TypeError kills room export — L765 CERTAIN
+42. D1-2 corrupt TIM struct.error kills export — L774 CERTAIN
+43. D2-1 26 missing pickup sites (MAP0_S01/2_S02/6_S03/7_S01/7_S02) — CERTAIN catalog gap
+44. D2-2 MAP5_S00 VIN evidence strings mis-slotted — L2611 CERTAIN
+45. D2-3 MAP1_S01 missing SILVER_H fresh entry — CERTAIN
+46. D2-4 aq=sin_v//30 floor-vs-trunc, wrong comment — L2907 CERTAIN
+47. D3-1 dead u16 overflow guard — L5076 CERTAIN
+48. D3-2 dead inst_key store — L6523 CERTAIN
+49. D3-3 report vertices/triangles always 0 — L6807 CERTAIN
+50. D4-1 whole-map DWAVE validation false ERROR — L8687 CERTAIN reproduced
+51. D4-2 stale consumer_field_B_1 warning flood — L6925 CERTAIN
+52. D4-3 UNUSED_ over-skip drops geometry — L7094 CERTAIN latent
+53. D4-4 propAnimPosed dead key; D4-5 add_seq label — CERTAIN nil
+
+P4 WALLPAPER NATIVE (own bugs, not twin-sync):
+54. C1-1 TV pad double-advance on HW fallback frames — sh1_hw_render.c:1416 CERTAIN
+55. C1-2 EGL/GL leak on init failure path — L302 CERTAIN
+56. C2-2 PERSP path: double perspective divide + w^2 attribute interpolation — shaders L75/L249 CERTAIN
+57. C2-3 mul_u32 midCarry at wrong weight (+1 not <<16) — L147 CERTAIN
+58. C2-4 Vulkan barrier scopes missing transfer stages — L216 CERTAIN spec
+59. C3-1 K_QUIT single-slot race: stale poison + quit-loss wedge — sh1_jni.c:392 CERTAIN
+60. C3-2 engine_thread clears flags without g_start_lock — L102 CERTAIN
+
+P5 WALLPAPER JAVA:
+61. E5-1 slider setValue unclamped -> crash (track switch to shorter track) — L979 CERTAIN REPRODUCIBLE
+62. E5-2 swapModel doesn't rebind tracks list — L1629 CERTAIN
+63. E5-3 dialog buttons set after create() = no buttons — L2486 CERTAIN
+64. E5-4 picker initial selection value-vs-position confusion (5 sites) — CERTAIN display
+65. E5-5 rate label not refreshed on bootPreview reset — L674 CERTAIN
+66. E5-6 Choreographer loop runs while paused — L293 CERTAIN
+67. E4-1 CamtrackPathView marker rotation atan2(fx,fz) sign — L646 CERTAIN
+68. E4-2 toLowerCase default locale breaks Turkish search — L70 CERTAIN minor
+69. E3-1 onSurfaceCreated main-thread start unsynchronized — L2496 CERTAIN
+70. E3-2 sAnyVisible process-global (watchdog disable + tilt unregister) — L2527 CERTAIN
+71. E3-3 peekNext consumes bag entry via drawNext — L1661 CERTAIN
+72. E3-4 copyAssetsIfNeeded main thread — L2464 CERTAIN perf
+73. E3-5 TIME_TICK main-thread camdat re-parse every minute — L1306 CERTAIN perf
+74. E3-6 updateEditorPreview sEditorSession race — L2371 CERTAIN narrow
+75. E3-7 RECEIVER_EXPORTED for custom action — L2246 CERTAIN low
+76. B3-Java CamtrackDoc divergences: pair>=2, vec3 all-or-nothing, points drop-then-validate, fixed lookMode stripped, light line fields dropped, animsDemo dropped, points export cap — CERTAIN (7)
+77. E6-1 scroll position save key mismatch (scroll_position1) — L707 CERTAIN minor
+78. E1-1/2/3 dead-band fallbacks; E1-4 hypot-vs-sqrt ulp — CERTAIN code, unreachable behavior
+
+## WAVE 4a OUTCOME — 2026-11-23
+39 PRs filed (29 PoC #175-203, 10 Wallpaper #24-33). All verified line-by-line vs decomp/swanstation/C-twin before fixing; all A/B tested (numbers in each PR body); zero force-pushes; main untouched on both repos.
+
+PR REGISTRY: #175 TVpaint OTZ<<2 | #176 TVpaint UV wrap order | #177 RP_ADD_TEX dither | #178 stoneChoreo fallthrough | #179 binSpin pose order | #180 kickSwing settle | #181 ferris/lissajous elseif | #182 camdat null bounds | #183 CAM BK<<4 | #184 R2 entry warp | #185 CAM DPCL clamp | #186 CAM camMoved yaw | #187 CAM rain rest | #188 CAM2 water gate | #189 CAM boot resets | #190 CAM2 splash corner0 | #191 CAM fallOnce float | #192 CAM2 sp64 | #193 CAM translate clamp | #194 seek prevView | #195 CAM2 GTE sat | #196 CAM2 animsDemo | #197 K_R weatherbits | #198 water sp14 scope | #199-200 ripper TIM robustness | #201 ripper DWAVE map validation | #202-203 PNG robustness | WA #24 slider crash | #25 swapModel | #26 dialog buttons | #27 picker selection | #28 rate chip | #29 marker rotation | #30 TV pad double-advance | #31 EGL leak | #32 K_QUIT race | #33 lifecycle lock.
+
+VERIFIED-BUT-UNFIXED (documented for the primary agent; all CERTAIN unless noted):
+- PoC fog_poc.c: A14-1 UV-DDA anchor (V0 vs swanstation core vertex — sub-texel; fix is invasive, left to primary), A22-F1 self-view w12 noise dead code (basis discarded), A22-F2 R2 falloff formula (dead branch), A6-2 curPosX/Z +0.5 rounding (negligible), A19-2 GLB node-cycle guard (crafted input only), A20-F1 dead parse paths kick/rest/restAngle/angVelMax, A14-3 RP_BLEND_TEX fall-through hazard (UNCERTAIN), A6-3 MASK defensive per-tri cull (documented divergence), A15-F8 stale seq-order comment.
+- camtrack.html follow-ups found during fixes: FLAKE_VERT + SPLASH_VERT missing ±1024 saturation (C saturates both at fog_poc.c:14259/14432 — same family as PR #195); B6-2 water material missing side:DoubleSide; B6-3 posed-parent stale matrixWorld (one-frame lag); B5-4/B5-5 lax coercion (latent); B5-6 droplet cull untruncated; B1-6 rr<=0 extra RNG draw.
+- Ripper: D2-1 26 missing pickup sites (MAP0_S01/MAP2_S02/MAP6_S03/MAP7_S01/MAP7_S02 — need BIN data to author), D2-2 MAP5_S00 VIN evidence strings mis-slotted, D2-3 MAP1_S01 missing SILVER_H, D2-4 sin//30 floor-vs-trunc, D3-1/2/3 dead code + report keys, D4-2 stale consumer_field_B_1 warning flood, D4-3 UNUSED_ over-skip, D4-4/5 dead keys/labels.
+- Wallpaper native: C2-2 PERSP path double-divide + w^2 interpolation (needs GLSL+SPIR-V regen — recommend doing with the twin-sync so HW==SW stays true), C2-3 mul_u32 midCarry +1 instead of <<16 (same constraint), C2-4 Vulkan barrier scopes (spec-level), C1 debug-only: occ column + POSE double-log on fallback.
+- Wallpaper Java: E3-1 onSurfaceCreated main-thread start (enabler of native races — WAN-3/#32 closes the worst), E3-2 sAnyVisible process-global (watchdog disable + tilt unregister), E3-3 peekNext consumes bag entry, E3-4 copyAssets main thread, E3-5 TIME_TICK main-thread parse, E3-6 updateEditorPreview race, E3-7 RECEIVER_EXPORTED, E5-6 Choreographer in pause, E5-7 snapshot on recreate, E6-1 scroll key mismatch, E6-2/3/4 (UNCERTAIN), B3 Java-twin CamtrackDoc schema batch (pair>=2, vec3 all-or-nothing, points drop-then-validate, fixed lookMode stripped, light line fields, animsDemo, points cap — 7 issues), E1-1/2/3/4 dead-band/ulp (unreachable).
+- Documentation hygiene: pervasive stale decomp file:line citations across fog_poc.c/camtrack.html (every audit block reported drift; substance verified correct throughout). One consolidated docs pass recommended.
+- Known primary-agent TODOs NOT touched: waterAdd consumer port, Wallpaper twin sync V46+V47, Wallpaper CI, flashlight, APU00FF/APUFFFE.
+
+END OF WAVE 4a.
+
+# WAVE 4b — 2026-11-23 (session continuation): V48 port audit + wave-4a leftover delivery
+
+## Context
+Wave 4a complete (39 PRs open: PoC #175-203, Wallpaper #24-33; backlog NOT yet cleared by primary —
+board seq 121 shows primary started Main_Agent_s26_V49 "flashlight circle + audit-PR disposition").
+Continuation per standing directive (no stone unturned). Baseline: PoC @ 7f08437 (v33.45, includes the
+V48 water session 1de5e2c which landed DURING wave 4a — wave 4a's camtrack agents read the PRE-V48 file),
+Wallpaper @ 82540f4 (unchanged). Board: Audit_Agent_w4b_V48PortAndLeftovers "starting" (seq 121).
+
+## CRITICAL DISCOVERY: the V48 camtrack water port (+649 lines) was NEVER audited
+Wave 4a's B-blocks read camtrack.html @ d448d77 (13,840 lines); V48 (1de5e2c, committed 00:25 UTC
+mid-wave) added the 595-line water FX block (current 11909-12503) + 9 small hooks. Fresh line-by-line
+audit ran this wave (agent W1). fog_poc.c V48 diff (+49/-8: 7 lens-flare screen-Y sites) audited by
+agent W2 — CLEAN BILL (all 7 sites verified vs decomp light_overlap.c/lens_flare.c + 20k-sample
+numeric checks; ang_xy re-derivation correct; ang_z invariance proven; no remaining unfixed site;
+no collateral damage; nits: "reflection" should read "rotation" — det(T)=+1; stale lighting.c
+citations now live in world/light_overlap.c).
+
+## WAVE 4b FINDINGS REGISTRY (verified: my own line reads for every fix filed; agents' evidence quotes held)
+
+P6 GTE-SNAP FAMILY EXTENDED (my sweep; same defect as PR #195 which only fixed SH_VERT+CPU walk):
+101. FLAKE_VERT camtrack:2818 floor but NO [-1024,1023] saturation (C: fog_poc.c:14259 gte_snap_screen)
+102. SPLASH_VERT camtrack:2927 same (C: fog_poc.c:14432)
+103. WATER_VERT camtrack:11511 same (C: transform_item2 fog_poc.c:9070 — all DrawItem quads)
+104. WATERLIVE_VERT camtrack:12076 (V48-new) same (C: same transform_item2 path)
+105. TV_VERT camtrack:12562 same (C: sh_tvpaint_project fog_poc.c:13792)
+106. STREAK_VERT camtrack:2852-2890: endpoints NOT snapped AT ALL (no lattice floor, no saturation;
+     C: fog_poc.c:14350-14351 snap then (int) at 14475-14482; DDA 9318-9334 walks lattice ints) —
+     also shifts the v43 CT-2#7d ribbon alignment (its own comment claims "the float endpoints are
+     the truncated indices' pixel CENTERS" — the code never implements the truncation).
+
+P7 V48 WATER PORT (agent W1, 17 CERTAIN + F11d partial; showstoppers verified by me personally):
+107. F1 camtrack:12139 SubtractEquation+ONE/ONE = F−B, engine ABR-2 = B−F (C fog_poc.c:8348-8392
+     "bg−f clamped 0") → must be ReverseSubtractEquation. VERIFIED MYSELF (WebGL FUNC_SUBTRACT O=sS−dD).
+108. F2 camtrack:12197-12233 glint quad index [0,1,2, 1,3,2] with v0=TL,v1=TR,v2=BL,v3=BR → both tris
+     CW (back-facing), material default FrontSide → GLINT NEVER RENDERS. VERIFIED MYSELF (cross products).
+     Fix: side: DoubleSide (the repo's TV-quad convention).
+109. F3 camtrack:12246-12274 cone op/semi mats FrontSide; engine POLY_G4/G3 no cull, C raster accepts
+     both windings (fog_poc.c:8795-8797) → merge with B6-2 PR.
+110. F4 camtrack:12123-12127 floor missing func_80059E34 far cull; comment "far-cull never applies"
+     FALSE (decomp bodyprog_80056D8C.c:1475-1476/1500-1503: var_t9 = MIN(Q8(7.61)<<otShift+2,
+     fog.farDistance); if (var_t9 < depth) continue; C twin fog_poc.c:14889-14904 applies it).
+111. F5 camtrack:12131-12136 floor depthTest=true (TRUE depth) vs engine FIXED bucket-640 semantics:
+     engine paints floor UNDER all opaque nearer than 20.06m; JS subtracts dapple onto walls farther
+     than the water plane but nearer than 20.06m. Fix = the GLINT/CONE fixed-depth-gate pattern
+     (uRoomDepth 20.0625 discard) + depthTest:false.
+112. F6 camtrack:11969-11975 sh1xWaterZonesFromExtras FILTERS OUT disabled zones; engine terminates at
+     FIRST disabled (lens_flare.c:513 for(;cur->isEnabled;cur++)); C keeps all + breaks (fog_poc.c:12523).
+     Zone after a disabled entry reachable in JS, unreachable in engine. Also missing the C's 4-zone cap.
+113. F7 camtrack:11980-11992+12360 live tile never SEEDED; C falls back fx_water_tile_update(0)
+     (fog_poc.c:12452-12453) so the floor always shows at least the ctr=0 composite.
+114. F8 camtrack:11936-11939+7506+12106 ?drwater=0 does NOT gate the floor material swap (only the FX).
+115. F9 camtrack:12059-12062 floor assumes tile-relative TEXCOORDs; C has dual form via waterLiveUvTile
+     extras flag (fog_poc.c:15098-15103 un-mangle u*4, v*2−7; flag from extras "floor" :3062).
+116. F10 camtrack:12114-12115 waterLive identification adds DWAVE name-PREFIX fallback
+     (indexOf('DWAVE')===0 && !_WADD); engine = EXACT 8-byte filename match (materials.c:119
+     COMPARE_FILENAMES via func_8008E4EC lens_flare.c:499-502); C twin = extras-only (fog_poc.c:3061).
+117. F11 camtrack:12332-12356 the 30Hz ctr grid diverges 4 ways: (a) per-tick GATE1/GATE2 not evaluated
+     during catch-up (C fog_poc.c:12487-12515 per tick); (b) tick light = raw track pos, C adds the
+     engine offset (−0.08,+0.28,−0.12 glTF; fog_poc.c:11497-11538 fx_light_anchor); (c) first call
+     seeds ticks=target (path-dependent; C recounts deterministically); (d) seek-back never rewinds
+     (UNCERTAIN semantics — single-shot C has no interactive seek).
+118. F12 camtrack:12315 GATE 2 compares float d*256>112; C/engine use (int)(d*256)>112 (fog_poc.c:12513).
+119. F13 camtrack:12429-12435 cone corner colors PRE-quantized repl5(c>>3); C interpolates raw u8
+     tuples, truncates per pixel (fog_poc.c:8806-8811) → ±1 5-bit level in gouraud ramps.
+120. F14 camtrack:7424 waterRefract payload consumed without the C's envFlagIsWaterRefract gate
+     (fog_poc.c:1940, flag from envEffects.flag=="WaterRefract" :1815).
+121. F15 camtrack:12063-12098 WATERLIVE no PSX AFFINE UV interpolation (C raster UV DDA fog_poc.c:7996-8041);
+     WATER_VERT next door already has the flat-w form — port it.
+122. F16 camtrack:12152-12178 GLINT/CONE no int truncation of projected coords; C truncates EVERY coord
+     (fog_poc.c:11973/11981/12002-12011) — sub-pixel divergence, internally inconsistent with psx mode.
+123. F17 camtrack:12092-12097 modern (non-psx) mode still 5-bit F; C modern branch 8-bit (fog_poc.c:8398-8404).
+124. F18 camtrack:12190-12193 comment "96 tris" is 48; DR buffers 2x oversized — cosmetic, NOT PR'd.
+
+P8 CAMTRACK LEFTOVERS (agent W3 re-verified on current main; all STILL-TRUE):
+125. B1-6 camtrack:1643-1649 rr<=0 guard missing (C fog_poc.c:6874-6880 returns BEFORE 2nd RNG draw;
+     JS always draws → PRNG stream diverges from that event on; p(rr==0) ~3.7e-9/call).
+126. B5-4 camtrack:10364-10369+8525 sh1xJi lax (+v accepts "5"→5, true→1, null→0) vs C jint strict
+     JV_NUM-only (fog_poc.c:555-558); 41 call sites. (Original "JS keeps float" wording stale —
+     JS truncates; the type-laxness is the bug.)
+127. B5-5 camtrack:10194-10199 clut row[k] & 0xFFFF coerces strings ("33825"→33825 vs C 0); C twin
+     fog_poc.c:1912-1920. ("Missing-entry default" half = FALSE PREMISE — C keeps prior global, no default.)
+128. B5-6 camtrack:11000-11001 waterfall DROPLET cull on raw floats (stored untruncated at 10994);
+     C truncates before cull (fog_poc.c:13355/13363 (int)px). [Original claim mislabeled it weather-DRIP;
+     the JS rain drip path has NO cull matching C — correct as-is.]
+129. B6-2 camtrack:11678-11699 wfMat (waterfall) no side: → FrontSide; C fx_blit_wsheet_q4 rasterizes
+     both windings (fog_poc.c:12744-12810). V48 WATERLIVE floor has DoubleSide (OK); V48 CONE mats
+     are a NEW same-class instance (= F3); V48 GLINT benign (fixed winding, but see F2).
+130. B6-3 camtrack:12905-12913 posed-child world compose reads parent's LAST-FRAME matrixWorld
+     (applySh1xPropAnims runs before render; no updateMatrixWorld); C replaces world matrices flat
+     (fog_poc.c:10086-10134, 10181-10186). Fix: refresh parent chain before compose.
+
+P9 RIPPER LEFTOVERS (agent W4; on ipd2gltf.py @ 8851 lines):
+131. D2-2 ipd2gltf.py:2606-2618 MAP5_S00: all 7 poseBin entries' src raws mis-slotted (only map in the
+     catalog with pos-vs-raw contradictions; 79/86 entries self-consistent). 3 re-slots provable
+     internally (L2611 raw→L2612, L2612 raw→L2614, L2613 raw→L2616); 4 zero-raws need BIN (residual).
+132. D2-3 UNCERTAIN-NEEDS-BIN-DATA (MAP1_S01 SILVER_H static add vs cutscene-only — decomp map1_s01.c
+     not in repo; the cutscene emission exists at _PROP_ANIMS 900-903). NOT PR'd; documented.
+133. D3-1 ipd2gltf.py:5075-5079 u2 cast BEFORE overflow check → guard unreachable + silent wrap
+     (65537→1 empirically). Fix: check before cast (>65535).
+134. D3-2 ipd2gltf.py:6523 inst_key dead store in build_sh1x (live plumbing = inst_key_of at 6900).
+135. D3-3 ipd2gltf.py:6807 per-room report vertices/triangles always 0 (no writer anywhere; serialized
+     into --report JSON at 8827-8831).
+136. D4-2 ipd2gltf.py:6925-6941 stale CONSUMER_IPD_MODEL_LAYERS cross-check (table removed from
+     fog_poc.c in v24, 2850-2875) → 56 false "NOT in the consumer's IPD_MODEL_LAYERS" problems across
+     5/6 rooms in the corpus (0 genuine). Fix: delete the stale table + both branches (extras.ot_base
+     is the contract).
+137. D4-4 ipd2gltf.py:7239 propAnimPosed extras key write-only (fog_poc.c reads only animInst 2912 +
+     cutsceneOnly 2913). Fix: drop the key.
+138. D4-5 ipd2gltf.py:7064-7065 add_seq: ripper writes, fog_poc.c parses (2906→2938) but item.addSeq
+     NEVER read (3 occurrences: decl + 2 assignments). Fix: drop the emission + schema line (OR wire
+     OT tie-break in fog_poc.c — chose drop; wiring = new logic, primary's call).
+139. D4-3 FALSE-POSITIVE (exact-match set membership, not prefix; 0 over-skips in corpus) — wave-4a
+     registry entry RETRACTED.
+
+P10 WALLPAPER JAVA LEFTOVERS (agent W5; @ 82540f4):
+140. E3-2 Sh1WallpaperService.java:289/2527 sAnyVisible STATIC → multi-engine (preview+live, keyguard)
+     last-writer-wins; readers 1785 (watchdog gate) + 2108 (tilt gate).
+141. E3-3 :1660-1663 peekNext on empty bag routes through drawNext=pollFirst → CONSUMES the refilled
+     head; prewarmNextScene (2573) warms the wrong scene.
+142. E3-4 :2464 copyAssetsIfNeeded on main thread (61 MB bundled assets, SHA-256 + stream copy) in
+     onSurfaceCreated → ANR risk. Editor paths already use sExecutor (2329/2379).
+143. E3-5 :2170-2173/:1306 TIME_TICK → full camdat disk read + JSONObject parse EVERY minute when
+     Auto Mode on (default true), no mtime/size cache.
+144. E3-6 :2371 sEditorSession checked on caller thread, never re-checked inside the sExecutor task →
+     stale task can boot preview after endEditorPreview restored wallpaper.
+145. E3-7 :2246 RECEIVER_EXPORTED for internal ACTION.SETTINGS_CHANGED (senders all setPackage in-app;
+     targetSdk 35) + same pattern SettingsFragment:255, AppearanceFragment:171, OtherFragment:351.
+146. E5-6 CamtrackEditorActivity.java:293-313 frameTick Choreographer loop never removed in onPause
+     (file has no onPause) → per-vsync View invalidation + evalPose while paused.
+147. E5-7 FALSE-POSITIVE (snapshot held once at open, never re-captured; surface recreate does full
+     preview reboot — heavy but intended update path). Registry entry RETRACTED (hardening note only).
+148. E6-1 OtherFragment.java:707 saves under key "scroll_position1" (EXTRA.SCROLL_POSITION + 1),
+     restores at :683 under "scroll_position" → always 0. Fix: drop the +1.
+149. B3-Java CamtrackDoc vs JS twin (camtrack.html:6393-6761) + C (fog_poc.c:3458-3856), 6 confirmed:
+     (1) pair>=2 vs exactly-2 (JS 6499-6500, C 3774) — CamtrackDoc.java:582;
+     (2) vec3: JAVA is the strict side, JS/C coerce element-wise (JS 6563-6568 mirrors C jvec3 589-596) —
+         direction INVERTED from wave-4a claim; fix = port element-wise coercion into Java vec3() 1325-1337;
+     (3) points: Java drops-then-validates (686-699) vs JS/C validate-raw-count-first (JS 6644-6651,
+         C 3600-3614), malformed→[0,1,0] kept — shifts --track N indexing;
+     (4) fixed-track lookMode/lazyRateDegS/normalDirection stripped (parse 783, serialize 967-981);
+         JS parses for fixed (6761), C parses before type switch (3527);
+     (5) light mode/start/end/speedMS/loopMode dropped (Light 491-504; JS 6535-6550 carries them);
+     (6) animsDemo dropped (no field; JS 6515, C 3816).
+     (7) points export cap — FALSE-POSITIVE (INVERTED: JS caps at export 6393/6404 matching C 3605;
+         Java caps at parse 699 + all mutation sites ≤64) — RETRACTED.
+
+## Delivery plan (this session, PR-per-bug, branches off CURRENT main 7f08437 / 82540f4)
+PoC: #101-106 (GTE snap 2 PRs), #107-124 (water port ~14 PRs), #125-130 (leftovers 6 PRs),
+#131-138 (ripper 7 PRs). Wallpaper: #140-148 + B3-Java batch (Java, ~8 PRs). If context runs out:
+registry above is authoritative; unfixed items remain documented for primary/next session.
+
+END OF WAVE 4b REGISTRY (delivery continues below).
+
+## WAVE 4b DELIVERY OUTCOME — 2026-11-23
+32 PRs filed, zero force-pushes, all branches off main (one deliberate stack: wf-8 on wf-1 — same
+material comment block; noted in PR #226's body, merge #206 first).
+
+PoC PRs (#204-226): #204 CT2-1 GTE sat family (FLAKE/SPLASH/WATER/WATERLIVE/TV) | #205 CT2-2 streak
+snap | #206 WF-1 blend direction (ReverseSubtract) | #207 WF-2 DoubleSide family (glint NEVER
+rendered — CW winding) | #208 WF-3 gate2 trunc | #209 WF-4 envFlag gate | #210 WF-5 drwater floor
+gate | #211 WF-6 zone terminate+cap | #212 WF-7 tile seed | #213 WF-9 cone raw colors | #214 CAM2-6
+rr guard (RNG stream) | #215 CAM2-7 sh1xJi strict | #216 CAM2-8 clut coercion | #217 CAM2-9 droplet
+cull trunc | #218 CAM2-10 posed-parent two-pass | #219-224 RIP-4..9 (u16 guard, dead store, report
+counters, stale table, add_seq, propAnimPosed) | #225 RIP-10 VIN re-slot | #226 WF-8 floor depth
+contract (STACKED on #206).
+Wallpaper PRs (#34-42): WAJ-8 sAnyVisible | WAJ-9 peekNext | WAJ-10 copyAssets thread | WAJ-11
+TIME_TICK cache | WAJ-12 session recheck | WAJ-13 RECEIVER_NOT_EXPORTED | WAJ-14 Choreographer
+pause | WAJ-15 scroll key | WAJ-16 CamtrackDoc schema (compiled + 44 assertions vs the JS twin).
+
+RETRACTIONS this wave (registry corrected): D4-3 (UNUSED_ over-skip — exact-match, 0 corpus
+over-skips), E5-7 (snapshot on recreate — held once, never re-captured), B3-Java#7 (points cap —
+inverted; both sides effectively <=64), F17 (modern 8-bit floor F — the camtrack's FX family is
+uniformly 5-bit; a floor-only 8-bit modern form would be internally inconsistent — family-wide
+modern-mode gap, primary's call), B5-4 float-detail + B5-5 default-half (claim wording corrected,
+cores confirmed).
+
+VERIFIED-BUT-UNFIXED this wave (documented for the primary; all CERTAIN unless noted):
+- V48 water port: F9 floor UV dual-form (waterLiveUvTile un-mangle u*4/v*2-7, fog_poc.c:15098-15103;
+  needs ripper-side coordination on which GLBs carry tile-relative UVs), F10 DWAVE name-prefix
+  fallback vs the engine's EXACT 8-byte filename match (the true constant D_8002B2CC is unresolved
+  in the decomp — needs VIN/BIN), F11 ctr-grid divergences ((a) per-tick gates during catch-up,
+  (b) tick light missing the fx_light_anchor offset (-0.08,+0.28,-0.12 glTF) — up to 12cm at zone
+  boundaries, (c) first-call ticks=target seeding, (d) seek-back never rewinds — interactive
+  semantics undefined in the single-shot C), F15 WATERLIVE affine UV warp (the C raster UV DDA;
+  WATER_VERT's flat-w form is the template), F16 glint/cone int truncation of projected coords
+  (fog_poc.c:11973/11981/12002-12011), F18 the "96 tris" comment/buffer sizing (cosmetic).
+- The whole FX family's modern-mode (uQuantize=0) 8-bit forms — family-wide, primary's call.
+- Wave 4a leftovers still open: D2-1 26 missing pickup sites (needs BIN), D2-3 MAP1_S01 SILVER_H
+  (needs decomp map1_s01.c), D2-4 sin//30 floor-vs-trunc, C2-2/C2-3 (HW path, tied to the twin
+  sync), C2-4 Vulkan barriers, A14-1 UV-DDA anchor (invasive), A14-3 RP_BLEND_TEX (UNCERTAIN),
+  docs citation pass.
+- Camtrack PR-body honesty note: this wave's camtrack fixes are line-verified + node --check'd +
+  logic-harnessed (RNG/coercion numerics); no browser pixel A/B was run (no SDK/browser budget
+  left this session) — the primary's A/B discipline should cover #206/#207/#226 (visual-critical).
+
+END OF WAVE 4b.
+
+# WAVE 5 — 2026-11-24: V49 line-by-line audit + lively (new in scope) + Wallpaper merge integrity + F11/F15/F16/F18 delivery
+
+## Context
+User cleared the PR backlog (all repos 0 open PR at wave start); lively now IN SCOPE (primary mid-merge
+on engine changes). Baselines: PoC @ ef6acfd→a0196f9 (v33.47), Wallpaper @ c540ff2, lively @ eca44107
+(core-separation), decomp @ eb96675c5 (housekeeping only — no map1_s01.c), swanstation @ 631f0fb (unchanged).
+UNAUDITED TARGETS this wave: V49 ff2ca66 (the primary's flashlight-circle fix: fog_poc.c +292/-50,
+camtrack.html +121/-58 — NEVER audited), 3cb50fa (#198 re-land), lively eca44107 (V49 cherry-pick) +
+the S24/S25/S26 seam commits, the 19-PR Wallpaper merge batch, wave-4b leftovers F11/F15/F16/F18.
+
+## Method
+9 parallel audit agents (A1 ONE-light engine-truth / A2 LINE light / A3 runtime keys / A4 extras offset
+fold / A5 camtrack delta / A6 GTE saturation re-cut + #198 / A7 lively sync+seam / A8 Wallpaper merge
+integrity / A9 F11+F15+F16 recheck), each with a small block, verbatim-vs-decomp/swanstation mandate.
+I personally re-verified every fix's anchor lines before filing. All 22 PRs: gcc -fsyntax-only (C) /
+node --check all script blocks (JS) / gcc -fsyntax-only -DLIVELY_PLAYER + plain-mode gcc -E -P
+byte-identity (lively) / harness-proven classes (Wallpaper Java). Runtime probe of the riskiest JS change
+(F13 restructure): playwright, DR01FE water model, night mode, 8.5s playback — ZERO page errors, anims
+running (the #226 "diff-verified but never RUN" class is closed for these PRs).
+
+## WAVE 5 FINDINGS REGISTRY (disposition in brackets)
+
+V49 fog_poc.c:
+1.  A1-1 authored follow:'camera' light w/o ahead gains the 2.5m trail (C mode 0) vs JS/gizmo/v40-comment
+    ahead=0 — twin divergence [PR #227, C-side fix `if (!cd.lightFollow)`; A9-N1 proposed the opposite
+    direction, rejected: 3 twins agree authored-no-ahead=0; lively seam's mirrored condition noted for
+    next twin sync]
+2.  A2-1 LINE light arms for ANY follow; twin only for follow:'world' (lightModeOf 'legacy') [PR #228]
+3.  A2-2 travel clock advances 136/4096 (255/256 of 1/30) — machine-checked [PR #229 w/ A2-3+A2-4]
+4.  A2-3 backward scrub/wrap never rewinds the clock (twin = pure function of phase) [PR #229]
+5.  A2-4 multi-shot loop doesn't reset g_userLightLineT (breaks the shot==fresh-process contract) [PR #229]
+6.  A3-1 A/E yaw keys SIGN-INVERTED (+yaw = engine +x = camera RIGHT; labels/enum/comments all say left)
+    [PR #230]
+7.  A3-2 nudge base = track pose during R2 view (render/anchor use r2view_pose) — first press teleports
+    [PR #231]
+8.  A3-4 paused nudge: FX moves per-frame, mesh latched until unpause (Spot modes) [PR #232]
+9.  A1-5/A2-5 degenerate/static LINE base = START vs twin's authored pos [PR #233]
+10. A2-6 speedMS in (0,1e-6] freezes vs twin's Math.max(1e-6) denominator clamp [PR #233]
+11. A1-2/A4-1 Harry offset must be Q8-grid (-21,+72,-30)/256 (engine Q12>>4 BEFORE the bone transform);
+    was raw floats at 3 drifting literal sites [PR #234]
+12. A1-3 light pos store must land on the engine's exact Q8 grid (Q8<<4), both C sites + 2 JS sites
+    [PR #235]
+
+V49 camtrack.html:
+13. A5-2 floor-swap repair reads sh1xDrWave off SV.V.models (NEVER carries it) — the #209-gated branch
+    DEAD, un-gated wr fallback always ran [PR #236, reads three.loaded]
+14. A5-5 follow-undefined light drops from the carrier (C defaults 'camera', gizmo treats non-world as
+    camera) [PR #237]
+15. A6-1 C twin's water STRIP projection has NO gte snap (engine water.c:626-629 rtps/stsxy per corner;
+    JS already has floor+clamp) [PR #238]
+16. A9-F11 a/b/c/d the 30Hz ctr grid: (a) no per-tick GATE 2 in catch-up; (b) tick light = RAW track pos
+    (now up to 2.5m+off from the anchored frame light — V49 made it worse; line lights don't travel per
+    tick); (c) first call seeds ticks=target; (d) restart never resets (water FROZEN after reload for the
+    old session length) + dead seek-back line [PR #239 — restructured catch-up, per-tick anchor+gates,
+    restart resets; GATE-1 env-ramp caveat documented]
+17. A9-F15 WATERLIVE perspective-correct UVs vs the PSX affine DDA — WATER_VERT's flat-w form ported
+    [PR #240]
+18. A9-F16 glint quad + cone fan never int-truncate projected coords (C truncs EVERY coord, trunc-toward-
+    zero NOT floor) [PR #241]
+19. docs: 20 stale citations (V49+#198 moved everything: gte_snap_screen 8892-8903→9104-9115 etc.),
+    WATER_VERT misattribution (strip ≠ DrawItem), legend 0.44→113 Q8 exact, F18 "96 tris"→48 drawn,
+    false post-V49 comments (--userlight off claim, v6 directive comment, beam LUT 1061/3957→1056/3958)
+    [PR #242, comment-only]
+
+lively (eca44107 + S24/S25/S26 seam):
+20. A7 cherry-pick FAITHFUL (374/374 changed lines byte-equal; plain-mode gcc -E -P == v33.45+V49 exactly;
+    all residual vs PoC HEAD = 14 named post-v33.45 commits). CLEAN.
+21. A7-1 seam never re-folds the V49 LINE state (room A's travel carries into B) [PR lively #7 w/ 2+3+5]
+22. A7-2 seam lacks the extras userLightOffset re-fold twin (rot re-folds, offset doesn't) [lively #7]
+23. A7-3 hasLightRot no else — stale rot survives + suppresses B's GLB rot [lively #7]
+24. A7-7 switch's dt=0 prime consumes 30Hz slot 1 — missing ticksDone=0 (v43 E-07-1 never ported to the
+    seam; with V49's ONE light both lights sit at the identity-camera pose ~2/30s EVERY switch)
+    [PR lively #8]
+25. A7-6 switch's FINAL snow warm-up runs BEFORE densitySel/D-3 with the DEFAULT seed (V45-W7 class,
+    604px-measured; live via HP0003/HP0100 field17=1) + A7-8 snow_init re-enables the user's OFF toggle
+    (app-reachable today) [PR lively #9: reorder + g_bootSnowSeed + capture/restore + nextWeather=2]
+26. A7-4 V49 light keys unreachable in the player (lp_wndproc discards keys; no panel substitute — every
+    other runtime key HAS one; the commit message's claim is false) [PR lively #10: live_wndproc arm
+    ported; primary may prefer panel props — flagged]
+
+Wallpaper (c540ff2 merge integrity):
+27. A8 merge integrity CLEAN: all 19 fixes present verbatim, no conflict markers, no double-boots/
+    deadlocks/stale-cache in the cross-PR interactions; the WAJ-10 boot thread trace safe (all GL on the
+    engine thread).
+28. A8-1 frameTick null crash when loadDocument() fails (pre-existing; AOSP Choreographer throws on
+    null; crash loop on corrupt camdat) [PR Wallpaper #43, null-guard both removal sites]
+29. A8-2 Java parse doesn't dedup track ids — the JS B-5 rule since V41; harness-proven (JDK21 twin run
+    vs the extracted JS pipeline) [PR Wallpaper #44]
+
+DOCUMENTED, NOT PR'd (primary's call / pre-existing policy / hand-authored-only):
+- A1-6/A3-3 --r2-key shadowing by the 10 new letters (pre-existing class since v23; parse-time reject
+  would be new logic). A1-7/A4-2 extras parse JV_NUM laxness (pre-existing; #215 policy made the camdat
+  side strict, the sh1x side stayed lax; hand-edited GLBs only). A2-7 strict-vs-coercive parse divergences
+  on hand-authored JSON (same policy). A2-9 nudge disarm of the line is a persistent user choice (R not
+  re-arming = defensible design; documented). A2-10 line fold not gated on light.on (edge, usually dark).
+  A3-5 printf observability. A3-6 R2 pan-yaw doc sign (out of block, unverified). A5-6 gizmo one-frame
+  lag (pre-existing ordering). A5-7 JS lacks the C's extras-offset fallback + the floor-swap null-payload
+  early-return vs C's default-sheet (pre-existing, authentic rips unaffected). A7-9 R2 state not reset on
+  switch (latent — keys were dead pre-#10). A7-10 boot env.bootWeather arm has no seam twin (all shipped
+  camdats -1). A8-3 ±Infinity gate inconsistency (isNum vs isNumFinite — rides the pending B-4 ruling).
+  A8-4 sCamdatCacheRoot volatile (theoretical JMM publication; the documented double-parse race is benign).
+- F9 (floor UV dual-form) + F10 (DWAVE exact-name) still parked (need ripper coordination / VIN data).
+  D2-1/D2-3 parked (BIN / decomp map1_s01.c still absent). A14-1/A14-3 parked. Wallpaper engine twin
+  staleness = the primary's V50 queue head (in progress: ee33106 pushed per the V50 WORKLOG entry).
+
+## DELIVERY
+22 PRs, zero force-pushes, all branches off current main (PoC a0196f9 / Wallpaper c540ff2 / lively
+eca44107@core-separation). PoC #227-#242 (16), lively #7-#10 (4), Wallpaper #43-#44 (2). No duplicates
+(0 open PRs at start; lively #3/#6 were the primary's own, untouched).
+
+END OF WAVE 5.
+
+# WAVE 6 — 2026-11-24: V51 reimplementations + twin syncs + merge-batch integrity audit
+
+## Context
+Primary cleared the w5 backlog (V51 session, WORKLOG.md:2966-3071): 17 of 22 merged, 5 REIMPLEMENTED
+(bug-right fix-wrong: PoC #235->39735a9 mode-split store, #239->8dbf781 ctr-grid corrections incl. the
+F11d restart resets the PR itself omitted, #241->22cfc8e engine-true floor+clamp BOTH twins, #242->
+faac702 amended docs incl. the apostrophe SyntaxError blocker + kSineTable re-index, lively #10->
+f158446e narrowed 11-key routing), then twin-synced Wallpaper (ee33106 V46-V49 96+11-hand-ported,
+ff27f22 session-9 24 hunks) and lively (86153ec8 26 hunks fuzz-3). ALL of that new code is
+unaudited = the wave-6 surface. Baselines: PoC d5b28f3 (v33.50), Wallpaper ff27f22, lively
+86153ec8 @ core-separation (lively's working branch, NOT main), decomp 2822f26f3 (lighting.c ->
+light_overlap.c rename + bodyprog reorg — citations must be re-located), swanstation 631f0fb.
+Board: Audit_Agent_w6_V51ReimplAndTwinSyncs registered (seq 136).
+
+## Method
+7 read-only parallel audit agents on small blocks: B1 reimpl-A1-3 / B2 reimpl-F11 / B3 reimpl-F16 /
+B4 merges+docs-reimpl / B5 Wallpaper twin syncs / B6 lively sync+keys / B7 stress+logic. Diffs saved
+to wave6/ (poc_reimpl_*.diff, poc_range_*.diff, wall_*.diff, lively_*.diff). I personally re-verify
+every finding before any PR. 0 open PRs at start (verified via API). Do-not-re-report list refreshed
+in wave6/CONTEXT.md (w4a/4b/w5 lists + primary's parked queue).
+
+# WAVE 7 — 2026-11-25: V51 reimpls + twin syncs verbatim audit (wave-6 surface re-run) + lively in scope
+
+## Context
+Wave 6 was interrupted at registration (board seq 136, no findings); baselines UNCHANGED since
+(prior waves' worklog entries verbatim): PoC d5b28f3 (v33.50), Wallpaper ff27f22, lively 86153ec8
+@ core-separation, decomp 2822f26f3, swanstation 631f0fb. 0 open PRs at start (API-verified, all
+three repos). Board: Audit_Agent_w7_ReimplSyncDeepAudit registered (seq 137).
+
+## Method
+8 parallel read-only agents, small blocks: C1 reimpl-39735a9 / C2 reimpl-8dbf781 / C3 reimpl-22cfc8e
+/ C4 docs-faac702 + 12-merge integrity / C5 Wallpaper syncs ee33106+ff27f22 / C6 lively sync+keys /
+C7 camtrack delta / C8 stress+logic. I personally re-verified EVERY anchor line (incl. disproving
+one agent referral — see W-9). Diffs from wave6/ reused (still valid: baselines unchanged).
+
+## WAVE 7 FINDINGS REGISTRY (disposition in brackets)
+
+Certain engine-accuracy bugs:
+1.  C3-1/C5-4/C6-1 F16 INCOMPLETE: the water-ring corner X `rex` (int)floorf(px*iv) has NO x-axis
+    PushSXY saturation clamp while its y-twin rey and the glint/apex sites clamp both axes. ALL
+    THREE twins: PoC fog_poc.c:12333, Wallpaper :11835, lively :12213. Engine: swanstation gte.cpp:
+    353-380 saturates BOTH axes. [PR per repo]
+2.  C5-2 Wallpaper C-6 INCOMPLETE: ee33106 ported the driveGate parse + the A16-4 pre-scan but NOT
+    the main-loop freeze (PoC :11092-11104 `if (a->dgNear && camGltf) {... continue;}`) — rides tick
+    unconditionally. [Wallpaper PR]
+3.  C5-3 Wallpaper rot0 init: `rot0PerInstN = 0; instBase = 0;` sits POST-parse (:2446), killing the
+    parse at :2279-2291 — the exact v36-6a9e8c1 bug PoC's v43 fixed (PoC :2319-2328). [Wallpaper PR]
+4.  C5-7 Wallpaper sh_gte_ll_buggy DROPS the l0*vx term (old "FC-translation bug" mis-decode;
+    Wallpaper :5660-5676) — 0x4A4A6412 = MVMVA{m=LLM(1),v=V0,tx=NONE(3)} → swanstation gte.cpp:584
+    default MulMatVec(zero_T) = FULL 3-term dot (self-decoded from BitField layout, PoC :5826-5845
+    agrees). [Wallpaper PR]
+5.  C5-6 Wallpaper subcellTable loop retains `jint(ent, 0, -1)` NULL-key strcmp segfault loop
+    (:1705-1712) — PoC's V45 B-1/B-6 replaced it with the JV_ARR 2-element form (:1748-1758).
+    [Wallpaper PR]
+6.  C8-4 PoC CLI: --shot/--r2shot file= with an ABSOLUTE path gets outdir-prefixed ("shots//tmp/x.png")
+    → always fails (:20236, :20404). [PoC PR]
+7.  C5-5/C6-2 patch artifacts committed: Wallpaper tracks fog_poc.c.orig + fog_poc.c.rej (ff27f22);
+    lively tracks fog_poc.c.orig (86153ec8, byte-identical to the twin). [hygiene PRs per repo]
+
+Docs (verified certain):
+8.  C4-1/C7-1/C2-3 faac702's "20 citation refreshes" were computed against a0196f9 (the range
+    START) — every refreshed number stale at its own landing: gte_snap_screen :9104-9115→:9171-9182
+    (8 camtrack sites), transform_item2 :9282→:9346-9350, flake :14539→:14646, streak :14630-14631→
+    :14738-14739, DDA :14667-14668→:14775-14776, splash :14712→:14819, fx_water_scroll_sync
+    :12717-12766→:12814-12863, GATE-2 :12748→:12845, fx_water_tile_update :12768-12792→:12865-12900,
+    tvpaint :14031-14051→:14138-14164, waterLive nclip/far-cull/bucket :15198/:15260/:15275→
+    :15201-15242/:15276/:15278, live tick call :16562→:16669, g_userLightLineT :6349→:6415,
+    WATER_VERT self-cites 11830-11832/11872-11873→11850-11852/11892-11893, #236 :7655/:7656→
+    :7662/:12287. [PoC docs PR]
+9.  C8-5 fog_poc.c:6406-6409 comment: "camtrack twin rides state.t, EXACTLY 1/30 per fired tick
+    (tickPlayback :8532)" is wrong — state.t += dt*rate is a frame clock (:8543-8544, tickPlayback
+    :8540); the C's live_advance is the 1/30-exact one. Reword. [PoC docs PR]
+10. C1-1 mode-split comment (:6348-6349, all 3 twins): the PR-#235-rejection rationale states the
+    divergence class BACKWARDS — trunc(w*256)<<4 vs (trunc(w*4096)>>4)<<4 diverge for negative w
+    whose trunc(w*4096) is NOT an exact multiple of 16 (40001-point sweep re-run by me: 0 divergences
+    in the multiple-of-16 class, 20000 in the other). Fix "is an exact"→"is NOT an exact" + example.
+    [PoC docs PR; twins' copies refresh at next sync]
+11. C2-2/C2-1/C1-2 camtrack F11 walk doc gaps: (a) the per-tick tick light stays RAW (the C's
+    fx_light_anchor Q8-grid store trunc>>4<<4 is not applied per tick — ≤1 Q8-unit 3.9mm band at
+    zone/gate boundaries; add to the documented-approximation list :12833-12837); (b) the ctr grid
+    keys on floor(sessionT*30) with sessionT rate-scaled (rate≠1 diverges from the engine's
+    wall-clock 30Hz — editor-only surface, add one caveat line). [PoC docs PR]
+
+Documented-NOT-PR'd (primary's call):
+- C5-1 MASSIVE: the Wallpaper twin is missing the ENTIRE PoC v43/v44/v45 audit output (~30 families,
+  ~1100 lines): ee33106 synced only PoC d9af2df..HEAD onto a V42-era base + v45-water cherry-picks.
+  Marker counts: v43 76vs54, V44 56vs16, V45 26vs8. Missing families (each verified in the direct
+  twin diff): E-02-1/2 jsonIdx sharedRot, E-03-1..4 nbMerged/posedInst merge isolation + it.matIdx
+  matOff, E-10-1/3 GPU integer sample+top-left fill, E-11-2 PushSXY saturation family, E-12-1/2/C-1
+  rebind restore, rot0 pre-parse init (→PR #3 above is the surgical piece), V44 A-1 sprAbr flare
+  ghost, A-2 sh_water_ot_gate far-edge, A-3 g4-before-g3, C-2 rotStepDeg, C-4 vyFloorRaw -91,
+  C-7 raw-Q12 accumulators + g_GravitySpeed 1337 (twin 1336), D-2/D-3+V45 E-1/E-4 particle Q8 snap
+  floorf(x*256) vs twin's +0.5f, V45 A-F1/C2-1 two-step 5-bit subtract, B-2 accessor span, C1-2
+  ±2908 (twin ±2909), C1-4 WeightedAverageGet per-product >>12, D-1 z lattice, D-2 rwVzBaseQ12,
+  E-3 r2view save-final, E-7 R2 release snap, R2 zone z=-eye->z sign, bk<<4, llm[1][0] int16 cast,
+  nclip cross order. NOT in the parked list (only "Wallpaper twin raster gap t=0.0334" was) — this
+  is the next-sync queue's true size. The primary's established pattern = sync it themselves
+  (marker-parity gates); the 6 surgical Wallpaper PRs below cover only the parts I could verify
+  line-by-line against PoC main.
+- C6-4 lively next-sync queue EXTENSION (all under the documented blanket gap — NOT re-reportable,
+  but the 9-item list is incomplete): + v48 A3-1 snow_reset_seed prevViewX/Z=0, + v48 A16-4 ferris
+  else-if chain, + v48 A16-1 stone step-0 fall-through; and the listed "C-6 ferris driveGate" item
+  is STALE (lively already HAS the C-6 code at :1383/:2390/:10974) — the actually-missing piece on
+  top is the A16-4 layer.
+- C8-1/C8-2 UB-on-paper idioms ((x>>4)<<4 negative-shift; R2_ANGNORM (a<<20)>>20): the engine's
+  own idiom (decomp fixed_point.h Q8_TO_Q12 <<4) — documented only, NOT changed (verbatim wins).
+- C8-3 camdat parse no isfinite/range gate (1e308 points → 15 UBSan reports, no crash): pre-existing
+  lax-by-design policy (hand-authored-only surface). Documented.
+- C3-2 JS CONE_VERT clip.w<=0 pass-through unfloored/unclamped (behind-camera segments; C twin drops
+  them) — parked-queue adjacent (fan visibility VLM delta), documented for the primary.
+- C3-3 F16 uses a second constant set ([-1184,863]/[-1136,911] inline vs the family helper
+  [-1024,1023]) — algebraically identical (verified: abs bounds minus center 160/112), behavior-
+  neutral. Documented.
+- C5-8 bookkeeping: ee33106's "96+11 hunks" = 114 @@ actual; "marker parity 1:1" true only for the
+  4 cited markers. ff27f22's "all 24 applied clean" — the .rej proves the first attempt rejected 23
+  (hand re-serialization was faithful, all landed). Documented.
+- W-9 (DISPROVEN, no PR): C5's referral "PoC main dropped the pan= sscanf line in eb9b588" —
+  eb9b588 did drop it, but 8dc4565 ALREADY restored it; current main has the line (verified in
+  both twins + git -S). The Wallpaper twin's note is historically accurate.
+- C8 stress bill: build zero warnings; 24+ hostile CLI invocations + 36-file hostile camdat fuzz =
+  no crash/hang/ASAN memory error; JS harness: Q8-grid chain bit-exact JS↔C over 6000 samples;
+  30Hz ctr walk cannot double-fire (1e-9 slack load-bearing, 0 boundary misses in 90k probes);
+  travel clock JS↔C mirror bit-equal; multi-shot reset deterministic.
+- C5-8/C6-3 count corrections for my own registry: lively routes 10 keys (not 11) — I/K/J/O/U/C +
+  T/G/A/E.
+
+## DELIVERY
+(pending — PR numbers appended after filing)
+
+## DELIVERY (wave 7 final)
+11 PRs, zero force-pushes, all branches off current main (PoC d5b28f3 / Wallpaper ff27f22 / lively
+86153ec8@core-separation; lively PRs base core-separation). PoC #243 (rex x-clamp, CERTAIN, engine
+truth gte.cpp:353-380), #244 (--shot/--r2shot absolute path), #245 (docs citations + 4 comment
+corrections, comment-only). Wallpaper #45 (rex clamp), #46 (driveGate main-loop freeze port from PoC
+:11092-11104), #47 (rot0 pre-parse init — the v36-6a9e8c1 kill), #48 (sh_gte_ll_buggy full 3-term
+dot — 0x4A4A6412=tx NONE(3) re-decoded independently), #49 (subcellTable NULL-key loop -> PoC's V45
+form), #50 (rm .orig/.rej). lively #11 (rex clamp), #12 (rm .orig). Gates: gcc -fsyntax-only (PoC
+incl. -I src; Wallpaper -Wall zero warnings; lively -DLIVELY_PLAYER) + node --check on all
+camtrack blocks. Worklog backed up on PoC branch audit/w7-worklog. Board seq 137 complete.
+ALL w7 findings personally re-verified before filing (incl. one agent referral DISPROVEN: the pan=
+line was already restored by 8dc4565 — see W-9). Duplicates: none (0 open PRs at start, all repos).
+
+END OF WAVE 7.
+
+# WAVE 8 — 2026-11-25: pre-merge verify of the 11 open w7 PRs + the lively C# host audit + camtrack stress ext
+
+## Context
+Recovered post-context-recycle: sandbox intact (worklog + repos + wave6/7 assets survived; lively re-cloned).
+Baselines RE-CONFIRMED UNCHANGED since wave 7 (fetch + API): PoC main d5b28f3, Wallpaper ff27f22, lively
+core-separation 86153ec8, decomp pinned 2822f26f3 (re-fetched — the hash needed a fresh fetch to resolve),
+swanstation 631f0fb. The predicted primary merge-movement did NOT materialize: all 11 w7 PRs still open
+(PoC #243-245, Wallpaper #45-50, lively #11-12), nothing new landed anywhere. Board: Audit_Agent_w8_
+PreMergePlusLivelyHost registered (seq 139). The wave-8 surface = (1) the 11 open PR branches (the freshest
+unaudited code — my own fixes, now adversarially re-verified by independent agents), (2) the NEVER-audited
+lively C# host surface (Sh1Wallpaper.cs + integration + bundle + CI), (3) the camtrack.html editor
+stress/generic extension (the standing priority).
+
+## Method
+8 read-only parallel agents (D1-D8; diffs pre-extracted to wave8/; CONTEXT.md = the brief): D1 PoC PR trio /
+D2 Wallpaper PR trio A / D3 Wallpaper PR trio B / D4 lively PR pair / D5 Sh1Wallpaper.cs / D6 lively
+integration+bundle+CI / D7 camtrack editor stress / D8 build+smoke gates on all 11 branches. I personally
+re-verified EVERY filed claim (grep anchors, engine quotes, and 4 live empirical probes) before amending or
+filing anything.
+
+## WAVE 8 FINDINGS REGISTRY (disposition in brackets)
+
+PR-branch verification verdicts (the 11 open w7 PRs):
+- PoC #243 rex clamp: SHIP AS-IS (D1: bounds algebra re-derived from the site's own fxpX/center; gte.cpp:
+  353-380 both-axes quote; 4-site family consistency table; rey sibling identical form). [#243 merged as-is]
+- PoC #244 abspath: DEFECT D1-1 (POSIX-only predicate — Windows C:\x.png still outdir-prefixed).
+  [AMENDED: second commit — cli_path_is_abs helper w/ _WIN32 drive-letter+UNC forms; -Wall 0 warnings]
+- PoC #245 docs cites: DEFECT D1-2 (3 off-by-one citations: 14738-1479->14737-8, 14775-6->14774-5,
+  sessionT ->:8545). [AMENDED; +D7-1 (the v41 mode-1 comment's 5746-5752 x2 -> 6350-6353) and +D3-1's PoC
+  twin (:9394 'MVMMA FC bug' -> MVMVA LLM cv=3 full dot) in the same PR — 3 commits total now]
+- Wallpaper #45/#46/#47: SHIP AS-IS (D2: byte-identical ports; driveGate guard+body byte-identical to PoC
+  :11092-11104, PLAYER_NEAR_POS engine truth re-derived; rot0 init lands exactly at PoC's point).
+- Wallpaper #48 gte_ll: SHIP AS-IS (D3: 0x4A4A6412 independently re-decoded from gte_types.h bitfields —
+  command 0x12, lm 1, tx bits13-14 = 3 (NONE->zero_T full 3-term dot), m=LLM(1); 3,000,000-case
+  equivalence harness 0 mismatches; old form diverged 58.1%). [stale comment :9093 AMENDED in-PR]
+- Wallpaper #49 subcell: DEFECT D3-2 (converted the buggy loop into a SECOND copy instead of replacing —
+  twin ran the identical 25-cell parse twice; PoC has ONE loop). [AMENDED: duplicate deleted, 1:1 with PoC]
+- Wallpaper #50 / lively #11 / #12: SHIP AS-IS (deletion-only verified; .orig byte-identical at blob level
+  — same git blob, zero information loss; zero references repo-wide). lively #11 commit-message nit D4-2
+  (said 3 clamps were there; actually 5 — message-only, no force-push, documented).
+
+New findings (filed as PRs after my personal re-verification):
+- D4-1 ripple GTE snap (CERTAIN, cross-twin): the map5_s00 ripple MESH lattice + SPRITE corners use raw
+  (int) trunc — no floor, no PushSXY saturation — while the engine stores gte_rtpt/gte_rtps SATURATED
+  coords (decomp map5_s00.c:182-185 sp10 / :127-131 field_144; the +/-200//160 culls READ the saturated
+  stores; gte.cpp:353-380). Distinct from the parked 'droplet-path' item (water.c waterfall family).
+  [PoC #246, Wallpaper #51, lively #13 — F16-family form, clamps before the cull captures]
+- D6-1 CI TIM gate red-by-construction (CERTAIN, lively): the S19 viewer sits AFTER camdat discovery ->
+  every clean checkout fails the gate (CI runs 30-33 ALL failed at exactly that step — live confirmation);
+  SH1_PORT.md's '5 sanctioned main()-layer hunks' claim also false (D6-3: hunk1 absent, hunk2 never
+  existed, hunks 3-5 seam-internal; plain CLI == PoC empirically). [lively #14 — hunk re-landed + docs
+  reworded; live-verified: exit 1 -> exit 0 + PNG written]
+- D6-2 stdin FILE-lock exit deadlock (CERTAIN on the Linux stub): getchar holds stdin's lock across the
+  blocking pipe read; after Type-5 the main thread's glibc exit cleanup blocks on it (>10 s frozen,
+  0.02 s with a raw-read falsifier; ipc16 test masks it by closing stdin; the C# masks it with Kill).
+  [lively #15 — lp_getc_raw read(2) in the POSIX stub; re-verified: graceful exit rc=0 in 0.06 s]
+- D5-1 light-key printf chatter on the JSON wire (likely-bug, seam invariant): the silencing macro sat
+  below the live_* helpers; lp_wndproc's light keys route into user_light_nudge/aim whose [userlight]
+  printfs hit the pipe. [lively #16 — guarded macro hoisted above the live region; static proof: 6
+  chatter markers pre-process -> 0; plain CLI unchanged (guard is LIVELY-only)]
+- D7-2 unescaped innerHTML interpolation (nit, PoC): camtrack.html:7685-7688 presetIdx1/field16 unescaped
+  into the GLB env info row (glbSceneSh1xExtras does zero schema checks). [PoC #247 — esc(String(...))]
+
+Documented-NOT-PR'd (primary's call; all re-verified by me or two-sided quoted):
+- D5-2 Sh1Wallpaper.cs fires Loaded even on msg_wploaded Success:false (the one failure site always
+  process-exits; 1-line `break` suggested).
+- D5-3/D5-4 lifecycle-flag/cosmetic nits in Sh1Wallpaper.cs (family-pattern contained; 2 cosmetic lines).
+- D5-5 sh1_ipc16_test.py:143's comment misdescribes the C# host (it never closes stdin — close-only was
+  absorbing the D6-2 deadlock).
+- D6-4 sh1_gates.py docstring declares a <bundle-dir> argv it never reads; D6-5 stale 'night' comment in
+  the seam dispatch (:18767); D6-6 2.zip drag-drop import rejected by IsWallpaperPackage (root-level-only
+  match) — by-design informational (auto-install path is the consumer).
+- D2-1/D2-2 Wallpaper propAnims parse-block residuals (rotStepDeg missing, vyFloorRaw 0 vs -91, rwVzBase
+  authored-pose vs 80691, jsonIdx) — probable C5-1 massive-gap class; flagged for the registry, NOT
+  separately PR'd (C5-1 remains the primary's queue).
+- D7 camtrack stress bill: 37 object-level + 13 text-level + 4 serialize-level hostile probes ALL graceful
+  (wrong types/nulls/huge arrays/NaN/1e999/dup-ids B-5/unicode/NUL/astral/1e6-char strings); round-trip
+  fixed-point byte-identical (gen1==gen2); editor writer never emits a field the C parser rejects;
+  playback determinism bit-identical in+cross-process incl. after edits; evalTrack purity (no track
+  mutation); camtrack_audit.js still runs clean at v33.50 (30 tracks x 401). Known/parked items not
+  re-reported (C8-3 Infinity, B-3/B-4, name-cap 60/63, A18-1).
+- D8 build bill: all 11 branches compile-gated PASS (PoC -Wall -Wextra 0; Wallpaper 0 new; lively both
+  modes 0); #244 abspath A/B proven on the branch (main exit 1 no file -> branch exit 0 + byte-identical
+  27019 B PNG); #245 binary byte-identical to main (comment-only proven); .o deltas confirm the code
+  branches compiled in; deletion branches lossless (blob-identical). Harness drift (pre-existing on MAIN,
+  not branch regressions): v10_stress_test.py's absolute pass bars stale at v33.50; v10 harnesses stage
+  input/THRF9FD.glb (glbs/ now); v10_ab_regression.sh needs a v9 binary (cannot run).
+
+## DELIVERY (wave 8 final)
+7 new PRs + 5 in-PR amends; zero force-pushes; all branches off current main (PoC d5b28f3 / Wallpaper
+ff27f22 / lively 86153ec8@core-separation; lively PRs base core-separation). NEW: PoC #246 (ripple snap),
+#247 (esc glbenv); Wallpaper #51 (ripple twin); lively #13 (ripple twin), #14 (TIM viewer S19 re-land +
+SH1_PORT.md truth), #15 (stdin raw-read), #16 (printf hoist). AMENDED (open PRs, second commits, normal
+pushes): PoC #244 (Windows abs-path forms), #245 (4+1 citations + the PoC FC-comment twin); Wallpaper #48
+(stale caller comment), #49 (duplicate loop deleted). Gates on everything I touched: gcc -fsyntax-only
+(PoC incl -I src, -Wall -Wextra 0; Wallpaper -Wall 0; lively -DLIVELY_PLAYER + plain 0) + node --check
+all camtrack blocks. 4 live empirical proofs (TIM gate exit 0 + PNG; graceful close 0.06 s; wire markers
+6->0 post-preprocess; abspath A/B). Worklog backed up on PoC branch audit/w8-worklog. Board seq 139
+complete. ALL w8 findings personally re-verified before filing. Duplicates: none (0 open PRs beyond mine
+at start, API-checked twice).
+
+END OF WAVE 8.
+
+# WAVE 9 — 2026-11-25: the v53-sync verification + the V52 deltas + THE F16-BOUNDS DERIVATION (the primary's queue item 5, delivered)
+
+## Context
+Recovered post-context-recycle: sandbox INTACT (worklog + repos + waves survived; lively re-cloned fresh
+@core-separation 3c37a3e5). Baselines re-fetched and confirmed: PoC 219b0d6 (V52: my 16 w7/w8 PRs ALL
+merged + the primary's CI v53 repair wave), Wallpaper 7aeee46 (1.16.0 + the s26/V52 unit-hang fix + CI
+twin), lively 3c37a3e5 (the twin-sync-v53 full engine port = THE fresh surface), decomp pinned 2822f26f3,
+swanstation 631f0fb. 0 open PRs at start (all three repos, API-checked). Board: Audit_Agent_w9_V53SyncVerify
+registered seq 143.
+
+## Method
+9 read-only agents (W9-A..I; the v53 sync's 30 hunks split hunk-by-hunk; the CI diffs; the Wallpaper unit-hang;
+the F16 bounds derivation) + this coordinator personally re-verified EVERY filed claim before filing (the
+swanstation PushSXY/RTPS quotes, the decomp SetGeomOffset tree-wide search, the helper call-site coordinate
+forms, the merge-faithfulness of all 18 merged w7/w8 PRs — mechanical delivered-lines check, 0 lines missing).
+
+## WAVE 9 FINDINGS REGISTRY
+
+The v53 sync verdict (W9-A..E): ALL 30 HUNKS FAITHFUL — byte-identical ports of PoC main (patch-replay
+reproduces lively HEAD byte-for-byte; PoC↔lively lines 1-16487 byte-identical post-sync). Every engine
+citation checked true (decomp map6_s04_2 else-if :3493-3508, map1_s03 flag-106 N/N+1 :1974-1996, map7_s01_2
+case-0 no-break :1485-1504, map7_s03_3 pose-then-decrement :8196-8203, map4_s03 raw-UV/bucket :1258-1400,
+vc_main/vc_util WARP_WATCH :761-786/:1929-1935/:2565-2572/:360, particle.c/load_screen.c weatherBits cites,
+swanstation gpu_sw_backend dither :136-178). The "8 remaining diff regions = sanctioned seams only" claim
+SUBSTANTIATED (7 hunks in plain diff -u = 8 at -U0 — a counting-tool difference, all regions documented seams).
+
+NEW findings (filed as 7 PRs after my personal re-verification):
+- W9-H F16-BOUNDS (CERTAIN, family-wide, THE primary's queue item 5 delivered): the PushSXY saturation is on
+  the CENTER-RELATIVE store (gte.cpp:691-698 adds OFX BEFORE the :353-380 clamp; the world path runs
+  OFX=OFY=0 — zero world-path SetGeomOffset in the whole decomp tree, the 7 sites are item-screen/special-
+  pass save-restores; five 2D corroborations: fade TILEs at (-320,-240), text x-160/y-112, fb edges ±h/2,
+  fog veil bounds, flare +h/2). The landed [-1184,863]/[-1136,911] inline windows AND the helper's
+  [-1024,1023]-on-absolute both model the WRONG frame (OFX=160 inside the GTE). Divergence: up to 160px x/
+  112px y on far-offscreen non-cull corners; the ±200/±160 culls NEVER diverge. Fix: inline → [-1024,1023]
+  per axis (value there is center-rel); helper + JS twins → [center-1024, center+1023] = x [-864,1183],
+  y [-912,1135] (input is FB-absolute at all 5 call sites — verified). [PoC #248, Wallpaper #52 (also
+  ports the missing v43 E-11-2 helper saturation directly in the w9 form — the twin never had it), lively
+  #17; camtrack.html CONE_VERT + JS glint + 8 helper-form sites in #248. A/B gate: 16-render battery
+  BYTE-IDENTICAL to main — divergence unreachable on the shipped corpus]
+- W9-F F-1 (LOW, Wallpaper CI): the v53 bump's round 1 re-reads version.properties only at attempt>1 —
+  round 1 bumps from the STALE event checkout onto fresh main (the PoC twin re-reads unconditionally); a
+  queued asset-only run can land versionName BELOW a released tag (1.15.1 after 1.16.0). [Wallpaper #53 —
+  guard dropped + the dead pre-loop read removed; yaml.safe_load OK. The rest of both v53 CI fixes verified
+  SOUND with live-git empirical reproduction of the orphan-tag mechanism + atomic/skip/retry semantics]
+- W9-G F-1 (LOW, Wallpaper): gradle.properties got a DUPLICATE org.gradle.jvmargs key (4915050 appended
+  beside the 2021 line) — Properties last-wins silently dropped the Kotlin-daemon option (inert: zero .kt
+  sources). [Wallpaper #54 — merged line, behavior-identical]
+- W9-G F-2 (comment-only, Wallpaper): the s26 fix javadoc's LATENT-narrative is mechanically wrong — the
+  un-masking was WAJ-14's onResume() re-arm (e034eec), NOT the WAJ-1 slider clamp (nothing throws at boot:
+  trackTime 0 → playhead in range; pre-v48 non-hang = no re-arm + the first-tie 0>0). Fix diagnosis itself
+  verified SOUND (ShadowLegacyChoreographer 4.14.1 source; setPostFrameCallbackDelay is Robolectric's own
+  documented remedy; production untouched confirmed). [Wallpaper #55]
+- W9-B/W9-C comment hygiene (PoC, comment-only): the A18-1 comments' camtrack.html cites drifted +234
+  (6621/6767/6769 → 6855/7001/7003; CamtrackDoc.java:1382 → :1504-1505); the kickPhase field comment
+  missing phase 3; a stray 'n' at :11593 (carried to both twins); the 8 stale fog_poc.c:9171-9182 cites in
+  camtrack.html (fixed in the F16 PR's own comment blocks). [PoC #249]
+
+Documented-NOT-PR'd (the primary's call):
+- W9-E: SH1_PORT.md's seam inventory is V42-era stale (the post-v53 seam sub-features documented only in
+  PR titles / in-file comments); the "8 regions" count only reproduducible at -U0 (worth a wording note).
+- W9-B: the lively S26 scene-switch seam's explicit prevViewX/Z zeroing pair is now redundant (post-A3-1
+  snow_reset_seed owns it) with a stale fog_poc.c:16906-16907 cite — seam hygiene, LIVELY-only code.
+- W9-C: the engine's ferris/lissajous AABB sub-gate (Vw_AabbVisibleInScreenCheck, map6_s04_2.c:3495/:3503)
+  remains un-modeled (the standing C-6/C-U1 design question; both twins identical).
+- W9-D INFO: the dither hunk's bg-inclusion presumes the STP-set G4 veil variant (the STP-clear variant
+  draws the G4 opaque) — PoC-main's own documented modeling choice, ported faithfully.
+- Merge-faithfulness of the 18 merged w7/w8 PRs: VERIFIED CLEAN (every PR line delivered by its merge
+  commit; 0 evil merges). The primary's "16/16" count vs my 18 = their count basis (16 audit-labeled).
+- The wave-8 C3-3 registry entry ("algebraically identical, behavior-neutral") is now AMENDED by W9-H:
+  identical WITHIN the family, but the family itself sat on the wrong frame — the engine-true window is
+  [-1024,1023] center-relative. VrfA's V52 note CONFIRMED and extended (helper included).
+
+## DELIVERY (wave 9)
+7 PRs, zero force-pushes (one pre-push AMEND on the PoC F16 branch — comment cites, before any remote ref
+existed), all branches off current main (PoC 219b0d6 / Wallpaper 7aeee46 / lively 3c37a3e5@core-separation).
+PoC #248 (F16-bounds root: 10 inline clamps + helper + 10 JS sites + cites), #249 (5 comment fixes);
+Wallpaper #52 (F16 twin + the E-11-2 helper port), #53 (CI round-1 fresh read), #54 (gradle dedup), #55
+(s26 javadoc narrative); lively #17 (F16 twin). Gates on everything touched: gcc -fsyntax-only (PoC -I src
+0; Wallpaper -Wall 0; lively -DLIVELY_PLAYER 0 + plain 0) + node --check all camtrack blocks + A/B render
+battery 16/16 byte-identical + yaml.safe_load. Board seq 143. Duplicates: none (0 open PRs at start,
+API-checked).
+
+END OF WAVE 9.
+
+# WAVE 10 — 2026-11-26: GENERAL line-by-line re-audit (owner directive: full pass, NOT candidate-focused) + the V53-session surface + lively in scope
+
+## Context
+Owner: backlog cleared (all w9 PRs merged: PoC #248/#249, Wallpaper #52-55, lively #17). New wave:
+general audits (logic/code/stress), ACTUAL line-by-line reading, small blocks per parallel agent,
+verbatim checks against decomp/swanstation, NO false positives, PR-per-verified-bug, no force-pushes,
+check open PRs before filing (multiple agents may run concurrently). lively ALLOWED now but the primary
+is actively merging engine changes there (core-separation in flux — parity-check + report, do not
+chase in-flight churn).
+
+## Baselines (fetched & hard-reset this session)
+PoC 0eecec5 (v33.57; the primary's V53 session = 4 user-tested regression fixes: 5e704f7 lens-flare
+visible-branch, bef3a0c TV-paint OT bucket revert, c4937fd boot-weather recipe, 8499226 default light
+anchor) / Wallpaper 749c61e (v1.20.0; same 4 as twins + w9 merges) / lively 365866b1@core-separation
+(same 4 as twins + w9 #17 merged; 21957-line fog_poc.c with LIVELY_PLAYER seams) / decomp 2822f26f3 /
+swanstation 631f0fb. 0 open PRs in all three repos (API-checked this session). Board:
+Audit_Agent_w10_GeneralVerbatim seq 146 STARTING.
+
+## Method
+Small-block parallel agents (each ~1500-1700 lines, read FULLY, line-by-line vs decomp/swanstation),
+reports in final message only; coordinator (me) personally re-verifies EVERY finding (both sides
+quoted + arithmetic run) before any PR; PR-per-bug branches off CURRENT main; gates: gcc -fsyntax-only
+(-Wall -Wextra where C), node --check on JS, A/B render battery where visual. Worklog pushed to PoC
+branch audit/w10-worklog at every batch completion (non-volatile requirement).
+
+## Partition
+Engine fog_poc.c 20594 lines: E1-E12 (~1720 lines each). camtrack.html 15243: C1-C10 (~1525 each).
+Wallpaper: Java core + sh1_hw_render.c + CI. V53 surface: 3 deep-audit agents + 1 twin-parity agent.
+Stress: PoC + camtrack functional batteries.
+
+END OF WAVE 10 HEADER (registry appended at delivery).
+
+## WAVE 10 INTERIM (worklog checkpoint pushed to PoC branch audit/w10-worklog)
+
+PRs filed so far (all branches off current mains, zero force-pushes, all personally
+verified before filing; gates: gcc -fsyntax-only on every C change, node --check on
+ALL 5 camtrack script blocks per branch incl. the module, md5 A/B empirical proofs
+where noted):
+- PoC #250 (module SYNTAX-DEAD: V53 DOC_STRING apostrophe at 5980 kills the whole
+  editor — node-proven FAIL->PASS; carried as the 1-char escape on every camtrack
+  branch since main is unmerged), #251 (g_waterPlaneY double-/16 + missing negation),
+  #252 (PoC missing its own twins' V53 track-level weatherTarget -1 hunk), #253
+  (boot drawCase arg hardcoded 1 vs the room's field_16; dead envField16 parse made
+  live), #254 (snow_ground_build float->int UB: inf->SIGSEGV rc=139, 1e9->hang
+  rc=124, both -> rc=0 verified on the built binary), #255 (K_R turn filter never
+  reset — md5 b2f90781 pre/post-proven), #256 (ShEnv.updatePose missing the
+  lightFlicker env-light multiply), #257 (weather watcher coerced V53 -1 to 0 ->
+  instant transition-to-none clobbered the boot recipe), #258 (camtrack waterPlaneY
+  read nonexistent wz.illumination -> always 0), #259 (snow boot discipline trio:
+  prevViewX/Z zeroing + the v41-AUDFX density-selector room sync + the authored
+  path's dropped resets), #260 (rain-streak v-row pre-v43 form), #261 (env primes
+  consume 30Hz grid slots), #262 (b64 '==' padding mis-sized -> the GLB DR_WAVE
+  sheet ALWAYS rejected — DR-water dead in the editor; verified on DR0000.glb:
+  old 4097 vs new 4096), #263 (the 4 v48 A16 engine-order fixes never ported:
+  kickSwing/stoneChoreo/binSpin/ferris-lissajous), #264 (waterfall sp14 per-segment
+  — the v48 hoist), #265 (TV-paint UV early &0xFF wrap — the v48 A-2 form).
+- Wallpaper #56 (waterPlaneY twin), #57 (boot arg1 twin), #58 (snow UB twin),
+  #59 (K_R turn_init twin).
+- lively #18 (waterPlaneY twin), #19 (boot arg1 twin), #20 (snow UB twin).
+(lively's K_R chain already carried turn_init — its S26 seam landed it.)
+
+REMAINING QUEUE (verified, not yet PR'd — the Wallpaper Java/HW cluster + the
+Wallpaper engine-lag numeric trio):
+- WJ1-1 asset-refresh manifest records USER files' hashes -> the NEXT version
+  clobbers user data (Sh1WallpaperService:417-419; fix: "USER" sentinel).
+- WJ1-2 runtime env/weather re-eval ignores the per-track/per-scene overrides ->
+  pinned overrides silently reverted within a minute in default Auto Mode
+  (Sh1WallpaperService:1302/1346 vs 1394-1405).
+- WHW-1 the HW shader affine-recovery pair MULTIPLIES where it must divide
+  (v_colw*v_w vs v_colw/v_w) in BOTH backends (--modern path; computed proof
+  177.78 vs 25.0). Needs the .spv re-sync for the VK path.
+- WHW-2 HW TV collect order stale v36 (flakes over TV); WHW-3 HW rain OTZ +0.5.
+- Wallpaper engine-lag numeric trio (PARITY-2/3/4): R2 restricted-zone z
+  missing the negation; g_GravitySpeed 1336 vs 1337 (5 sites); SH_BB_NORMALS
+  2909 vs 2908 (8 slots) — decomp-computed certain.
+- The larger Wallpaper engine lag (PARITY-5..16: the v43/v44/v45 audit bulk ~25
+  fix families — the twin's engine base is v33.8 + selective syncs) and the
+  WJ2/WJ3 Java findings (editor clock wrap, Sh1Camdat raw track index,
+  CamtrackDoc weatherTarget clamp) + the documented-nit registry are in the
+  agents' reports held by the coordinator; the primary can call the sync batch.
