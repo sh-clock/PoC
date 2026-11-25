@@ -3582,8 +3582,10 @@ static int camdat_load_track(const JValue *raw, CamTrack *t) {
     if (jget(raw, "weatherTarget") &&
         jget(raw, "weatherTarget")->type == JV_NUM) {
         int v = jint(raw, "weatherTarget", -1);
-        if (v < 0) v = 0;
-        if (v > 8) v = 8;                          /* clamp 0..8 */
+        /* V53: -1 = no transition (the absent semantics, kept for a
+         * present -1 too — the same rule as the env-level field)     */
+        if (v < -1) v = -1;
+        if (v > 8) v = 8;                          /* clamp -1..8 */
         t->weatherTarget = v;
     }
 
