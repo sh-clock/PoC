@@ -5977,7 +5977,7 @@ const DOC_STRING =
   'loopMode: loop wraps, pingPong mirrors at ends, once stops at end. ' +
   'Orientation: lookAt point when lookMode is center|point|path; lookMode "normal" looks along N=normalize(cross(T,up)) with T the travel tangent (reversed on the pingPong return leg, same rule as path) and up=+Y, so N is horizontal and perpendicular to T (T parallel to up falls back to cross(T,+Z), then cross(T,+X)); normalDirection "forward"|"backward" selects +N|-N; else fixed yaw/pitch (YXZ Euler, +Y up, pitch positive = up). ' +
   'Units: meters / degrees / seconds. Coordinates are the glTF file own world space (identity transform). ' +
-  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room's OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
+  'Per-model flags: fogon, nighton, flashlighton (booleans, derived from the World & Weather panel in v1) ride with each models[] entry for the consuming program; the full world env also rides as models[].env { pair:[A,B] (MAP_EFFECTS_INFOS indices 0..20), weatherTarget 0..8 (sharedFunc_800D0B18 arg), bootWeather -1..6 (-1 = the room\u2019s OWN recipe from the GLB SH1X.env field_17/field_16, GameBoot_WorldEnvInit load_screen.c:34-36; map0_s00 (2,1) only as the env-less fallback), lensFlare 0..5, flashlightOn, psxWobble, dither, particles, engine }. ' +
   'durationSec is informational (one playback cycle). ' +
   'PER-TRACK WEATHER (v12): models[].tracks[].weatherTarget (optional, 0..8, strict number) is the weather THE TRACK carries — the sharedFunc_800D0B18 argument, resolved track > models[].env.weatherTarget when present. Consumers apply it through the engine\u2019s own 512-tick sine cross-fade (the authentic runtime transition); the CamTrack v12 EDITOR previews it instantly (no cross-fade). ' +
   'ROOM-ORIGINAL ENV DERIVATION (v13.5): when a GLB is added, models[].env is AUTHORED from the GLB\u2019s UNBIASED SH1X.env (the verbatim map-overlay WorldEnv pair, effects.c:220-267) — pair = the room\u2019s original pair VERBATIM; dayEnv/nightEnv follow the room\u2019s map family (the town {1,1}/{6,3} streets: day 1 / night 6; day-lit interiors {2,2}: day 2 / night 7; night-only locations — the amusement park, alt sewers, resort, the night town SPU, the flooded streets DR: both 6; dark nightmare-only interiors {7,4} — the school/hospital/Nowhere: both 7; Nowhere fog {9,9}: both 9); weatherTarget = field_17 VERBATIM (the map-load Particle_EnvironmentSet recipe — the ORIGINAL weather, rain only where the original map data says so); flashlightOn = the preset-0 Dark+FlashlightAllowed signature. The SH1X extras themselves stay UNBIASED — the derivation is an EDITOR-side authored default, and the \u201cuse original\u201d button re-applies it to the active model on request. ' +
@@ -9646,6 +9646,25 @@ function shTvState3(a, si, dtRaw) {
  * skipped) is part of the deterministic contract. */
 function sh1xDriverTick(S, dt, cam) {
   const dtRaw = Math.trunc(dt * 4096);          /* C: (int)(dt * 4096.0) */
+  /* w10 (A16-4 back-port): the engine's ferris -> lissajous else-if chain
+   * (map6_s04_2.c:3492-3508): when ANY ferris anim passes its full gate
+   * set this tick, the lissajous update is SKIPPED — inside the two
+   * near-rects' overlap strip both rides' PLAYER_NEAR_POS tests pass and
+   * the engine advances ONLY the ferris (the first branch); the
+   * lissajous D_800EBB36 must freeze. */
+  let ferrisFired = 0;
+  for (let f = 0; f < S.anims.length && !ferrisFired; f++) {
+    const fa = S.anims[f];
+    if (fa.driver !== 14 || !sh1xGateOn(S, fa)) continue;
+    if (!fa.dgNear || !cam) { ferrisFired = 1; break; }
+    const exq = Math.trunc(cam.x * 4096);
+    const ezq = Math.trunc(-cam.z * 4096);
+    const fdx = exq - fa.dgBaseXQ12;
+    const fdz = ezq - fa.dgBaseZQ12;
+    const fnx = (fdx >= 0) ? (fdx < fa.dgTolXQ12) : (-fdx < fa.dgTolXQ12);
+    const fnz = (fdz >= 0) ? (fdz < fa.dgTolZQ12) : (-fdz < fa.dgTolZQ12);
+    if (fnx && fnz) ferrisFired = 1;
+  }
   for (let i = 0; i < S.anims.length; i++) {
     const a = S.anims[i];
     a.gated = sh1xGateOn(S, a) ? 0 : 1;
@@ -9659,6 +9678,8 @@ function sh1xDriverTick(S, dt, cam) {
       continue;                                  /* engine: update gated off */
     }
     if (a.sharedLeader >= 0) continue;           /* follower: leader's state */
+    if (a.driver === 15 && ferrisFired)
+      continue;   /* w10 (A16-4): the engine's else-if — the ferris fired this tick */
     /* v44 (C-6): the driveGate proximity freeze (fog_poc.c mirror) — the
      * engine runs the ferris/lissajous update ONLY inside its two
      * PLAYER_NEAR_POS rects (map6_s04_2.c:3493-3508, strict < per the
@@ -9772,9 +9793,16 @@ function sh1xDriverTick(S, dt, cam) {
           a.rawVel = th;
           if (th === 1 || th === -1) a.rawVel = 0;
         }
+        /* w10 (A16-3 back-port): the engine sets flag 106 on the frame the
+           halving ends (map1_s03.c:1986-1990) but applies the settle pose
+           vy = Q12_ANGLE(-157.4f) only on the NEXT frame via the else-if
+           flag branch (:1992-1996). Phase 2 latches, phase 3 settles one
+           step later — the engine's frame N / N+1 split. */
         if (a.rawVel === 0 && a.kickPhase === 1) {
-          a.rawVy = a.rawSettle;                /* rest: Q12_ANGLE(-157.4) */
           a.kickPhase = 2;
+        } else if (a.rawVel === 0 && a.kickPhase === 2) {
+          a.rawVy = a.rawSettle;                /* rest: Q12_ANGLE(-157.4) */
+          a.kickPhase = 3;
         }
       }
       break;
@@ -10004,7 +10032,12 @@ function sh1xDriverTick(S, dt, cam) {
       switch (a.stoneStep) {
         case 0:
           a.stoneStep = 1;                        /* sfx 1647 kick */
-          break;
+          /* w10 (A16-1 back-port): NO break — the engine's case 0 falls
+           * straight into case 1's dt accumulation (map7_s01_2.c:1488-
+           * 1493: case 0 sfx + StateStepIncrement(1) with no break ->
+           * case 1 sysStateStepData[0] += g_DeltaTime); the old form
+           * started the slide one 30Hz tick late. */
+        case 1:
         case 1: {
           a.stoneData += dtRaw;
           if (a.stoneData > 8192) a.stoneData = 8192;  /* Q12(2.0) */
@@ -10069,9 +10102,14 @@ function sh1xDriverTick(S, dt, cam) {
         a.fallArmed = 1;           /* cutscene step 21 init: Q12_ANGLE(-167.6) */
         a.binAng = -1906;
       }
+      /* w10 (A16-2 back-port): the engine poses/draws FIRST and decrements
+       * AFTER (map7_s03_3.c:8200-8202: Math_SetSVectorFast(...); WorldObjects
+       * _Add(...); D_800F482C -= ...) — the old form decremented first, so
+       * every tick drew the NEXT frame's angle (a ~3.33deg lead at the
+       * (dtRaw<<12)/14745 rate) and the initial -1906 pose never drew. */
+      a.cur[0] = a.binAng * (360 / 4096);
       a.binAng -= sh1xDivT(dtRaw << 12, 14745);   /* int64 div trunc */
       if (a.binAng < -32768) a.binAng += 65536;   /* SVECTOR vy s16 */
-      a.cur[0] = a.binAng * (360 / 4096);
       break;
     }
     case 20: { /* scrollBelt — map7_s03_3.c:8296-8355 (the finale conveyor) */
