@@ -3240,3 +3240,41 @@ clean; camtrack 4 JS blocks node --check green.
 4. The remaining V50 queue (the twin parity raster gap, the exact
    chase-cam poses) + the droplet-path GTE snap.
 The commandments remain embedded at the head of this file.
+
+## THE W11 SESSION — THE 29-PR W10-AUDIT CLEAR (26 MERGED, 2 REIMPLEMENTED, ALL GATES GREEN)
+
+### 1. THE WAVE
+29 open PRs (PoC #250-266, wallpaper #56-64, lively #18-20) from the relaunched
+w10 audit agents. Cleared by 4 parallel verifier agents (clusters: weather/water/boot;
+snow/rain/env; blitter/b64/anim; wallpaper+lively twins) + chief re-verification of
+the timed-out cluster (#251/#257/#258) directly against the decomp. Every verdict
+ground-truth-cited; empirical repros where runnable (snow UB SIGSEGV/hang on all 3
+engines, K_R md5 fresh==restart on PoC+wallpaper, drawCase 1->3 boot divergence,
+b64 oracle A/B, stoneChoreo 61/80-tick extraction A/B).
+
+### 2. MERGED (26): PoC 250,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266
+wallpaper 56,57,58,59,60,61,62,63 + lively 18,19,20 (stacked 252->253->254 in order).
+### 3. REIMPLEMENTED (2):
+- PoC#266 merged + follow-up 07a4773^: the dead w0/w1/w2 locals (3 warnings, 0-warn gate).
+- wallpaper#64 closed unmerged, landed as ce3353b: code motion verbatim (TV collect
+  FIRST, game_sys_states.c:155->168->186; rain OTZ truncate) but the PR's comment
+  INVERTED the postent_cmp tie semantics (bucket DESC seq DESC = first-collected
+  draws LAST = ON TOP — TV paint OVER flakes) and orphaned the v36 comment.
+- PoC#257 follow-up 07a4773: the camdat EXPORT still clamped 0..8 — an authored -1
+  (nothing authored) round-tripped as 0 (armed transition-to-none).
+### 4. FOLLOW-UPS LANDED THIS SESSION
+- wallpaper V44 D-2 snow-OTZ truncate (SW fog_poc.c + HW sh1_hw_render.c) 40f450a.
+- lively K_R turn_init parity (the #59 body's claim was false — only the seam had it).
+### 5. OPEN FOLLOW-UPS (next queue)
+- wallpaper#62's embedded SPIR-V (sh1_hw_vk_spv.h + .spv) still carries the old
+  MULTIPLY bytes — needs the project's glslang 15.2.0 re-sync (GLES runtime path IS
+  fixed); also the stale `attr_affine = attrw * w_fs` header comment (sh1_hw_shaders.h:29).
+- wallpaper#63's wider PARITY-5..16 numeric-lag inventory (the trio landed).
+- AssetRefreshTest: add the multi-cycle (two versionCode) regression case for #60.
+- fx_blit_gouraud_tri still uses pixel-center COVERAGE (E-10-1 top-left rule port
+  is a separate PR; only the COLOR plane moved to integer positions).
+- camtrack JS weatherName(-1) labels 'none' (cosmetic; -1 = nothing authored).
+### 6. GATES
+PoC make 0 err/0 warn; 4/4 camtrack JS blocks node --check PASS (the module script
+is no longer syntax-dead); DR01FE --benchmark smoke rc=0 (359 frames, PNG written);
+wallpaper gcc -fsyntax-only rc=0 (fog_poc.c + sh1_hw_render.c); lively rc=0.
