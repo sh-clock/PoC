@@ -1,0 +1,78 @@
+{
+ "format": "camdat",
+ "version": 1,
+ "generatedBy": "V-1 verify",
+ "units": {
+  "length": "meters",
+  "angle": "degrees",
+  "time": "seconds",
+  "up": "+Y",
+  "handedness": "right-handed (glTF)"
+ },
+ "doc": "SUFFFE only",
+ "models": [
+  {
+   "file": "SUFFFE.glb",
+   "addedAt": "2026-11-19T00:00:00.000Z",
+   "bounds": {
+    "min": [
+     -31.3,
+     -0.4,
+     48.5
+    ],
+    "max": [
+     -8.3,
+     9.1,
+     72.9
+    ]
+   },
+   "fogon": true,
+   "nighton": true,
+   "flashlighton": true,
+   "env": {
+    "pair": [
+     7,
+     4
+    ],
+    "weatherTarget": 0,
+    "bootWeather": -1,
+    "lensFlare": 0,
+    "flashlightOn": true,
+    "psxWobble": true,
+    "dither": true,
+    "particles": true,
+    "engine": true,
+    "dayEnv": 7,
+    "nightEnv": 7
+   },
+   "tracks": [
+    {
+     "id": "waterfall",
+     "name": "waterfall ambient",
+     "type": "line",
+     "enabled": true,
+     "fovDeg": 55,
+     "loopMode": "pingPong",
+     "start": [
+      -15.5,
+      1.8,
+      47.0
+     ],
+     "end": [
+      -16.4,
+      1.8,
+      47.0
+     ],
+     "speedMS": 0.25,
+     "lookMode": "point",
+     "lookAt": [
+      -15.5,
+      -0.2,
+      51.5
+     ],
+     "durationSec": 60.0
+    }
+   ]
+  }
+ ]
+}
