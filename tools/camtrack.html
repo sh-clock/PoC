@@ -3333,6 +3333,11 @@ window.SHView = (function () {
        env state BEFORE the frame loop (dt = 0 — keeps the boot values).
        Runs AFTER the pose scratch is initialized.                        */
     V.env.tick(0, V.camPos, V.camAxes);
+    V.env.ticksDone = 0;   /* w10: the prime's dt=0 side effects stay, but it must not consume a
+                            * 30Hz grid slot (the C's v43 E-07-1 form, fog_poc.c:20168-20178 —
+                            * the first dt=136 tick fires at t=1/30 exactly like the snow
+                            * grid; each prime otherwise lags the env ramp/light-pose grid
+                            * one slot permanently, accumulating per model load/pair change) */
     V.ready = true;
     return true;
   }
@@ -3476,6 +3481,11 @@ window.SHView = (function () {
         SC.bootWeatherMap0(V.snow);
     }
     V.env.tick(0, V.camPos, V.camAxes);
+    V.env.ticksDone = 0;   /* w10: the prime's dt=0 side effects stay, but it must not consume a
+                            * 30Hz grid slot (the C's v43 E-07-1 form, fog_poc.c:20168-20178 —
+                            * the first dt=136 tick fires at t=1/30 exactly like the snow
+                            * grid; each prime otherwise lags the env ramp/light-pose grid
+                            * one slot permanently, accumulating per model load/pair change) */
     return true;
   }
 
@@ -4305,6 +4315,11 @@ window.SHView = (function () {
     V.envPair0 = a; V.envPair1 = b;
     V.env.setPair(a, b);
     V.env.tick(0, V.camPos, V.camAxes);   /* refresh derived state now */
+    V.env.ticksDone = 0;   /* w10: the prime's dt=0 side effects stay, but it must not consume a
+                            * 30Hz grid slot (the C's v43 E-07-1 form, fog_poc.c:20168-20178 —
+                            * the first dt=136 tick fires at t=1/30 exactly like the snow
+                            * grid; each prime otherwise lags the env ramp/light-pose grid
+                            * one slot permanently, accumulating per model load/pair change) */
   }
   function setFlashlight(on) {
     if (on && !V.env.flashlightAllowed()) return false;
