@@ -13508,8 +13508,13 @@ function tvEmitQuad(k, wx, wy, wz, u0, u1, v0, v1, tex, vcol, depthM) {
    * v43: the V was left RAW (0..255) — every panel sampled 256 vertical
    * WRAPS of the plane = the vertically-tiled garbage the owner read as
    * 'the panels do not show the correct image and is corrupted snow'. */
-  uv[0] = u0 / 256; uv[1] = v0 / 256;  uv[2] = u1 / 256; uv[3] = v0 / 256;
-  uv[4] = u0 / 256; uv[5] = v1 / 256;  uv[6] = u1 / 256; uv[7] = v1 / 256;
+  /* w10 (v48 A-2 back-port): the raw sums (up to 511) mask to u8 AT
+   * CONSUMPTION exactly like the C (fog_poc.c:14466: o->u = (float)
+   * (*guq & 0xFF)/256.0f) — the >>1 midpoints are computed on the RAW
+   * values (the lattice at 13518-13524) so a window crossing 256 wraps
+   * correctly ((A+B)>>1 & 0xFF, NOT ((A&0xFF)+(B&0xFF))>>1).          */
+  uv[0] = (u0 & 0xFF) / 256; uv[1] = (v0 & 0xFF) / 256;  uv[2] = (u1 & 0xFF) / 256; uv[3] = (v0 & 0xFF) / 256;
+  uv[4] = (u0 & 0xFF) / 256; uv[5] = (v1 & 0xFF) / 256;  uv[6] = (u1 & 0xFF) / 256; uv[7] = (v1 & 0xFF) / 256;
   for (let c = 0; c < 4; c++) {
     pos[c * 3] = wx[c]; pos[c * 3 + 1] = wy[c]; pos[c * 3 + 2] = wz[c];
     bkt[c] = depthM;
@@ -13582,7 +13587,7 @@ function sh1xTvPaintUpdate() {
       let u1 = a.tvU[si] + sty.u0 + a.tvR2[si] + sty.du - 1;
       let v0 = a.tvV[si] + sty.v0 + a.tvR3[si];
       let v1 = v0 + sty.dv - 1;
-      u0 &= 0xFF; u1 &= 0xFF; v0 &= 0xFF; v1 &= 0xFF;
+
       /* the corners (func_800D761C's cross-wiring); world (glTF m):
        * x = ax + A/256, y = -(aengY + A[1]/256), z = -(az + A[2]/256) */
       const A = tv.cA[si] || [0, 0, 0], B = tv.cB[si] || [0, 0, 0];
