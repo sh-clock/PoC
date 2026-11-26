@@ -9182,7 +9182,6 @@ static void fx_blit_gouraud_tri(Frame *fb, int x0, int y0, const int c0[3],
             if (neg && pos) continue;
             double tot = e0 + e1 + e2;
             if (tot == 0) continue;
-            double w0 = e0 / tot, w1 = e1 / tot, w2 = e2 / tot;
             /* w10 (E-10-3 class — the mesh rasterizer's v43 rule): the
              * COLOR plane rides the INTEGER pixel position (the GPU's
              * color accumulator is anchored at integer x/y with its own
