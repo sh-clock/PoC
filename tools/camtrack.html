@@ -12940,7 +12940,13 @@ function sh1xDrWaterFxUpdate() {
       env.waterPlaneY = -1e9;
       for (const wz of rec.sh1xWaterZones) {
         if (!wz.enabled) break;   /* the engine search terminates at disabled */
-        env.waterPlaneY = (+wz.illumination || 0) / 16;
+        /* w10: the zone record carries illumM (ENGINE meters — the
+         * builder emits illuminationMeters or illumination/16); there is
+         * no `illumination` field on the record (the old read was
+         * +undefined || 0 = 0 — the plane was ALWAYS 0). The glTF y-up
+         * plane is NEGATED (engine y-down), the same form the glint twin
+         * uses: posY = -zone.illumM (camtrack:13083). */
+        env.waterPlaneY = -wz.illumM;
         break;
       }
       /* GATE 1 (bodyprog_80055028.c:102-106): Spot mode + the blended
