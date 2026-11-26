@@ -3337,3 +3337,76 @@ wallpaper gcc -fsyntax-only rc=0 (fog_poc.c + sh1_hw_render.c); lively rc=0.
    width, soft dithered falloff; dapple blotches visible; water base ~(2-3,2-3,1-2) 5-bit.
 5. Images 1/3 (no light on water when unlit/aimed away) = the gate test: the shimmer
    family must stay OFF there (the current Gate-2 discipline holds — verify visually).
+
+# SESSION 13 (W54) — THE 'MISSING TEXTURE BELOW THE WATER' ROOT-CAUSED + FIXED; THE W11 DELTAS DIAGNOSIS RETRACTED
+
+## 1. THE W11 'WATER DELTAS PASS' WAS MEASURED ON A VOID (RETRACTED)
+The W11 matched-angle renders (--cam -90 12 18 -93 0.5 8 / -80 3 30 -95 0.5 5)
+pointed the camera at EMPTY SPACE: the DR01FE room occupies world
+(40..64, -0.5..5, 40..64); its MIZ*_DWA water channel spans x 44.9..63.7,
+z 40..62 at y = -0.50 (all 8 MIZ meshes at the illumination-8 plane).
+The 'pool 2x dim / wrong hue / missing dapple' measurements were of the
+water FX blobs painted over the void. D1/D2/D3 and the fix queue built on
+them are VOID. The correct matched camera: INSIDE the room over the basin,
+e.g. --cam 49 2.2 50 57 -0.5 54 (reference image 2's geometry: across the
+basin toward the east walkway). At native 320x224 the reference pool core
+samples ~(66,69,55) — NOT the 1920x1080-res (150,130,80) the W11 claimed.
+THE CORRECT MATCHED-ANGLE METHOD FOR ALL FUTURE WATER WORK: read the room
+bounds from the GLB accessors FIRST, place the camera inside them, and
+sample the reference at native res.
+
+## 2. THE ENGINE'S ACTUAL WATER STACK (all verbatim in the PoC, re-verified)
+- THE GLINT (func_8008E794): warm additive POLY_FT4 +-24x+-48 ENGINE px at
+  the MIRRORED light point, DR_WAVE clut row 1, OT 641. THE ANGLE GATE:
+  color = sin(clamp(scr_l_ang_z - 40deg, <=90deg)); scr_l_ang_z = the angle
+  between the eye->light ray and the BEAM (light_overlap.c:178-234,
+  WorldEnvRender_LightScreenAngleGet). Max at angZ 130deg; BLACK under 40deg.
+- THE RING/FAN (func_8008EA68): 8x45deg segments, opaque (20,18,12)->(4,4,4)
+  + wedge apex (24,22,12) @OT641, semi (4,8,4)/(8,8,4) additive @OT639,
+  inner r 0.2 @ z+1.2 ON-plane, outer r 2.2 @ z+1.5 raised 0.2.
+- THE DAPPLE TILES (func_80059D50(1)->func_80059E34(1), field_B=0x10): the
+  MIZ water floors draw the LIVE 32x32 DR_WAVE composite (the func_8008E5B4
+  CLUT scroller: poly[0] opaque v-scroll (ctr>>1)&0x1F, poly[1] semi u-scroll
+  ((ctr+1)>>2)&0x1F into clut rect {832,224,32,32}) as 15-bit DIRECT color,
+  FLAT (56,56,56), ABR-2 SUBTRACTIVE, at the FIXED org[640] (~20.5m depth
+  equivalent — everything nearer paints over). THIS IS THE OWNER'S 'texture
+  below the water': the ripple pattern subtracted from the glint/ring —
+  brighter ripples near the flashlight, darker-but-still-lit further.
+- THE LENS FLARE rides scrLPos/angZ too (rate = f(intensity, depth, angZ)).
+
+## 3. THE W54 FIX (PoC main + wallpaper 1.23.0 + lively + camtrack.html)
+ROOT CAUSE of the owner's report: the mode-0 default beam (camera-forward
+-15deg) keeps angZ ~15-35deg at every water-framing camera -> the glint
+paints BLACK -> the dapple subtracts over NOTHING -> 'the effect is
+missing'. FIX: when the mode-0 anchor parks the light AT the water plane
+(the V53 ray-plane hit +1.0m or a water-level look-at) and the aim is not
+authored, the beam descends toward the viewer across the water (target =
+the light->camera midpoint at waterPlaneY+0.3; a straight-at-camera aim
+over-drives the flare — angZ 165deg/rate 3983 vs the midpoint's 149deg/
+1562). The GLB's SH1X userLightRot (the unbiased engine default) defers
+via g_userLightRotGlbDefault; authored rots keep precedence.
+VERIFIED: DR01FE --cam 49 2.2 50 57 -0.5 54 --night --flashlight t=4:
+bright pool 0 -> 687px + the soft falloff band; pool (74,74,57) vs the
+reference-native (66,69,55); VLM: pool + in-pool speckle present.
+SPU0401 tv_camdat t=3 bright 3202px (no regression). Gates: PoC make
+0/0; wallpaper + lively gcc -fsyntax-only 0/0; camtrack 5 JS blocks
+node --check green.
+
+## 4. THE STILL-OPEN QUEUE (the honest remainder, matched-angle-verified)
+1. THE ENVIRONMENT AROUND THE POOL: the walls/walkway render near-black
+   (the verbatim light<8 cliff at this light geometry; the reference's
+   walls sit at (33..57) native — the light must stand NEAR the walls
+   (Harry on the walkway) for them to light: authored camdat lights, or a
+   shore-hugging anchor variant). The water tiles' base is (24,24,24) —
+   the reference's water band reads (33..57); audit the engine clear +
+   brightness overlay arithmetic (the PoC clear 16 vs the engine's fog-
+   off clear; the brightness ABR) for the missing ~1-2 5-bit levels.
+2. THE DAPPLE CONTRAST outside the pool ring: engine-true (subtract over
+   the dark base) — verify against an in-game frame at the SAME light
+   geometry before touching anything.
+3. The camtrack light gizmo default (a newly-enabled editor light) should
+   get the same water-framing beam default when parked at the water level.
+4. The W11-part-2 '3 deltas' queue items 1-4 are RETRACTED (see 1); the
+   remaining F16/wallpaper-#62-SPIR-V/AssetRefresh/parity-5..16 follow-ups
+   from the w11 clear still stand.
+The commandments remain embedded at the head of this file.
