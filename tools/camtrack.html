@@ -1538,6 +1538,41 @@ const SHCore = (function () {
         const flickerQ12 = Math.trunc(sh1xLightFlicker * 4096);
         this.light.intensity = shR(this.light.intensity * flickerQ12, 12);
       }
+      /* W54: the WATER-FRAMING default beam (the PoC twin's
+         beamTowardViewer, fog_poc.c sh_env_update_pose). When the mode-0
+         anchor parks the light AT the water plane (the V53 look-at or
+         ray-plane anchor) and no aim is authored, aim the beam from the
+         light down toward the viewer across the water — the engine's
+         angle-gated water reflection (func_8008E794:
+         sin(clamp(angZ-40deg,<=90deg)); scr_l_ang_z = the angle between
+         the eye->light ray and the BEAM, light_overlap.c:178-234) only
+         fires when the beam faces back toward the camera; a camera-
+         forward beam at a look-down camera keeps angZ ~20-35deg and the
+         glint stays black (the dapple tiles then subtract over nothing
+         — the owner's 'missing underwater ripple texture' report). The
+         beam target = the midpoint between the light and the viewer's
+         shore position, just above the surface (a straight-at-camera
+         aim over-drives the flare rate at angZ~165deg). */
+      if ((!UL || (!UL.hasRot && UL.mode !== 1)) &&
+          this.waterPlaneY > -1e8) {
+        const wy2 = L.pos[1] / 4096;             /* the anchor Y (m)    */
+        const dy2 = wy2 - this.waterPlaneY;
+        if (dy2 > -0.05 && dy2 < 1.6) {
+          const lx2 = L.pos[0] / 4096, lz2 = L.pos[2] / 4096;
+          const tx2 = (lx2 + camPos[0]) * 0.5, tz2 = (lz2 + camPos[2]) * 0.5;
+          const ty2 = this.waterPlaneY + 0.3;
+          let bx = tx2 - lx2, by = ty2 - wy2, bz = tz2 - lz2;
+          const bl = Math.sqrt(bx * bx + by * by + bz * bz);
+          if (bl > 1e-3) {
+            bx /= bl; by /= bl; bz /= bl;
+            if (by > -0.95) {
+              L.dir[0] = Math.trunc(bx * 4096);
+              L.dir[1] = Math.trunc(by * 4096);
+              L.dir[2] = Math.trunc(bz * 4096);
+            }
+          }
+        }
+      }
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),
          field_30 = light position Q8 */
       const intensity = this.light.intensity;
