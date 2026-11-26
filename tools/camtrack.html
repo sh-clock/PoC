@@ -4492,7 +4492,7 @@ window.SHUI = (function () {
     const tr = selTrackObj();
     /* V53: the model default may be -1 (nothing authored — the boot
      * recipe persists; setWeatherTarget(-1) is a no-op)              */
-    if (tr && tr.weatherTarget != null) return Math.max(0, Math.min(8, tr.weatherTarget | 0));
+    if (tr && tr.weatherTarget != null) return Math.max(-1, Math.min(8, tr.weatherTarget | 0));
     return U.modelWeather;
   }
 
@@ -6927,7 +6927,7 @@ function sanitizeTrack(raw) {
    * B-4's domain (isFinite rejects it; the C's JV_NUM inf flows to the
    * jint clamp) — unchanged here by design. */
   tr.weatherTarget = raw.weatherTarget != null && typeof raw.weatherTarget === 'number' && isFinite(raw.weatherTarget)
-      ? Math.max(0, Math.min(8, raw.weatherTarget | 0)) : null;
+      ? Math.max(-1, Math.min(8, raw.weatherTarget | 0)) : null;
   /* v13: the per-track day/night env overrides — strict numbers clamped
    * to the 0..20 preset range; absent/null/invalid = inherit the model.
    * v41 audit (B-3): the same typeof-number discipline (latent class —
@@ -13701,11 +13701,18 @@ function startRenderLoop() {
   function applyTrackWeather(tr) {
     if (!window.SHView || !window.SHView.V.ready) return;
     const m = activeModel();
+    /* V53: -1 = nothing authored — the room's OWN boot recipe PERSISTS.
+     * The old Math.max(0, ...) clamp turned -1 into 0 and fired
+     * setWeatherTarget(0) = an INSTANT transition-to-none that clobbered
+     * the boot recipe the V53 boot sites just applied (e.g. the street's
+     * snow) on the first effective-track change. Keep the -1 (clamp
+     * -1..8) and skip the application entirely — setWeatherTarget(-1)
+     * is the engine-true no-op. */
     const mw = (m && m.env && m.env.weatherTarget != null)
-        ? Math.max(0, Math.min(8, m.env.weatherTarget | 0)) : 2;
+        ? Math.max(-1, Math.min(8, m.env.weatherTarget | 0)) : 2;
     const w = tr && tr.weatherTarget != null
-        ? Math.max(0, Math.min(8, tr.weatherTarget | 0)) : mw;
-    window.SHView.setWeatherTarget(w);   /* INSTANT (v12 editor rule) */
+        ? Math.max(-1, Math.min(8, tr.weatherTarget | 0)) : mw;
+    if (w >= 0) window.SHView.setWeatherTarget(w);   /* INSTANT (v12 editor rule) */
     if (window.SHUI && window.SHUI.ready) window.SHUI.syncWeatherUI();
   }
   function frame() {
