@@ -3252,7 +3252,7 @@ ground-truth-cited; empirical repros where runnable (snow UB SIGSEGV/hang on all
 engines, K_R md5 fresh==restart on PoC+wallpaper, drawCase 1->3 boot divergence,
 b64 oracle A/B, stoneChoreo 61/80-tick extraction A/B).
 
-### 2. MERGED (26): PoC 250,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266
+### 2. MERGED (27): PoC 250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266
 wallpaper 56,57,58,59,60,61,62,63 + lively 18,19,20 (stacked 252->253->254 in order).
 ### 3. REIMPLEMENTED (2):
 - PoC#266 merged + follow-up 07a4773^: the dead w0/w1/w2 locals (3 warnings, 0-warn gate).
