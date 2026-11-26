@@ -10587,7 +10587,13 @@ const SH1X_WATER_TIM_CLUT = [
  * SH1X-DRIVERS block must stay Node-harness-runnable, no atob) */
 function sh1xB64Bytes(b64) {
   const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const n = b64.length - (b64.endsWith('=') ? 1 : 0);
+  /* w10: subtract the REAL padding — '==' pads TWO chars (the old form
+   * subtracted one, allocating (5463*3)>>2 = 4097 for the 5464-char
+   * 'xx=='-padded 4096-byte DR_WAVE payload; the 4096 exact-length
+   * check then REJECTED it — the editor's DR-water live tile was dead
+   * for every payload-bearing GLB (DR0000/DR01FE/...). The C twin's
+   * sh_b64_decode decodes to exactly 4096.) */
+  const n = b64.length - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
   const out = new Uint8Array((n * 3) >> 2);
   let acc = 0, bits = 0, w = 0;
   for (let i = 0; i < b64.length; i++) {
