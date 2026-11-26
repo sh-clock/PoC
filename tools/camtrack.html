@@ -11143,6 +11143,12 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
 
   /* ---------------- the stream surface (water.c:446-711) ------------- */
   if (a.wfSurfaceOn) {
+    /* w10 (v48 A4/A5-1 back-port): sp14 is FUNCTION-scope in the engine
+     * (water.c:466/485/638/671 — zeroed ONCE before the segment loop;
+     * the sole writer is the clamp branch) — the last strip quad's vSpan
+     * must read the PREVIOUS segment's leftover. The old per-segment
+     * declaration reset it every sgi (the exact pre-v48 PoC bug). */
+    let sp14 = 0;
     for (let sgi = 0; sgi < a.wfSegCount; sgi++) {
       const sg = a.wfSeg[sgi];
       let temp_s0 = sg.width >> 1;               /* water.c:494 */
@@ -11171,7 +11177,7 @@ function sh1xSchoolWaterDraw(S, a, ctx) {
       if (sgi === a.wfSegCount - 1)
         f26E = sg.len - a.wfSeg[a.wfSegCount].len;
       if (f26E < 0) f26E = -1;          /* 0xFFFF sentinel (no taper) */
-      let sp14 = 0;
+
       let j = 0, var_s4 = 0;
       for (;;) {
         if (j >= 16) break;
