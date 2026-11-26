@@ -3278,3 +3278,62 @@ wallpaper 56,57,58,59,60,61,62,63 + lively 18,19,20 (stacked 252->253->254 in or
 PoC make 0 err/0 warn; 4/4 camtrack JS blocks node --check PASS (the module script
 is no longer syntax-dead); DR01FE --benchmark smoke rc=0 (359 frames, PNG written);
 wallpaper gcc -fsyntax-only rc=0 (fog_poc.c + sh1_hw_render.c); lively rc=0.
+
+## THE W11 SESSION — PART 2: THE WATER DELTAS PASS (DR01FE, MATCHED ANGLES) — DIAGNOSIS COMPLETE, FIX NEXT
+
+### 1. THE METHOD (apples-to-apples per the user's demand)
+- The 3 CDN reference images are the SEWER/RESERVOIR set (VLM-verified: walkway junction,
+  water basin with blue mesh catwalk + brick walls, lattice catwalk — the DR family).
+  Image 2 (-16-09-30.png) is the key water shot: high-angle steep look-down into the basin.
+- DR01FE.glb SH1X: overlay MAP5_S00, boots pair {6,3} (Dark + FlashlightAllowed, 14m black
+  fog) + field17=5 RAIN; TWO water zones (illum 8 = 0.5m engine; z1 x[-120,80] z[-120,40],
+  z2 x[0,40] z[0,80]); ripple anims at x~-93 z~8; userLight = torso Spot (-15 deg pitch).
+- Matched renders: --cam -90 12 18 -93 0.5 8 (steep, = image 2's geometry) and
+  --cam -80 3 30 -95 0.5 5 (grazing), --night --flashlight, --shot t=2. The V53 default
+  light anchor (fixed-cam water-plane hit +1.0m) frames the pool at frame center in both.
+
+### 2. VERIFIED CORRECT (no action)
+- fx_water_glint_blit IS func_8008E794 verbatim (+-24x+-48 engine px, u 64..127 v 31..0
+  V-flipped, DR_WAVE clut row 1, ABR-1 additive F5=T5*C8>>7, OT 641 with the 20.0625m
+  far-edge occlusion gate) — the v37/v40/v41/v43/v48 audits hold.
+- g_waterPlaneY = -illumination (post-#251) = lens_flare.c:88.
+- Ground truth extracted for the ring/fan (func_8008EA68): 8 segments @45deg; inner arc
+  r=0.2 @ local z+1.2 ON-plane; outer arc r=2.2 @ local z+1.5 RAISED 0.2m; g4[0] OPAQUE
+  (20,18,12)->(4,4,4) @OT641 + g3[0] OPAQUE wedge apex (24,22,12)->(20,18,12) to the
+  point (0,0,0.7) local; g4[1]+g3[1] SEMI-TRANS (4,8,4)->(0,0,0) and (8,8,4)->(4,8,4)
+  @OT639 (ABR=1 via SetDrawTPage(..,1,32)); yaw frame = atan2(rot.vx,rot.vz).
+- Ground truth for the dapple CLUT scroller (func_8008E5B4): two 32x32 quads into clut
+  rect {832,224,32,32} from tpage 45; poly[0] OPAQUE v-scroll (D>>1)&0x1F; poly[1]
+  SEMI-TRANS u-scroll ((D+1)>>2)&0x1F at v 8..40; D++ per non-zero-dt frame.
+
+### 3. THE THREE DELTAS (evidence: quantitative + VLM vs reference image 2)
+- D1 BRIGHTNESS: the water-floor light POOL (the lit MIZ2_DWA mesh, NOT the glint quad)
+  is ~2-2.5x too dim: reference pool core ~8-bit (150-160,130-140,80-90) = 5-bit
+  (19,17,11); the PoC render peaks (57,49,33) = 5-bit (7,6,4).
+- D2 HUE: the reference pool is WARM (r>g>b, yellow-olive); the PoC pool is GREENISH
+  (g>r) — the PoC's mesh tint path applies the PRESET worldTint ([0.4,0.7,1.0] bluish,
+  fog_poc.c:4887+ shMeshLightVertex region) while the ENGINE's flashlight light color
+  rides the THREE PER-CHANNEL TABLES built by func_80055648 (bodyprog_80055028.c:289+,
+  i=0..2, from dir->vx/vy/vz + intensity) — the warm weights live in that table
+  construction + the vertex application in bodyprog_80056D8C.c. NOT yet extracted.
+- D3 DAPPLE: the reference water carries olive-green speckle blotches (8-bit
+  (60-85,70-85,30-45)) = the DR_WAVE live tile visibly dithered across the floor; the
+  PoC floor reads FLAT BLACK (~(20,20,20)) — the dapple/tile visibility is absent or
+  crushed by the dim pool (fix D1/D2 first, then re-check if D3 persists).
+- CAVEAT: the blob detector's peak (247,156,140) in the reference is HARRY's lit figure
+  (VLM: the character stands at the pool's right edge) — the POOL itself is the
+  (150-160,130-140,80-90) core; do not chase saturation.
+
+### 4. THE FIX QUEUE (next session, in order)
+1. Read func_80055648 FULLY (bodyprog_80055028.c:293-~400: the 3 channel tables) + the
+   mesh vertex-light application (bodyprog_80056D8C.c) -> extract the per-channel warm
+   weights; compare against the PoC's tint path (fog_poc.c ~4877-4950) under the
+   flashlight regime; port VERBATIM.
+2. Check the MIZ2_DWA floor brightness + the DR_WAVE tile visibility (fx_water_tile_
+   update path) once D1/D2 land; re-render the SAME two --cam angles.
+3. Port every delta to the camtrack.html JS twin + wallpaper + lively (byte-identical
+   hunks where the C is shared).
+4. Re-verify: pool core within ~1 5-bit unit of (19,17,11) warm, extent ~6.5-10% frame
+   width, soft dithered falloff; dapple blotches visible; water base ~(2-3,2-3,1-2) 5-bit.
+5. Images 1/3 (no light on water when unlit/aimed away) = the gate test: the shimmer
+   family must stay OFF there (the current Gate-2 discipline holds — verify visually).
