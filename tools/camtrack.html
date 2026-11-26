@@ -1528,6 +1528,16 @@ const SHCore = (function () {
         L.pos[2] = Math.trunc(wz * 4096) >> 4 << 4;
       }
 
+      /* w10 (C-F1 twin): the engine's ONE multiply site — effects.c:476
+         lightIntensity = Q12_MULT(<the mode's light weight>,
+         g_SysWork.lightIntensity) runs for EVERY light mode (unconditional,
+         AFTER func_8003F4DC). The JS twin of fog_poc.c:6461-6465's
+         g_sh1xLightFlicker multiply — the boiler-room (map1_s05) flicker
+         rides the ENV light weight (field_28/dqa), not only the sun.   */
+      {
+        const flickerQ12 = Math.trunc(sh1xLightFlicker * 4096);
+        this.light.intensity = shR(this.light.intensity * flickerQ12, 12);
+      }
       /* WorldEnv_LightTransform: field_28 = clamp16(dir)*intensity>>12 (s16),
          field_30 = light position Q8 */
       const intensity = this.light.intensity;
@@ -9650,7 +9660,7 @@ function sh1xDriverTick(S, dt, cam) {
     const a = S.anims[i];
     a.gated = sh1xGateOn(S, a) ? 0 : 1;
     if (a.gated) {
-      if (a.driver === 11) S.lightFlicker = 1.0; /* fresh: Q12(1.0) identity */
+      if (a.driver === 11) { S.lightFlicker = 1.0; sh1xLightFlicker = 1.0; } /* fresh: Q12(1.0) identity */
       /* v32 (S18): the waterfall despawns when the gate closes */
       if (a.driver === 22 && a.seeded) {
         for (let q = 0; q < 16; q++) a.wfAlive[q] = 0;
@@ -9818,6 +9828,7 @@ function sh1xDriverTick(S, dt, cam) {
       const inten = 5529                        /* Q12(1.35f) */
         + sh1xMulSh(3686 + sh1xMulSh(sp0, 2457, 12), sh1xSinQ12(sp1), 15);
       S.lightFlicker = inten / 4096;
+      sh1xLightFlicker = S.lightFlicker;   /* w10: keep the env-light twin live */
       break;
     }
     case 13:  /* carouselSpin master — map6_s04_2.c:3553-3554 */
@@ -11482,6 +11493,10 @@ const SH1X_MAX_TICKS_PER_FRAME = 3600; /* v44 (F-2): 120 s of 30 Hz catch-up fir
                                         * while evalTrack/camera kept moving; */
 const SH1X_SUN_BASE_INTENSITY = 1.6; /* the authored preview sun level */
 let sh1xSunLight = null;             /* set by initThree (the flicker multiplier) */
+let sh1xLightFlicker = 1.0;           /* w10: the JS twin of the C's
+                                        * g_sh1xLightFlicker (fog_poc.c) — the
+                                        * env-light multiply input (the driver
+                                        * case-11 tick + reset keep it live)   */
 
 function sh1xOwnerNode(o) {
   /* Resolve the GLTFLoader object that corresponds to the owning glTF
