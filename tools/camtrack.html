@@ -2154,6 +2154,11 @@ const SHCore = (function () {
     S.prevYawQ12 = 0;                 /* PrevRotationY (BSS 0 at load) */
     S.boxX = 0; S.boxZ = 0;
     S.camMoved = 0;
+    S.prevViewX = 0; S.prevViewZ = 0;   /* w10: the C twin's snow_reset_seed
+                                         * zeroing (fog_poc.c:7840) — g_Weather
+                                         * Particle_Vectors1 is BSS 0 at a
+                                         * fresh boot; every re-seed gets the
+                                         * zero first tick                  */
   }
 
   /* g_Particle_Position = viewPos + horizontal-forward*3m (fog_poc.c:4740) */
@@ -2387,7 +2392,7 @@ const SHCore = (function () {
    * room map0's snow (the owner's report: the boot recipe flag is not
    * set correctly by the camtrack — the school/amusement rooms boot
    * recipe 0 none, DR 5 rain, SPU 6 rain+). */
-  function bootWeatherApply(S, recipe, arg1) {
+  function bootWeatherApply(S, recipe, arg1, roomField17) {
     particleEnvironmentSet(S, recipe, arg1);
     S.weatherSettings = (S.weatherBits >> 12) & 0xFFFF;
     /* v12: the decomp's truncating case-0 sync — E0CB6/E0CB4 are u16
@@ -2406,6 +2411,12 @@ const SHCore = (function () {
        boot recipe's density-3 warm-up. */
     S.transitionLock = 1;      /* field_234A = true at map load      */
     S.snowDensitySel = 0;      /* g_SysWork.field_2349 (BSS 0)       */
+    /* w10: the C twin's v41-AUDFX sync (fog_poc.c:20135-20137 — the
+     * decomp's map-load SystemUpdate case-0 arm, particle.c:396-400:
+     * field_2349 = the ROOM's field_17). The selector follows the ROOM,
+     * not the recipe: recipe-1 (light-snow) rooms warm up + spawn at
+     * density 1, not 3. */
+    if (typeof roomField17 === 'number') S.snowDensitySel = roomField17 | 0;
     S.prevPosY = 0;            /* g_Particle_PrevPosition.vy (BSS 0) */
     snowReset(S);
   }
@@ -3459,7 +3470,8 @@ window.SHView = (function () {
       if (env && typeof env.field17 === 'number')
         SC.bootWeatherApply(V.snow,
           Math.max(0, Math.min(6, env.field17 | 0)),
-          typeof env.field16 === 'number' ? env.field16 : 1);
+          typeof env.field16 === 'number' ? env.field16 : 1,
+          env.field17);   /* w10: the selector sync (raw room field_17) */
       else
         SC.bootWeatherMap0(V.snow);
     }
@@ -3497,7 +3509,8 @@ window.SHView = (function () {
       if (env && typeof env.field17 === 'number')
         SC.bootWeatherApply(V.snow,
           Math.max(0, Math.min(6, env.field17 | 0)),
-          typeof env.field16 === 'number' ? env.field16 : 1);
+          typeof env.field16 === 'number' ? env.field16 : 1,
+          env.field17);   /* w10: the selector sync (raw room field_17) */
       else
         SC.bootWeatherMap0(V.snow);
     }
@@ -4326,7 +4339,8 @@ window.SHView = (function () {
     if (n < 0) {
       if (renv && typeof renv.field17 === 'number')
         SC.bootWeatherApply(V.snow,
-          Math.max(0, Math.min(6, renv.field17 | 0)), r16);
+          Math.max(0, Math.min(6, renv.field17 | 0)), r16,
+          renv.field17);   /* w10: the selector sync (raw room field_17) */
       else
         SC.bootWeatherMap0(V.snow);
       return;
@@ -4340,6 +4354,13 @@ window.SHView = (function () {
     V.snow.snowTypeEnable = 1;
     V.snow.weatherTick = 0;
     V.snow.transitionLock = 1;
+    /* w10: the dropped resets from the general form (bootWeatherApply's
+     * BSS-zero discipline) + the v41-AUDFX selector sync — the engine's
+     * map-load state, not a stale D0B18-side selector/prevPosY. */
+    V.snow.snowDensitySel = 0;
+    if (renv && typeof renv.field17 === 'number')
+      V.snow.snowDensitySel = renv.field17 | 0;
+    V.snow.prevPosY = 0;
     SC.snowReset(V.snow);
   }
   function setPsx(on) {
