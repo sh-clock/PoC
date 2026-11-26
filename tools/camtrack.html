@@ -6835,7 +6835,7 @@ function trackToJSON(tr) {
   /* v12: the PER-TRACK weather — emitted only when the track carries its
    * own (null/absent = inherit the model env default) */
   if (tr.weatherTarget != null) {
-    o.weatherTarget = Math.max(0, Math.min(8, tr.weatherTarget | 0));
+    o.weatherTarget = Math.max(-1, Math.min(8, tr.weatherTarget | 0));
   }
   /* v13: the per-track day/night env overrides */
   if (tr.envDay != null) o.envDay = Math.max(0, Math.min(20, tr.envDay | 0));
