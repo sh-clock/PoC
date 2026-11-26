@@ -3113,13 +3113,12 @@ window.SHView = (function () {
          pixel 1 = v(1)=8, the C's single visible texel                   */
       vec2 dir = (abs(d.x) + abs(d.y) > 0.0) ? d / len : vec2(0.0, 1.0);
       vec2 nrm = vec2(-dir.y, dir.x);        /* the screen perpendicular   */
-      /* v43 (CT-2#7d): the C's DDA paints the INCLUSIVE pixel range
-         x0..x1 = len+1 pixels (px = x0 + dx*s/len, s = 0..len). The float
-         endpoints are the truncated indices' pixel CENTERS, so the paint
-         span = the segment expanded half a pixel each way; each device
-         pixel then carries exactly its own walk step (vProf*(len+1)
-         floored in the fragment shader).                                  */
-      vec2 p = sT + (position.x * (len + 1.0) - 0.5) * dir + position.y * nrm;
+      /* w10: the C's v43 E-11-5 form — len pixels at pixel centers
+         (the s=0..len-1 walk, v = (16s+8)/len; the s=len HEAD pixel
+         (center on the v=128 edge) lies OUTSIDE the quad and is never
+         drawn — the top-left fill rule). The old (len+1) inclusive
+         span painted one extra head pixel the engine never draws.  */
+      vec2 p = sT + (position.x * len - 0.5) * dir + position.y * nrm;
       vec2 ndc = vec2(p.x / uRT_W * 2.0 - 1.0, 1.0 - p.y / uRT_H * 2.0);
       gl_Position = vec4(ndc * cT.w, cT.z, cT.w);
     }`;
@@ -3129,10 +3128,11 @@ window.SHView = (function () {
     varying float vProf; varying float vLenS; varying float vDepth;
     void main() {
       if (vDepth <= 0.05) discard;
-      /* the C's per-pixel walk: s = the integer step along the major axis,
-         v = (s*16)/(len+1) -> the 3x16 sprite's middle column texel   */
-      float sIdx = floor(vProf * (vLenS + 1.0));
-      float vF = floor(sIdx * 16.0 / (vLenS + 1.0));
+      /* the C's per-pixel walk (v43 E-11-5): s = 0..len-1, texel row at
+         the pixel center v = (16s+8)/len — NOT the head-inclusive
+         (16s)/(len+1) form                                        */
+      float sIdx = floor(vProf * vLenS);
+      float vF = floor((sIdx * 16.0 + 8.0) / vLenS);
       if (vF < 0.0) vF = 0.0;
       if (vF > 15.0) vF = 15.0;
       vec4 texel = texture2D(map, vec2(0.5, (vClut + (vF + 0.5) / 16.0) / 8.0));
